@@ -11,7 +11,6 @@ Canais excluídos: Mac App Store, `homebrew/cask` oficial (as regras exigem pass
 - Nome do app: `MicBoost.app`. Bundle ID: `io.github.vittau.MicBoost`.
 - Repositório: `github.com/vittau/MicBoost`. Tap: `github.com/vittau/homebrew-micboost` (`brew tap vittau/micboost`).
 - Versão: SemVer em `CFBundleShortVersionString` e contador de build em `CFBundleVersion`. A fonte da verdade é a tag git `vX.Y.Z`.
-
 - Doações: `.github/FUNDING.yml` (`github: vittau`, `buy_me_a_coffee: vittau`) ativa o botão Sponsor do repositório, junto com a opção Settings → General → Features → Sponsorships, que é ligada manualmente no GitHub.
 
 ## Build
