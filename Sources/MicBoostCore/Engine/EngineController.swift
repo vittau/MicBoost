@@ -37,6 +37,7 @@ public actor EngineController {
     private var aggregate: AudioObjectID?
     private var proc: AudioDeviceIOProcID?
     private var engine: OpaquePointer?
+    private var completedCounters = mb_counters()
     private var reportedFrames: UInt32 = 0
     private var buffer: UInt32 = 0
     private var overloads: UInt64 = 0
@@ -157,8 +158,8 @@ public actor EngineController {
                 + hardware.latencyFrames(id, scope: kAudioObjectPropertyScopeInput) + buffer
             state = .running
         } catch {
-            try tearDown()
             state = .error((error as? EngineError) ?? .invalidArgument(String(describing: error)))
+            try tearDown()
             throw error
         }
     }
@@ -199,19 +200,35 @@ public actor EngineController {
         } catch { state = .error((error as? EngineError) ?? .invalidArgument(String(describing: error))) }
     }
     private func tearDown() throws {
+        let aggregateExists: Bool
+        if let aggregate {
+            aggregateExists = try hardware.devices().contains { $0.id == aggregate && $0.uid == AggregateBuilder.uid }
+        } else {
+            aggregateExists = false
+        }
         if let id = aggregate, let proc {
-            if let engine { mb_engine_begin_fade_out(engine) }
-            Thread.sleep(forTimeInterval: 0.04)
-            try hardware.stopIO(id, proc: proc)
-            try hardware.destroyIO(id, proc: proc)
+            if aggregateExists {
+                if let engine { mb_engine_begin_fade_out(engine) }
+                Thread.sleep(forTimeInterval: 0.04)
+                try hardware.stopIO(id, proc: proc)
+                try hardware.destroyIO(id, proc: proc)
+            }
+            // An absent aggregate has no registered IOProc after a HAL restart.
             self.proc = nil
         }
         if let engine {
+            var counters = mb_counters()
+            mb_engine_read_counters(engine, &counters)
+            completedCounters.cycles += counters.cycles
+            completedCounters.input_missing += counters.input_missing
+            completedCounters.nonfinite_resets += counters.nonfinite_resets
+            completedCounters.frames_over_max += counters.frames_over_max
+            completedCounters.io_delta_host = counters.io_delta_host
             mb_engine_destroy(engine)
             self.engine = nil
         }
         if let aggregate {
-            try hardware.destroyAggregate(aggregate)
+            if aggregateExists { try hardware.destroyAggregate(aggregate) }
             self.aggregate = nil
         }
         for token in tokens.dropFirst() { try hardware.removeListener(token) }
@@ -239,6 +256,10 @@ public actor EngineController {
     public func status() -> EngineStatus {
         var counters = mb_counters()
         if let engine { mb_engine_read_counters(engine, &counters) }
+        counters.cycles += completedCounters.cycles
+        counters.input_missing += completedCounters.input_missing
+        counters.nonfinite_resets += completedCounters.nonfinite_resets
+        counters.frames_over_max += completedCounters.frames_over_max
         let rate = source?.sampleRate ?? 0
         let latency = Double(reportedFrames)
         return EngineStatus(

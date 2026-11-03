@@ -118,7 +118,9 @@ public final class CoreAudioHardware: AudioHardware {
     public func removeListener(_ token: UUID) throws {
         guard let (property, queue, block) = listeners[token] else { return }
         var address = property.address
-        try checkHAL(AudioObjectRemovePropertyListenerBlock(property.object, &address, queue, block), "Remove listener")
+        let status = AudioObjectRemovePropertyListenerBlock(property.object, &address, queue, block)
+        // A coreaudiod restart invalidates the object and its registered listener together.
+        if status != kAudioHardwareBadObjectError { try checkHAL(status, "Remove listener") }
         listeners.removeValue(forKey: token)
     }
 }
