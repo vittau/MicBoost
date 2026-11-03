@@ -46,11 +46,11 @@ Filtros biquad do Audio EQ Cookbook (RBJ) em Transposed Direct Form II. Shelves 
 
 | Banda | Tipo | Frequência (padrão / faixa) | Ganho | Q |
 |---|---|---|---|---|
-| Graves | low shelf | 70 Hz / 40–500 Hz | −2 dB / −12…+12 dB | fixo (S = 1) |
+| Graves | low shelf | 70 Hz / 40–500 Hz | −6 dB / −12…+12 dB | fixo (S = 1) |
 | Médios | peaking | 3.000 Hz / 200–6.000 Hz | +2 dB / −12…+12 dB | 1,0 / 0,3–4,0 ("Largura") |
 | Agudos | high shelf | 8.000 Hz / 2.000–14.000 Hz | +1,5 dB / −12…+12 dB | fixo (S = 1) |
 
-Os valores padrão formam o "padrão de voz": um realce discreto de fala para microfones em geral. O corte suave abaixo de 70 Hz tira ronco, vibração e ruído de manuseio sem tocar no corpo da voz (fundamental e primeiros harmônicos, de 85 a 250 Hz); a presença em 3 kHz melhora a inteligibilidade; os agudos suaves acrescentam clareza. O EQ vem ligado com esse padrão.
+Os valores padrão formam o "padrão de voz": um realce discreto de fala para microfones em geral. O corte de −6 dB nos subgraves (≈ −3 dB em 70 Hz, ≈ −1,5 dB em 100 Hz e quase nada acima de 150 Hz) tira ronco, vibração e ruído de manuseio, que o microfone capta e a voz não precisa, e preserva o corpo da voz (fundamental e primeiros harmônicos, de 85 a 250 Hz); a presença em 3 kHz melhora a inteligibilidade; os agudos suaves acrescentam clareza. O EQ vem ligado com esse padrão.
 
 - Estabilidade: toda frequência é limitada a `[20 Hz, 0,45 · fs]` no momento do cálculo dos coeficientes. A UI limita o slider ao máximo efetivo para a taxa atual (exemplo: Bluetooth a 16 kHz → agudos até 7.200 Hz).
 - Resposta plana: com ganho 0 dB, a banda é tratada como identidade exata (coeficientes b0 = 1, demais 0), sem depender de arredondamento.
