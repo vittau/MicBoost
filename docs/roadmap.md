@@ -85,7 +85,7 @@ Condições de conclusão:
 ## 7 — Entrega
 
 Condições de conclusão:
-- README do repositório com instalação, primeira abertura, uso com apps de chamada, desinstalação, limitações (Bluetooth, ganho digital) e aviso de não notarização;
+- README do repositório completo, conforme [distribution.md](distribution.md#readme-do-repositório), com capturas da interface final;
 - medições registradas;
 - artefatos publicados apenas dos canais validados.
 
