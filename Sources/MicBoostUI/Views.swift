@@ -117,8 +117,11 @@ import SwiftUI
             }
             Divider()
             VStack(spacing: 0) {
-                Button(localized("Settings…"), action: model.onSettings).keyboardShortcut(",")
+                Button(localized("Settings…"), action: model.onSettings)
+                    .keyboardShortcut(",")
+                    .accessibilityLabel(localized("Settings…"))
                 Button(localized("Quit MicBoost"), action: model.onQuit)
+                    .accessibilityLabel(localized("Quit MicBoost"))
             }.buttonStyle(PanelMenuItemStyle())
         }.padding(16).frame(width: 320).fixedSize(horizontal: false, vertical: true)
     }
