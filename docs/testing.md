@@ -2,7 +2,7 @@
 
 ## Testes automatizados (`swift test`)
 
-Rodam sem hardware de áudio, sem BlackHole e sem permissão de microfone. Usam o Swift Testing (`import Testing`).
+Rodam sem hardware de áudio, sem BlackHole e sem permissão de microfone. Usam o Swift Testing (`import Testing`). A suíte completa leva no máximo 1 minuto em média na máquina de referência, sem contar a compilação. Sinais de teste usam a menor duração que ainda dá precisão (por exemplo, assentamento de filtro em vez de segundos de áudio), e tempos de espera reais (debounce, coalescência) ficam curtos ou são injetados.
 
 ### `MicBoostDSPTests` (processador via `mb_engine_process`)
 
