@@ -56,7 +56,9 @@ Mudanças chegam em rajadas. O controller agrupa eventos com 100 ms de coalescê
 
 Depois da criação, aguardar que o agregado apareça na lista de dispositivos e responda a `kAudioDevicePropertyDeviceIsAlive` (limite de 2 s). Se falhar, `error(.halFailure)`. Destruir com `AudioHardwareDestroyAggregateDevice` no stop. No launch, se existir um agregado com o UID acima (sobra de outra instância), destruí-lo antes de criar.
 
-A qualidade do resampler de drift (`kAudioSubDeviceDriftCompensationQualityKey`) é avaliada na etapa 1, comparando CPU e artefatos. O padrão inicial é a qualidade padrão do sistema.
+O adaptador valida formato virtual Float32 nativo e tenta configurar Float32 nos streams do agregado, preservando taxa e intercalação, antes de recusar um formato incompatível.
+
+A qualidade do resampler de drift permanece no padrão do sistema (a chave de qualidade não é sobrescrita). Na webcam USB a 16 kHz, 18 minutos de correlação mostraram deriva de −0,0625 ms, sem overloads nem resets numéricos; a avaliação auditiva de artefatos permanece manual.
 
 ## Formato e taxa de amostragem
 
@@ -67,7 +69,7 @@ A qualidade do resampler de drift (`kAudioSubDeviceDriftCompensationQualityKey`)
 
 ## Tamanho de buffer
 
-- Definir `kAudioDevicePropertyBufferFrameSize` no agregado com `settings.bufferFrames` (padrão 256), limitado a `BufferFrameSizeRange`. A etapa 1 mede 128 e 256. O padrão final é registrado aqui.
+- Definir `kAudioDevicePropertyBufferFrameSize` no agregado com `settings.bufferFrames` (padrão 256), limitado a `BufferFrameSizeRange`. O padrão é 256: a 16 kHz, a mediana de 38,875–38,9375 ms atende ao limite de 100 ms e esse buffer tem evidência de estabilidade. As opções são 64/128/256/512/1024 frames, sempre limitadas à faixa do agregado. A opção 64 atingiu mediana de 14,9375 ms a 16 kHz, mas não passou por ensaio prolongado. O tamanho continua expresso em frames: selecionar automaticamente ≈ 5,3 ms reduziria o buffer a 64 nessa fonte sem a mesma evidência de estabilidade.
 - `mb_engine_create` recebe o máximo de frames por ciclo, igual a `kAudioDevicePropertyBufferFrameSize` ou a `kAudioDevicePropertyUsesVariableBufferFrameSizes`, quando presente, para pré-alocar os buffers de trabalho. Se um ciclo chegar com mais frames do que o máximo, o processador trabalha em blocos internos desse tamanho.
 
 ## Mapa de streams e canais
@@ -151,5 +153,7 @@ Invariantes: nunca definir uma fonte física como padrão, exceto na restauraç�
 | Permissão negada | `AVCaptureDevice.authorizationStatus(for: .audio)` antes do start e ao reativar o app | `error(.microphonePermissionDenied)` |
 | Overload de IO | `kAudioDeviceProcessorOverload` | incrementar contador, sem mudar estado |
 | Serviço de áudio reiniciado (`coreaudiod`) | todos os objetos inválidos / `Devices` muda por completo | descartar IDs em cache, reenumerar por UID e reconstruir |
+
+Uma fonte que entrega apenas zeros mantém o motor em `running`; não há detecção automática de fonte silenciosa na v1.
 
 Silêncio seguro: sempre que o processador não tiver entrada válida ou detectar não-finitos, a saída para o BlackHole é zero. Antes de qualquer stop voluntário, rampa de saída.

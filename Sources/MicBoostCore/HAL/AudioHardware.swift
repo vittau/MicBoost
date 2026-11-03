@@ -1,12 +1,18 @@
 import CoreAudio
 import Foundation
 
-public enum EngineError: Error, CustomStringConvertible {
+public enum EngineError: Error, CustomStringConvertible, Equatable {
+    case blackHoleMissing, microphonePermissionDenied, noSourceSelected
+    case sourceUnavailable(String)
     case halFailure(OSStatus, String)
     case formatUnsupported
     case invalidArgument(String)
     public var description: String {
         switch self {
+        case .blackHoleMissing: return "BlackHole 2ch missing"
+        case .microphonePermissionDenied: return "Microphone permission denied"
+        case .noSourceSelected: return "No source selected"
+        case .sourceUnavailable(let uid): return "Source unavailable: \(uid)"
         case .halFailure(let status, let operation): return "\(operation): OSStatus \(status)"
         case .formatUnsupported: return "Unsupported audio format"
         case .invalidArgument(let message): return message

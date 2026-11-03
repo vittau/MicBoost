@@ -102,7 +102,7 @@ import Testing
                 low: EQShelfBand(frequency: 5, gainDB: -40),
                 mid: EQPeakingBand(frequency: 30000, gainDB: 40, q: 0),
                 high: EQShelfBand(frequency: 100, gainDB: 40)),
-            bufferFrames: 64))
+            bufferFrames: 32))
     let store = SettingsStore(storage: storage)
     let settings = await store.current
     #expect(settings.gainDB == Settings.gainRange.upperBound)
