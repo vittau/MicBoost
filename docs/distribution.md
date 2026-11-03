@@ -27,6 +27,8 @@ Canais excluídos: Mac App Store, `homebrew/cask` oficial (as regras exigem pass
 4. Assina com `codesign --force --deep --sign - build/MicBoost.app`, sem hardened runtime e sem entitlements: não há sandbox e o runtime não é exigido sem notarização.
 5. Confere com `codesign --verify --strict build/MicBoost.app`.
 
+O script chama `scripts/compile-icon.sh <App>/Contents/Resources` quando o arquivo existe e é executável. Esse helper fornece `AppIcon.icns` e, opcionalmente, `Assets.car`. O plist define `CFBundleIconFile` e `CFBundleIconName` como `AppIcon`. Sem o helper, o bundle de desenvolvimento continua compilável, sem ícone personalizado. Os bundles de localização SwiftPM são copiados para `Contents/Resources`. A versão vem da última tag `v*` (fallback de desenvolvimento `0.0.0`) e o contador é `git rev-list --count HEAD`. Release sempre usa assinatura ad hoc.
+
 No Apple Silicon, todo binário precisa de assinatura válida para executar; a ad hoc basta.
 
 Desenvolvimento: a assinatura ad hoc muda o cdhash a cada build, e o macOS pode pedir de novo a permissão de microfone. Opcionalmente, crie no Acesso às Chaves um certificado autoassinado local de assinatura de código ("MicBoost Dev", gratuito) e exporte `MICBOOST_SIGN_IDENTITY="MicBoost Dev"`, que o script usa no lugar de `-`. Nunca usar esse certificado nos artefatos de release.

@@ -23,6 +23,8 @@ Alternativa reservada (não implementar sem necessidade): ponte com dois IOProcs
 - buffer: `kAudioDevicePropertyBufferFrameSizeRange`;
 - se está vivo: `kAudioDevicePropertyDeviceIsAlive`.
 
+Para agregados, a lista completa de UIDs (`kAudioAggregateDevicePropertyFullSubDeviceList`) é lida, incluindo membros inativos. A elegibilidade percorre agregados aninhados com proteção contra ciclos.
+
 Uma fonte é elegível se tiver ≥ 1 canal de entrada, **não** for BlackHole (nenhuma variante), **não** for o agregado do próprio MicBoost e **não** for um agregado que contenha BlackHole.
 
 Listeners (na fila `engine`):
@@ -37,7 +39,7 @@ Mudanças chegam em rajadas. O controller agrupa eventos com 100 ms de coalescê
 - Primária: UID `BlackHole2ch_UID` (UID padrão do build upstream de 2 canais).
 - Alternativa: fabricante contendo "Existential Audio" e nome contendo "BlackHole", com exatamente 2 canais de saída.
 - Qualquer dispositivo cujo UID ou nome comece com "BlackHole" é excluído como fonte, seja qual for a contagem de canais.
-- **A confirmar na etapa 0**, com o BlackHole instalado na máquina de referência. Se o UID real for diferente, atualizar esta seção.
+- Na máquina de referência, a HAL ainda não expõe BlackHole (ver medição em testing.md). **A confirmar na etapa 0**, com o BlackHole instalado na máquina de referência. Se o UID real for diferente, atualizar esta seção.
 
 ## Construção do agregado
 

@@ -101,3 +101,19 @@ Máquina de referência: MacBook Neo (Apple A18 Pro), macOS 27.2.
 | Ensaio de 60 min | microfone interno | — |
 
 (— = ainda não medido. Substituir pelo valor e pela data da medição.)
+
+### Diagnóstico disponível na etapa 0
+
+Somente `devices [--json]` e `capture` estão implementados. A saída textual lista também elegibilidade e BlackHole; o JSON é o `DeviceSnapshot` com `devices` e `defaultInputUID` (os predicados de elegibilidade e BlackHole são derivados dos campos). `capture` aceita duração positiva de até 300 segundos, grava WAV IEEE Float32 intercalado na taxa nominal e imprime frames efetivamente capturados, pico e RMS lineares por canal. A duração inclui a partida do dispositivo; Continuity pode entregar menos frames durante a conexão. Formatos diferentes de Float32 nativo são recusados sem alterar o hardware.
+
+Verificação da etapa 0 na máquina de referência (2026-11-03):
+
+| Medida | Condição | Resultado |
+|---|---|---|
+| Captura bruta interna | pedido de 3 s, 48 kHz, 1 canal | 144000 frames; pico 0,102121599; RMS 0,005412710; sinal não zero |
+| Captura bruta Continuity | pedido de 3 s, 48 kHz, 1 canal | 126976 frames; pico 0,003942308; RMS 0,001024310; sinal não zero |
+| Enumeração BlackHole | driver instalado, ainda ausente na HAL | UID real pendente; não reiniciado coreaudiod |
+
+Nenhuma entrada ou saída padrão foi alterada. Capturas locais ficam em `.scratch/` e não entram no git. A ausência de BlackHole mantém a etapa 0 em andamento. Testes automatizados desta etapa cobrem enumeração/elegibilidade, detecção primária e alternativa, coalescência, remoção de listeners, guarda de saída padrão e cópia/limites do buffer de captura; os testes de motor e DSP descritos acima pertencem às próximas etapas.
+
+`swift build`, `swift test` (2 testes C/captura + 5 Core) e `scripts/build-app.sh debug` passam; o teste negativo da fake registra uma issue esperada com `withKnownIssue`. `codesign --verify --strict` passa. `open build/MicBoost.app` iniciou o processo, mas a presença visual do item de status não foi confirmada: o provedor de automação disponível não suporta a superfície da barra de menus.
