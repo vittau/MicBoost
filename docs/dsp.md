@@ -13,7 +13,7 @@ canais da fonte → [mapa de canais] → low shelf → peaking → high shelf �
 - Formato interno: Float32 nos buffers; estado e coeficientes dos biquads em `double`.
 - 1 canal de processamento (modos mono) ou 2 (estéreo). Estado dos filtros por canal.
 - Nenhum lookahead, nenhuma fila e nenhuma latência algorítmica.
-- Toda a memória é alocada em `mb_engine_create(max_frames, sample_rate, channels)`. `mb_engine_process` não aloca.
+- Toda a memória é alocada em `mb_engine_create(max_frames, sample_rate)`. `mb_engine_process` não aloca.
 
 A implementação da ponte mínima aplica somente mapa de canais, fade-out, guarda numérica e medidores. Os setters de ganho, mute e EQ armazenam os alvos atômicos; os efeitos são implementados nas etapas seguintes. O ganho efetivo desta etapa é 0 dB.
 
