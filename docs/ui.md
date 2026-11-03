@@ -21,17 +21,16 @@
 
 ## Painel
 
-`NSPopover` padrão do AppKit, com conteúdo em `NSHostingController<PanelView>`:
-- comportamento `.transient`: o sistema fecha ao clicar fora;
-- moldura, material, transparência, sombra, cantos e seta do próprio popover, sem camadas de fundo nem desenho adicional;
-- conteúdo de 320 pt de largura e altura acompanhando o tamanho preferido do hosting controller;
-- ancorado no `NSStatusBarButton`; posicionamento e limites da tela gerenciados pelo AppKit;
-- foco de teclado na janela do popover para edição de valores e atalhos;
-- animações nativas desabilitadas quando "Reduzir movimento" está ativo.
+`NSMenu` padrão do AppKit, sem seta, com `PanelView` hospedada na `view` de um `NSMenuItem`:
+- moldura, material, transparência, sombra e cantos desenhados pelo próprio menu, sem camadas de fundo adicionais;
+- conteúdo SwiftUI de 320 pt, com padding de conteúdo e sem herdar safe areas da janela interna do menu; mudanças de tamanho atualizam o frame da view do item;
+- aberto sob o `NSStatusBarButton`, alinhado à direita e limitado à tela pelo AppKit;
+- fechamento e navegação do menu gerenciados pelo AppKit, inclusive Escape e clique fora;
+- o delegate inicia os medidores ao abrir e os cancela ao fechar;
+- entrada no tracking pelo run loop para não manter um job de concorrência Swift ocupado.
 
-Fecha com clique fora, `Esc` ou novo clique no ícone. **Fechar o painel nunca afeta o motor.**
-O delegate inicia os medidores ao mostrar e os cancela ao fechar. Aparência e preferências
-de acessibilidade são herdadas do sistema; não alterar o fundo ou a opacidade da janela.
+**Fechar o painel nunca afeta o motor.** Aparência e preferências de acessibilidade
+são herdadas do sistema. Não alterar o fundo, recorte ou opacidade da janela do menu.
 
 Conteúdo, de cima para baixo (SwiftUI, `PanelView`):
 
@@ -41,13 +40,13 @@ Conteúdo, de cima para baixo (SwiftUI, `PanelView`):
    - O estado persiste (`processingEnabled`), e a troca nunca fecha o painel.
 2. **Ganho:** botão de mute com o ícone `mic.fill`/`mic.slash.fill`, `Slider` de ganho de −12 a +24 dB e rótulo `+12,0 dB · 398%`. O valor é editável: clicar no rótulo abre um campo numérico em dB. O selo "Limitando" (pílula discreta) aparece durante a proteção de pico.
 3. **Medidores:** duas barras finas horizontais, "Entrada" e "Saída", em dBFS de −60 a 0, que só mudam de cor perto de 0. Aviso "Entrada saturada" quando `input_clipped`.
-4. **Roteamento:** estado da entrada do sistema:
+4. **Entrada do sistema:** apenas o estado da entrada padrão; a fonte selecionada é indicada pela marcação na lista de microfones, sem uma linha adicional de caminho do áudio:
    - ok: "Entrada do sistema: MicBoost" com marcação;
    - divergência: "Entrada do sistema: <nome>" + botão "Usar MicBoost".
    - com `manageDefaultInput` desligado, a linha só informa a entrada atual, sem tratá-la como divergência; o botão "Usar MicBoost" aparece se a entrada não for o BlackHole.
 5. **Microfone:** lista de fontes elegíveis no estilo das listas de dispositivos da Central de Controle (ícone por transporte, nome, marca de seleção). Selecionar troca a fonte (reconstrução do motor com rampa). Uma fonte persistida que não está conectada aparece como "<nome> (desconectado)".
 6. **Equalizador:** seção expansível (`DisclosureGroup`, recolhida por padrão; o estado de expansão persiste), com:
-   - `Toggle` "Ativar EQ" com switch nativo pequeno;
+   - `Toggle` "Ativar EQ" com switch nativo padrão;
    - Graves: slider de ganho (dB) + campo de frequência (Hz);
    - Médios: slider de ganho + campo de frequência + slider "Largura" com o valor de Q mostrado (Q maior = banda mais estreita);
    - Agudos: slider de ganho + campo de frequência;
@@ -80,7 +79,7 @@ Uma faixa no topo do conteúdo, abaixo do cabeçalho, mostra uma mensagem por ve
 `NSWindow` de 540 pt de largura com SwiftUI `SettingsView` (`Form` com estilo `.grouped`), aberta por "Ajustes…" ou ⌘, com o painel focado. Seções:
 
 As seções seguem o estilo dos Ajustes do Sistema: cartões agrupados nativos,
-controles de tamanho regular, switch nativo à direita com explicação secundária
+controles com tamanho padrão do sistema, switch nativo à direita com explicação secundária
 junto ao rótulo e linhas de diagnóstico/sobre com rótulo à esquerda e valor à direita.
 
 - **Áudio:** chave "Usar MicBoost como entrada do sistema automaticamente" (`manageDefaultInput`, ligada por padrão), com uma frase explicando que, desligada, cada app precisa selecionar o microfone "BlackHole 2ch" por conta própria; tamanho de buffer (64/128/256/512/1024, só os valores suportados) e modo de canais da fonte atual ([audio-engine.md](audio-engine.md#canais)).
@@ -115,6 +114,15 @@ O app consulta snapshots de estado a 1 Hz; os medidores têm tarefa separada de 
 cancelada ao fechar o painel. A expansão do EQ fica em `UserDefaults.eqExpanded`.
 A validação manual de VoiceOver, contraste e preferências de acessibilidade está pendente.
 
-As capturas fora da tela documentam o conteúdo SwiftUI, não a composição do popover
-com o desktop. Moldura, seta e transparência exigem conferir a janela real composta
-pelo WindowServer.
+As capturas fora da tela documentam o conteúdo SwiftUI, não a composição do menu
+com o desktop. Moldura e transparência exigem conferir o menu real composto pelo
+WindowServer.
+
+O executável do app e o auxiliar de capturas registram o SDK real de compilação
+separadamente do mínimo macOS 14. O AppKit assim escolhe os controles da geração
+atual do sistema, incluindo o switch nativo de 54 × 24 pt no macOS 27; não aplicar
+transformações de escala nem desenhar uma versão própria desse controle.
+
+O menu ativa o app ao abrir para que os controles AppKit sejam apresentados ativos.
+Os toggles usam `.toggleStyle(.switch)`, sem tamanho, escala, tint ou estado visual
+forçados: o AppKit escolhe as métricas e a cor de destaque a partir do sistema.

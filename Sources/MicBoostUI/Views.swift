@@ -16,7 +16,9 @@ import SwiftUI
                     localized("Processing"),
                     isOn: Binding(get: { model.controls.processingEnabled }, set: model.processing)
                 )
-                .labelsHidden().toggleStyle(.switch).accessibilityLabel(localized("Processing"))
+                .labelsHidden().toggleStyle(.switch)
+                .accessibilityLabel(
+                    localized("Processing"))
             }
             if let message = model.message {
                 VStack(alignment: .leading) {
@@ -71,7 +73,6 @@ import SwiftUI
             meter("Output", model.outputDB)
             if model.clipped { Text(localized("Input clipped")).font(.caption).foregroundStyle(.red) }
             Divider()
-            Text("\(model.status?.source?.name ?? localized("Microphone")) → MicBoost").font(.caption)
             if model.status?.defaultInput.isBlackHole == true {
                 Label(localized("System input: MicBoost"), systemImage: "checkmark.circle.fill").font(.caption)
             } else {
@@ -109,7 +110,7 @@ import SwiftUI
                             .labelsHidden()
                             .accessibilityLabel(localized("Enable EQ"))
                             .toggleStyle(.switch)
-                            .controlSize(.small)
+
                             .onChange(of: model.controls.eq.enabled) { model.eq() }
                     }
                     band(
@@ -235,6 +236,7 @@ import SwiftUI
                     }.fixedSize(horizontal: false, vertical: true)
                 }
                 .toggleStyle(.switch)
+
                 .onChange(of: model.controls.manageDefaultInput) {
                     let enabled = model.controls.manageDefaultInput
                     Task { await model.engine.setDefaultInputManagement(enabled) }
@@ -296,7 +298,7 @@ import SwiftUI
             }
         }
         .formStyle(.grouped)
-        .controlSize(.regular)
+
         .frame(width: 540)
     }
     private var channel: Int {

@@ -2,27 +2,47 @@ import AppKit
 import MicBoostUI
 import SwiftUI
 
-@MainActor final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPopoverDelegate {
+@MainActor final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
     private let model = AppModel()
     private var status: NSStatusItem?
-    private let popover = NSPopover()
+    private let panelMenu = NSMenu(title: "MicBoost")
+    private var menuHost: NSView?
+    private var optionClickMonitor: Any?
     private var settings: NSWindow?
     private var quitting = false
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureMenu()
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.target = self
-        item.button?.action = #selector(toggle)
-        item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         status = item
-        popover.behavior = .transient
-        popover.delegate = self
-        let host = NSHostingController(
-            rootView: PanelView(model: model).onExitCommand { [weak self] in
-                self?.closePanel()
-            })
-        host.sizingOptions = .preferredContentSize
-        popover.contentViewController = host
+        panelMenu.autoenablesItems = false
+        panelMenu.delegate = self
+        let host = NSHostingView(
+            rootView: PanelView(model: model)
+                .onGeometryChange(for: CGSize.self) {
+                    $0.size
+                } action: { [weak self] size in
+                    guard let host = self?.menuHost, host.frame.size != size else { return }
+                    host.setFrameSize(size)
+                })
+        host.safeAreaRegions = []
+        host.frame = NSRect(origin: .zero, size: host.fittingSize)
+        host.autoresizingMask = [.width]
+        menuHost = host
+        let content = NSMenuItem()
+        content.view = host
+        content.isEnabled = true
+        panelMenu.addItem(content)
+        item.menu = panelMenu
+        optionClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) {
+            [weak self] event in
+            let consumed = MainActor.assumeIsolated {
+                guard let self, event.window === self.status?.button?.window, event.modifierFlags.contains(.option)
+                else { return false }
+                self.model.processing(!self.model.controls.processingEnabled)
+                return true
+            }
+            return consumed ? nil : event
+        }
         model.onSettings = { [weak self] in self?.showSettings() }
         model.onQuit = { NSApplication.shared.terminate(nil) }
         model.onUpdate = { [weak self] in self?.update() }
@@ -67,28 +87,20 @@ import SwiftUI
             "MicBoost, \(model.message ?? localized(model.controls.processingEnabled ? "Active" : "Stopped")), \(AppModel.gainLabel(model.controls.gainDB))"
         )
     }
-    @objc private func toggle() {
-        if NSEvent.modifierFlags.contains(.option) {
-            model.processing(!model.controls.processingEnabled)
-            return
-        }
-        if popover.isShown { closePanel() } else { showPanel() }
-    }
     private func showPanel() {
-        guard let button = status?.button else { return }
-        popover.animates = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        popover.contentViewController?.view.window?.makeKey()
+        RunLoop.main.perform(inModes: [.default]) { [weak self] in
+            MainActor.assumeIsolated { self?.status?.button?.performClick(nil) }
+        }
     }
     private func closePanel() {
-        popover.performClose(nil)
+        panelMenu.cancelTracking()
     }
-    func popoverDidShow(_ notification: Notification) {
+    func menuWillOpen(_ menu: NSMenu) {
+        NSApplication.shared.activate(ignoringOtherApps: true)
         status?.button?.highlight(true)
         model.setPanelVisible(true)
     }
-    func popoverWillClose(_ notification: Notification) {
+    func menuDidClose(_ menu: NSMenu) {
         model.setPanelVisible(false)
         status?.button?.highlight(false)
     }
@@ -112,7 +124,11 @@ import SwiftUI
     func windowWillClose(_ notification: Notification) { model.settingsVisible = false }
     @objc private func sleep() { Task { try? await model.engine.willSleep() } }
     @objc private func wake() { Task { await model.engine.didWake() } }
+    func applicationWillTerminate(_ notification: Notification) {
+        if let optionClickMonitor { NSEvent.removeMonitor(optionClickMonitor) }
+    }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        closePanel()
         guard !quitting else { return .terminateNow }
         quitting = true
         Task {

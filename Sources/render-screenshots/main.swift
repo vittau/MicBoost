@@ -22,7 +22,8 @@ import SwiftUI
             let view = kind == "settings" ? AnyView(SettingsView(model: model)) : AnyView(PanelView(model: model))
             let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
             let host = NSHostingView(
-                rootView: view.padding(0).background(.background).environment(\.colorScheme, scheme))
+                rootView: view.padding(0).background(.background).environment(\.colorScheme, scheme).environment(
+                    \.appearsActive, true))
             host.appearance = appearance
             let size = host.fittingSize
             let window = NSWindow(

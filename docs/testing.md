@@ -167,8 +167,19 @@ execução somada de 1,72 s; a suíte Core inclui o caso negativo
 `swift build`, `swift test`, lint recursivo de formatação, montagem debug e
 `codesign --verify --strict` passam na máquina de referência.
 
-O painel usa a moldura de `NSPopover` sem sobreposição de material ou bordas.
-Na janela real do macOS 27 foram conferidos a moldura com seta de ancoragem,
-redimensionamento ao expandir o EQ, fechamento por Escape e reabertura pelo item.
-A edição de valores e o fechamento externo continuam no roteiro manual completo. A compatibilidade com macOS 14
-é verificada na compilação; aparência nessa versão requer teste no próprio sistema.
+O painel usa a moldura de `NSMenu`, sem sobreposição de material, bordas ou seta.
+A conferência inclui a composição real pelo WindowServer e interação com os controles
+durante o tracking do menu.
+
+No macOS 27, uma sonda de `NSSwitch`/SwiftUI com mínimo 14 e SDK 27.2 mede
+54 × 24 pt. A mesma sonda com o SDK registrado como 14 mede 38 × 22 pt.
+O build do app verifica SDK igual ao Xcode selecionado e mínimo 14 em cada
+arquitetura antes da assinatura. O renderizador recebe a mesma configuração.
+
+Na composição real do menu no macOS 27, o controle ligado foi verificado pela
+acessibilidade como 54 × 24 pt e valor 1, com a cor verde oliva do sistema.
+A conferência incluiu ausência de seta e de corte vertical, remoção da linha
+redundante do caminho de áudio e atualização dos medidores com o menu aberto.
+O ajuste do SDK foi validado também em um executável de teste universal
+(arm64 + x86_64), com mínimo 14, SDK 27.2 e assinatura ad hoc válida em ambas
+as arquiteturas.

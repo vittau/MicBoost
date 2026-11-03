@@ -4,7 +4,7 @@
 
 ```text
 ┌──────────────────────── MicBoostApp (main thread) ────────────────────────┐
-│ AppKit: NSStatusItem + NSPopover  ·  SwiftUI: PanelView,     │
+│ AppKit: NSStatusItem + NSMenu  ·  SwiftUI: PanelView,     │
 │ SettingsView  ·  @Observable AppModel  ·  MeterPoller (20 Hz, só visível) │
 └───────────────┬───────────────────────────────────────────▲───────────────┘
                 │ comandos async                            │ snapshots de estado
@@ -123,13 +123,12 @@ Cada campo é decodificado isoladamente (`decodeIfPresent`), então um campo aus
 `MicBoostUI` é uma biblioteca interna com `AppModel`, `PanelView` e `SettingsView`,
 localizações `.strings` e dependência apenas de MicBoostCore e frameworks do sistema.
 O executável auxiliar `render-screenshots` reutiliza as views sem iniciar captura.
-`AppDelegate` mantém o item, popover nativo, janela de ajustes e notificações de suspensão; o encerramento
+`AppDelegate` mantém o item, menu nativo, janela de ajustes e notificações de suspensão; o encerramento
 assíncrono aguarda `AppModel.shutdown`, stop com fade, restauração e flush dos ajustes.
 O controller mantém `DefaultInputManager` e seu listener de entrada padrão na fila engine.
 Comandos de processamento são serializados pelo modelo para preservar a ordem dos cliques.
 
-O painel usa `NSPopover` `.transient` e `NSHostingController` com
-`sizingOptions = .preferredContentSize`. O AppKit controla a apresentação, moldura
-e fechamento externo. O delegate acompanha a visibilidade para ligar/desligar os
-medidores; o conteúdo trata Escape com `onExitCommand`. Não há janela, material
-ou monitores globais de clique implementados pelo app para esse painel.
+O painel usa `NSMenu` e um item com `NSHostingView<PanelView>` transparente.
+O AppKit controla moldura, tracking e fechamento. O frame do host acompanha a
+geometria SwiftUI, e o delegate acompanha a visibilidade para iniciar/cancelar os
+medidores. O tracking começa pelo run loop, fora de um job de concorrência Swift.
