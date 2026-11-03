@@ -5,7 +5,7 @@ Status: `não iniciado` · `em andamento` · `concluído`. Uma etapa só é conc
 | # | Etapa | Status |
 |---|---|---|
 | 0 | Estrutura e diagnóstico | concluído |
-| 1 | Ponte mínima | em andamento |
+| 1 | Ponte mínima | concluído |
 | 2 | Ganho e proteção de pico | não iniciado |
 | 3 | Equalizador | não iniciado |
 | 4 | Interface | não iniciado |
@@ -40,7 +40,6 @@ Condições de conclusão:
 - decisão confirmada: agregado (ou troca para a ponte alternativa, com a especificação reescrita);
 - buffer padrão definido.
 
-Pendente: ensaio de 20 min com RSS instantânea, latência a 48 kHz (interno ou USB) e desconexão física da fonte durante `run`.
 
 ## 2 — Ganho e proteção de pico
 
@@ -94,9 +93,5 @@ Condições de conclusão:
 | Decisão | Recomendação atual | Quando |
 |---|---|---|
 | Licença do MicBoost | GPL-3.0, que alinha com o BlackHole e simplifica uma eventual redistribuição conjunta | antes da etapa 6 |
+| Queda lenta de latência no ensaio longo | ensaio de várias horas para confirmar que se estabiliza | antes da etapa 6 |
 | Faixa máxima do ganho | +24 dB provisório | etapa 2 |
-
-
-
-
-Decisões da ponte mínima: agregado privado mantido (deriva −0,0625 ms em 18 min, sem overloads); buffer padrão de 256 frames mantido (mediana USB ≈ 38,9 ms, dentro dos 100 ms); qualidade padrão de drift mantida pelos resultados numéricos, com escuta manual pendente. A opção 64 frames atende ao objetivo de menos de 20 ms na webcam de 16 kHz; a seleção automática por duração depende de estabilidade nos buffers menores.

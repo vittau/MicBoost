@@ -69,7 +69,7 @@ A qualidade do resampler de drift permanece no padrão do sistema (a chave de qu
 
 ## Tamanho de buffer
 
-- Definir `kAudioDevicePropertyBufferFrameSize` no agregado com `settings.bufferFrames` (padrão 256), limitado a `BufferFrameSizeRange`. O padrão é 256: a 16 kHz, a mediana de 38,875–38,9375 ms atende ao limite de 100 ms e esse buffer tem evidência de estabilidade. As opções são 64/128/256/512/1024 frames, sempre limitadas à faixa do agregado. A opção 64 atingiu mediana de 14,9375 ms a 16 kHz, mas não passou por ensaio prolongado. O tamanho continua expresso em frames: selecionar automaticamente ≈ 5,3 ms reduziria o buffer a 64 nessa fonte sem a mesma evidência de estabilidade.
+- Definir `kAudioDevicePropertyBufferFrameSize` no agregado com `settings.bufferFrames` (padrão 256), limitado a `BufferFrameSizeRange`. Opções: 64/128/256/512/1024 frames. O padrão 256 tem ensaio de estabilidade aprovado e mede 15,3 ms a 48 kHz e 38,9 ms a 16 kHz, dentro dos 100 ms da v1 ([testing.md](testing.md#resultados-registrados)). O tamanho é expresso em frames, então a duração do buffer depende da taxa da fonte.
 - `mb_engine_create` recebe o máximo de frames por ciclo, igual a `kAudioDevicePropertyBufferFrameSize` ou a `kAudioDevicePropertyUsesVariableBufferFrameSizes`, quando presente, para pré-alocar os buffers de trabalho. Se um ciclo chegar com mais frames do que o máximo, o processador trabalha em blocos internos desse tamanho.
 
 ## Mapa de streams e canais

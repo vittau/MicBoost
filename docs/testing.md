@@ -102,7 +102,9 @@ Máquina de referência: MacBook Neo (Apple A18 Pro), macOS 27.2. Latências med
 |---|---|---|
 | Latência adicional | microfone interno, 48 kHz, buffer 256 | — |
 | Latência adicional | microfone interno, 48 kHz, buffer 128 | — |
-| Latência adicional | USB 48 kHz, buffer 256 | — |
+| Latência adicional | USB (fifine), 48 kHz, buffer 256 | 15,31 / 15,29 / 15,31 ms; HAL 11,5 ms (2026-11-03) |
+| Latência adicional | USB (fifine), 48 kHz, buffer 128 | 9,96 / 9,94 / 9,96 ms; HAL 8,8 ms (2026-11-03) |
+| Latência adicional | USB (fifine), 48 kHz, buffer 64 | 7,29 / 7,29 / 7,29 ms; HAL 7,5 ms (2026-11-03) |
 | Latência adicional | USB (C920), 16 kHz, buffer 64 | 14,94 / 14,88 / 14,94 ms; HAL 10,5 ms (2026-11-03) |
 | Latência adicional | USB (C920), 16 kHz, buffer 128 | 22,88 / 22,88 / 22,88 ms; HAL 14,5 ms (2026-11-03) |
 | Latência adicional | USB (C920), 16 kHz, buffer 256 | 38,94 / 38,88 / 38,94 ms; HAL 22,5 ms (2026-11-03) |
@@ -110,7 +112,8 @@ Máquina de referência: MacBook Neo (Apple A18 Pro), macOS 27.2. Latências med
 | Passagem fonte → BlackHole | C920, 16 kHz, `run` + capturas simultâneas | fonte pico/RMS 0,0654 / 0,0056; BlackHole L = R 0,0630 / 0,0057 (2026-11-03) |
 | Silêncio seguro | fonte que entrega zeros (microfone interno com a tampa fechada) | BlackHole pico/RMS 0 nos dois canais (2026-11-03) |
 | Ensaio de estabilidade | C920, 16 kHz, buffer 256, 18 min | deriva −0,06 ms (38,88 → 38,81 ms); 0 overloads, `input_missing` e `nonfinite_resets`; CPU ≈ 0,4% de um núcleo; memória só como pico (maxRSS constante 15,6 MB) (2026-11-03) |
-| Ensaio de estabilidade | 20 min com RSS instantânea | — |
+| Ensaio de estabilidade | C920, 16 kHz, buffer 256, 20 min, RSS instantânea | deriva −0,69 ms (38,88 → 38,19 ms; estável até o minuto 8, depois queda de ≈ 0,06 ms/min); 0 overloads, `input_missing` e `nonfinite_resets`; RSS 12,9–13,6 MB após o minuto 3; CPU 5,9 s (≈ 0,5% de um núcleo) (2026-11-03) |
+| Recuperação física | fifine, 48 kHz, `run`; USB desconectado ≈ 5 s e reconectado | `running` → `recovering(sourceLost)` → `running` sem intervenção, 12 s em recuperação; contadores de erro 0 (2026-11-03) |
 | CPU do processo | running, EQ ligado | — |
 | Captura bruta | microfone interno, 48 kHz, 3 s | pico 0,102; RMS 0,0054 (2026-11-03) |
 | Captura bruta | Continuity, 48 kHz, 3 s | pico 0,0039; RMS 0,0010 (2026-11-03) |
@@ -121,4 +124,5 @@ Máquina de referência: MacBook Neo (Apple A18 Pro), macOS 27.2. Latências med
 Observações de hardware:
 - Com a tampa fechada, o macOS silencia o microfone interno por hardware: a permissão continua concedida e os callbacks entregam zeros. A medição de latência recusa esse sinal (correlação 0).
 - As pequenas diferenças de nível entre fonte e BlackHole vêm do resampler de drift e de capturas que começam em instantes distintos.
-- Recuperação física (desconectar o USB), reinício real do `coreaudiod` e escuta humana são verificações manuais. A HAL falsa cobre perda e retorno da fonte e do BlackHole.
+- A queda lenta de latência no ensaio de 20 min passa no critério, mas não está claro se ela se estabiliza (resampler de deriva acomodando) ou continua (deriva residual). Um ensaio de várias horas antes da release decide.
+- Reinício real do `coreaudiod` e escuta humana são verificações manuais. A HAL falsa cobre perda e retorno da fonte e do BlackHole.

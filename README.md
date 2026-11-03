@@ -22,13 +22,13 @@ calls, recorders, anything — hears the processed voice.
 >
 > **Working today (stage 1):** a device-agnostic capture → BlackHole 2ch bridge, driven by the
 > `micboost-diag` command-line tool. It captures any Core Audio input by UID through a private
-> aggregate device, with no queue between callbacks. Measured on a USB microphone (C920) at
-> 16 kHz: median **38.94 ms** of added latency at the default 256-frame buffer, an 18-minute
-> stability run with **−0.06 ms** of drift and 0 overloads, and safe silence when the source
-> delivers no signal.
+> aggregate device, with no queue between callbacks. Measured on a USB microphone at 48 kHz:
+> median **15.3 ms** of added latency at the default buffer, a 20-minute stability run with no
+> overloads, automatic recovery after unplugging the microphone, and safe silence when the
+> source delivers no signal.
 >
 > **Still planned:** gain and peak protection (stage 2), the 3-band EQ (stage 3), the menu bar
-> panel and settings window (stage 4), recovery (stage 5), and the Homebrew tap with a `.zip`
+> panel and settings window (stage 4), full recovery coverage — sleep/wake, format changes (stage 5), and the Homebrew tap with a `.zip`
 > release (stage 6). Progress lives in [the roadmap](docs/roadmap.md).
 
 ## How it works
@@ -148,26 +148,29 @@ input with host timestamps, correlates the room signal between both recordings a
 median of repeated trials. The consumer app's own latency is measured separately and is not part
 of this figure.
 
-Recorded on a MacBook Neo (Apple A18 Pro), macOS 27.2, USB microphone (Logitech C920), 16 kHz,
-room-signal correlation, 3 trials:
+Recorded on a MacBook Neo (Apple A18 Pro), macOS 27.2, with room-signal correlation and 3 trials
+per buffer:
 
-| Buffer | Median added latency |
-| --- | --- |
-| 64 frames | 14.94 ms |
-| 128 frames | 22.88 ms |
-| 256 frames (default) | 38.94 ms |
+| Buffer | USB mic at 48 kHz | USB webcam mic at 16 kHz |
+| --- | --- | --- |
+| 64 frames | 7.3 ms | 14.9 ms |
+| 128 frames | 10.0 ms | 22.9 ms |
+| 256 frames (default) | 15.3 ms | 38.9 ms |
+
+A buffer is a fixed number of frames, so it lasts three times longer at 16 kHz than at 48 kHz;
+that is why the low-rate source is slower.
 
 - **v1 acceptance:** median ≤ 100 ms for every supported source, except sources whose own
   reported input latency already exceeds that value — Continuity is one, at 125 ms.
 - **Engineering goal:** median < 20 ms at the default buffer for USB and built-in sources at
-  48 kHz. This is the requirement of the v2 monitor mode, where the total delay must stay under
-  20 ms to avoid hearing an echo.
-- **Stability:** an 18-minute run at buffer 256 kept the median at 38.88 → 38.81 ms (−0.06 ms
-  drift) with 0 overloads, 0 input-missing events, 0 non-finite resets and about 0.4% of one
+  48 kHz — met by the USB microphone above. This is the requirement of the v2 monitor mode, where
+  the total delay must stay under 20 ms to avoid hearing an echo.
+- **Stability:** a 20-minute run at the default buffer stayed within 0.7 ms of its starting
+  latency, with no overloads, no missing input, stable memory (about 13 MB) and about 0.5% of one
   CPU core.
-- **Still pending:** built-in microphone latency (it was unavailable, lid closed), 48 kHz
-  measurements, Bluetooth, the final 20-minute soak and memory stability — memory was recorded
-  only as peak resident size, so nothing is claimed about it here.
+- **Recovery:** unplugging the USB microphone during a run moves the engine to "recovering", with
+  silence in BlackHole; plugging it back in resumes the bridge on its own.
+- **Still pending:** built-in microphone and Bluetooth measurements.
 
 Full results and conditions: [docs/testing.md](docs/testing.md#resultados-registrados).
 
