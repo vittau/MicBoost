@@ -1,4 +1,5 @@
 import AppKit
+import CoreAudio
 import MicBoostCore
 import SwiftUI
 
@@ -36,7 +37,11 @@ import SwiftUI
             }
             HStack {
                 Button(action: model.mute) { Image(systemName: model.controls.muted ? "mic.slash.fill" : "mic.fill") }
-                    .accessibilityLabel(localized("Mute")).keyboardShortcut("m", modifiers: [])
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(localized("Mute"))
+                    .accessibilityValue(localized(model.controls.muted ? "On" : "Off"))
+                    .help(localized("Mute"))
+                    .keyboardShortcut("m", modifiers: [])
                 Slider(
                     value: Binding(get: { model.controls.gainDB }, set: model.gain), in: Settings.gainRange
                 )
@@ -75,44 +80,59 @@ import SwiftUI
                 Button(localized("Use MicBoost"), action: model.useBlackHole).disabled(model.status?.state != .running)
             }
             Text(localized("Microphone")).font(.headline)
-            ForEach(model.sources, id: \.uid) { device in
-                Button {
-                    model.select(device)
-                } label: {
-                    HStack {
-                        Image(systemName: "mic")
-                        Text(device.name).lineLimit(2)
-                        Spacer()
-                        if model.controls.selectedInputUID == device.uid { Image(systemName: "checkmark") }
-                    }.contentShape(Rectangle())
-                }.buttonStyle(.plain).accessibilityValue(
-                    model.controls.selectedInputUID == device.uid ? localized("Selected") : "")
-            }
+            VStack(spacing: 0) {
+                ForEach(model.sources, id: \.uid) { device in
+                    Button {
+                        model.select(device)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: sourceSymbol(device)).frame(width: 18)
+                            Text(device.name).lineLimit(2)
+                            Spacer()
+                            if model.controls.selectedInputUID == device.uid { Image(systemName: "checkmark") }
+                        }
+                    }
+                    .accessibilityLabel(device.name)
+                    .accessibilityValue(model.controls.selectedInputUID == device.uid ? localized("Selected") : "")
+                }
+            }.buttonStyle(PanelMenuItemStyle())
             if let uid = model.controls.selectedInputUID, !model.sources.contains(where: { $0.uid == uid }) {
                 Text("\(uid) (\(localized("Disconnected")))").font(.caption)
             }
             Divider()
             DisclosureGroup(localized("Equalizer"), isExpanded: $model.expanded) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Toggle(localized("Enable EQ"), isOn: $model.controls.eq.enabled).onChange(
-                        of: model.controls.eq.enabled
-                    ) { model.eq() }
+                    HStack {
+                        Text(localized("Enable EQ"))
+                        Spacer()
+                        Toggle(localized("Enable EQ"), isOn: $model.controls.eq.enabled)
+                            .labelsHidden()
+                            .accessibilityLabel(localized("Enable EQ"))
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                            .onChange(of: model.controls.eq.enabled) { model.eq() }
+                    }
                     band(
                         "Bass", gain: $model.controls.eq.low.gainDB, frequency: $model.controls.eq.low.frequency,
                         range: EQSettings.lowFrequencyRange)
                     band(
                         "Mid", gain: $model.controls.eq.mid.gainDB, frequency: $model.controls.eq.mid.frequency,
                         range: EQSettings.midFrequencyRange)
-                    Slider(value: $model.controls.eq.mid.q, in: EQSettings.midQRange) { Text(localized("Width")) }
+                    LabeledContent(localized("Width"), value: String(format: "Q %.1f", model.controls.eq.mid.q))
+                        .font(.caption)
+                    Slider(value: $model.controls.eq.mid.q, in: EQSettings.midQRange)
+                        .accessibilityLabel(localized("Width"))
                         .accessibilityValue(String(format: "Q %.1f", model.controls.eq.mid.q)).onChange(
                             of: model.controls.eq.mid.q
                         ) { model.eq() }
-                    Text(String(format: "Q %.1f", model.controls.eq.mid.q)).font(.caption)
                     band(
                         "Treble", gain: $model.controls.eq.high.gainDB, frequency: $model.controls.eq.high.frequency,
                         range: EQSettings.highFrequencyRange)
-                    Button(localized("Voice preset"), action: model.voicePreset)
-                    Button(localized("Reset EQ"), action: model.reset)
+                    HStack {
+                        Button(localized("Voice preset"), action: model.voicePreset)
+                        Spacer()
+                        Button(localized("Reset EQ"), action: model.reset)
+                    }.buttonStyle(.borderless)
                 }.padding(.top, 8)
             }
             Divider()
@@ -125,6 +145,15 @@ import SwiftUI
             }.buttonStyle(PanelMenuItemStyle())
         }.padding(16).frame(width: 320).fixedSize(horizontal: false, vertical: true)
     }
+    private func sourceSymbol(_ device: AudioDevice) -> String {
+        switch device.transport {
+        case kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE: "headphones"
+        case kAudioDeviceTransportTypeUSB: "mic.fill"
+        case kAudioDeviceTransportTypeContinuityCaptureWired, kAudioDeviceTransportTypeContinuityCaptureWireless:
+            "iphone"
+        default: "mic"
+        }
+    }
     private func meter(_ title: String, _ db: Double) -> some View {
         HStack {
             Text(localized(title)).font(.caption).frame(width: 42, alignment: .leading)
@@ -136,7 +165,12 @@ import SwiftUI
         -> some View
     {
         VStack(alignment: .leading) {
-            Text(localized(title)).font(.caption)
+            LabeledContent(localized(title)) {
+                Text(
+                    gain.wrappedValue.formatted(.number.precision(.fractionLength(1)).sign(strategy: .always())) + " dB"
+                )
+                .monospacedDigit()
+            }.font(.caption)
             Slider(
                 value: Binding(get: { gain.wrappedValue }, set: { gain.wrappedValue = ($0 * 2).rounded() / 2 }),
                 in: EQSettings.gainRange
@@ -157,7 +191,12 @@ import SwiftUI
             .onChange(of: gain.wrappedValue) { model.eq() }
             HStack {
                 Text(localized("Frequency"))
-                TextField("Hz", value: frequency, format: .number).accessibilityLabel("\(localized(title)), Hz")
+                Spacer()
+                TextField("Hz", value: frequency, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 80)
+                    .accessibilityLabel("\(localized(title)), Hz")
                     .onKeyPress(keys: [.upArrow, .downArrow]) { press in
                         let direction = press.key == .upArrow ? 1.0 : -1.0
                         let maximum = min(range.upperBound, (model.status?.sampleRate ?? 48000) * 0.45)

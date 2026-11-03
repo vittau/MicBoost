@@ -54,3 +54,11 @@
 "Missing input cycles" = "Ciclos sem entrada";
 "Numerical resets" = "Reinicializações numéricas";
 "Version" = "Versão";
+"On" = "Ativado";
+"Off" = "Desativado";
+"Edit" = "Editar";
+"Cut" = "Recortar";
+"Copy" = "Copiar";
+"Paste" = "Colar";
+"Select All" = "Selecionar Tudo";
+"MicBoost Settings" = "Ajustes do MicBoost";

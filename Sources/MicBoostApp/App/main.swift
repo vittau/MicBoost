@@ -17,6 +17,7 @@ import SwiftUI
     private var local: Any?
     private var quitting = false
     func applicationDidFinishLaunching(_ notification: Notification) {
+        configureMenu()
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.target = self
         item.button?.action = #selector(toggle)
@@ -33,6 +34,31 @@ import SwiftUI
             update()
             showPanel()
         }
+    }
+    private func configureMenu() {
+        let main = NSMenu()
+        let applicationItem = NSMenuItem(title: "MicBoost", action: nil, keyEquivalent: "")
+        let applicationMenu = NSMenu(title: "MicBoost")
+        let settingsItem = NSMenuItem(
+            title: localized("Settings…"), action: #selector(showSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        applicationMenu.addItem(settingsItem)
+        applicationMenu.addItem(.separator())
+        applicationMenu.addItem(
+            withTitle: localized("Quit MicBoost"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        applicationItem.submenu = applicationMenu
+        main.addItem(applicationItem)
+
+        let editItem = NSMenuItem(title: localized("Edit"), action: nil, keyEquivalent: "")
+        let editMenu = NSMenu(title: localized("Edit"))
+        editMenu.addItem(withTitle: localized("Cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: localized("Copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: localized("Paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(
+            withTitle: localized("Select All"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editItem.submenu = editMenu
+        main.addItem(editItem)
+        NSApplication.shared.mainMenu = main
     }
     private func update() {
         if let panel, panel.isVisible, let material = panel.contentView, let host = material.subviews.first {
@@ -109,12 +135,13 @@ import SwiftUI
             self.local = nil
         }
     }
-    private func showSettings() {
+    @objc private func showSettings() {
+        closePanel()
         if settings == nil {
             let window = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 540, height: 680), styleMask: [.titled, .closable],
                 backing: .buffered, defer: false)
-            window.title = localized("Settings…")
+            window.title = localized("MicBoost Settings")
             window.contentView = NSHostingView(rootView: SettingsView(model: model))
             window.isReleasedWhenClosed = false
             window.delegate = self

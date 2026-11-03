@@ -4,6 +4,7 @@
 
 - Terminologia: a UI chama a entrada processada de "MicBoost". O nome "BlackHole 2ch" só aparece onde o usuário precisa reconhecê-lo: ao escolher o microfone dentro de um app que não segue a entrada do sistema, e quando o driver está ausente.
 
+- A aparência e o comportamento nativos são a diretriz para toda a interface: preferir componentes AppKit/SwiftUI, métricas e cores do sistema; personalizar apenas o necessário para o painel. Ações de menu ficam em texto, switches usam o estilo do sistema e campos mantêm os comandos padrão de edição.
 - Parecer parte do sistema: materiais, tipografia (fonte do sistema, tamanhos de controle `.regular`/`.small`), espaçamento e cantos dos módulos de Som/Bluetooth da Central de Controle; ícones SF Symbols; sliders, toggles e listas nativos.
 - Sem aparência de mixer de estúdio e sem animações contínuas. Os medidores são o único elemento atualizado periodicamente, e só com o painel visível.
 - Toda a UI vem do `AppModel` (`@Observable`, `@MainActor`), que reflete o `EngineStatus` e encaminha comandos ao `EngineController`. A UI nunca chama a HAL.
@@ -43,11 +44,13 @@ Conteúdo, de cima para baixo (SwiftUI, `PanelView`):
    - com `manageDefaultInput` desligado, a linha só informa a entrada atual, sem tratá-la como divergência; o botão "Usar MicBoost" aparece se a entrada não for o BlackHole.
 5. **Microfone:** lista de fontes elegíveis no estilo das listas de dispositivos da Central de Controle (ícone por transporte, nome, marca de seleção). Selecionar troca a fonte (reconstrução do motor com rampa). Uma fonte persistida que não está conectada aparece como "<nome> (desconectado)".
 6. **Equalizador:** seção expansível (`DisclosureGroup`, recolhida por padrão; o estado de expansão persiste), com:
-   - `Toggle` "Ativar EQ";
+   - `Toggle` "Ativar EQ" com switch nativo pequeno;
    - Graves: slider de ganho (dB) + campo de frequência (Hz);
    - Médios: slider de ganho + campo de frequência + slider "Largura" com o valor de Q mostrado (Q maior = banda mais estreita);
    - Agudos: slider de ganho + campo de frequência;
-   - botões "Padrão de voz" e "Zerar EQ".
+   - ações sem borda "Padrão de voz" e "Zerar EQ" na mesma linha.
+
+   O ganho de cada banda aparece numericamente junto ao título; campos de frequência têm largura compacta e alinhamento numérico à direita.
 
    Valores editáveis, validados e limitados às faixas de [dsp.md](dsp.md#equalizador). Sem gráfico de resposta.
 7. **Rodapé:** opções de menu em texto puro, uma por linha e alinhadas à esquerda, "Ajustes…" (abre a janela de ajustes) e "Sair do MicBoost". Sem moldura de botão; a linha inteira é clicável e ganha destaque semântico ao passar o ponteiro ou pressionar, como as ações nos painéis de Som do macOS.
@@ -84,6 +87,7 @@ junto ao rótulo e linhas de diagnóstico/sobre com rótulo à esquerda e valor 
 ## Teclado e acessibilidade
 
 - Todo controle é alcançável por Tab, e as setas ajustam sliders: ganho em passos de 0,5 dB (1 dB com ⌥); EQ em 0,5 dB, frequência em 1/12 de oitava.
+- ⌘Q encerra o app e ⌘, abre os ajustes; campos de texto usam Recortar/Copiar/Colar/Selecionar Tudo do menu Editar nativo. Abrir os ajustes fecha o painel.
 - Atalhos com o painel focado: `M` alterna o mute, `Esc` fecha, ⌘, abre os ajustes.
 - VoiceOver:
   - sliders com `accessibilityLabel` ("Ganho", "Graves, ganho"…) e `accessibilityValue` em dB e percentual;
