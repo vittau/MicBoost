@@ -200,3 +200,7 @@ para os dois controles: numa captura solicitada 100 ms depois do degrau,
 já preenchia toda a faixa. O painel usa o indicador de nível nativo para não
 interpolar a apresentação dos picos. A escala foi conferida em 0 dBFS (100%) e
 −1 dBFS (98,33%), com clamp somente fora de −60…0 dBFS.
+
+Na captura clara renderizada a 1×, a trilha colorida do slider de ganho e as duas
+barras de nível medem 6 pixels de altura (6 pt). O indicador de nível mantém a
+aplicação direta do valor, sem interpolação de progresso.

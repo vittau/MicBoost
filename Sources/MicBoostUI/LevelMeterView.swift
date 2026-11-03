@@ -22,6 +22,6 @@ import SwiftUI
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSLevelIndicator, context: Context) -> CGSize? {
-        CGSize(width: proposal.width ?? 100, height: nsView.intrinsicContentSize.height)
+        CGSize(width: proposal.width ?? 100, height: 6)
     }
 }

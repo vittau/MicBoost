@@ -39,7 +39,7 @@ Conteúdo, de cima para baixo (SwiftUI, `PanelView`):
    - **Ligar:** reconstrói o motor com a fonte e os ajustes persistidos e reaplica a política de entrada padrão.
    - O estado persiste (`processingEnabled`), e a troca nunca fecha o painel.
 2. **Ganho:** botão de mute com o ícone `mic.fill`/`mic.slash.fill` centralizado em uma área fixa de 20 × 20 pt para não deslocar o slider ao alternar, `Slider` de ganho de −12 a +24 dB e rótulo `+12,0 dB · 398%`. O valor é editável: clicar no rótulo abre um campo numérico em dB. O selo "Limitador ativo" (pílula discreta) aparece ao lado do valor de ganho durante a proteção de pico; sua área permanece reservada e o selo fica oculto para acessibilidade quando inativo, sem alterar a altura do painel ou deslocar controles.
-3. **Medidores:** duas barras finas horizontais, "Entrada" e "Saída", em dBFS de −60 a 0, sempre na cor de destaque do sistema, sem flash vermelho nem aviso textual de saturação.
+3. **Medidores:** duas barras horizontais de 6 pt de espessura (como a trilha do slider de ganho), "Entrada" e "Saída", em dBFS de −60 a 0, sempre na cor de destaque do sistema, sem flash vermelho nem aviso textual de saturação.
 4. **Entrada do sistema:** apenas o estado da entrada padrão; a fonte selecionada é indicada pela marcação na lista de microfones, sem uma linha adicional de caminho do áudio:
    - ok: "Entrada do sistema: MicBoost" com marcação;
    - divergência: "Entrada do sistema: <nome>" + botão "Usar MicBoost".
