@@ -95,3 +95,4 @@ Condições de conclusão:
 | Licença do MicBoost | GPL-3.0, que alinha com o BlackHole e simplifica uma eventual redistribuição conjunta | antes da etapa 6 |
 | Queda lenta de latência no ensaio longo | ensaio de várias horas para confirmar que se estabiliza | antes da etapa 6 |
 | Calibração do ganho com voz humana | manter +24 dB; teto aprovado nos testes numéricos, calibração manual pendente | antes de concluir etapa 2 |
+| Homebrew 7 / macOS 27 com cask sem notarização | investigar com tap local: quarentena e "Abrir Mesmo Assim" para app ad hoc, permissão de microfone após `brew upgrade`, BlackHole já instalado, `brew uninstall` | antes da etapa 6 |
