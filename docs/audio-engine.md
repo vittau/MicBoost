@@ -128,6 +128,8 @@ O valor oficial é o medido ([testing.md](testing.md#medição-de-latência)); o
 - `useBlackHole()` para a ação "Usar BlackHole" da UI;
 - `engineWillStop(reason:)` ao sair de `running`, com `reason` `user` (sair do app, desligar o processamento) ou `engineError`.
 
+A política automática só vale com `manageDefaultInput = true` (padrão). Com `false`, o `DefaultInputManager` não escreve a entrada padrão em nenhum momento: não assume o BlackHole ao iniciar e não restaura ao parar. Ele continua publicando o `DefaultInputStatus`, e a ação manual "Usar BlackHole" continua disponível, mas sem restauração posterior. Ao desligar a opção com `defaultInputManaged = true`, a entrada atual é mantida e `defaultInputManaged` é limpo.
+
 Ao entrar em `running`:
 - Se a entrada padrão atual não for o BlackHole: gravar `previousDefaultInputUID` = UID atual e `defaultInputManaged = true` (gravação imediata) e então definir o BlackHole com `kAudioHardwarePropertyDefaultInputDevice`. A gravação vem antes da escrita na HAL, para que um crash no meio ainda restaure; se a escrita falhar, `defaultInputManaged` volta a `false`.
 - Se já for o BlackHole: não alterar nada nem sobrescrever `previousDefaultInputUID`. Manter `defaultInputManaged` como estiver persistido, o que cobre a recuperação após crash.

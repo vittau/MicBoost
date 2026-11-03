@@ -38,6 +38,7 @@ Conteúdo, de cima para baixo (SwiftUI, `PanelView`):
 4. **Roteamento:** linha "Microfone → BlackHole 2ch" e estado da entrada padrão:
    - ok: "Entrada do sistema: BlackHole 2ch" com marcação;
    - divergência: "Entrada do sistema: <nome>" + botão "Usar BlackHole".
+   - com `manageDefaultInput` desligado, a linha só informa a entrada atual, sem tratá-la como divergência; o botão "Usar BlackHole" aparece se a entrada não for o BlackHole.
 5. **Microfone:** lista de fontes elegíveis no estilo das listas de dispositivos da Central de Controle (ícone por transporte, nome, marca de seleção). Selecionar troca a fonte (reconstrução do motor com rampa). Uma fonte persistida que não está conectada aparece como "<nome> (desconectado)".
 6. **Equalizador:** seção expansível (`DisclosureGroup`, recolhida por padrão; o estado de expansão persiste), com:
    - `Toggle` "Ativar EQ";
@@ -70,7 +71,7 @@ Uma faixa no topo do conteúdo, abaixo do cabeçalho, mostra uma mensagem por ve
 
 `NSWindow` com SwiftUI `SettingsView` (`Form` com estilo `.grouped`), aberta por "Ajustes…" ou ⌘, com o painel focado. Seções:
 
-- **Áudio:** tamanho de buffer (64/128/256/512/1024, só os valores suportados) e modo de canais da fonte atual ([audio-engine.md](audio-engine.md#canais)).
+- **Áudio:** chave "Usar BlackHole como entrada do sistema automaticamente" (`manageDefaultInput`, ligada por padrão), com uma frase explicando que, desligada, os apps precisam selecionar "BlackHole 2ch" por conta própria; tamanho de buffer (64/128/256/512/1024, só os valores suportados) e modo de canais da fonte atual ([audio-engine.md](audio-engine.md#canais)).
 - **Diagnóstico** (somente leitura, atualização a 1 Hz com a janela visível): taxa de amostragem, buffer, latência reportada, overloads, `input_missing`, `nonfinite_resets`. Botão "Copiar relatório" (texto para a área de transferência).
 - **Sobre:** versão, link do projeto, aviso de que o app não é notarizado e informação de licença.
 

@@ -106,6 +106,7 @@ stopped ──start──▶ starting ──ok──▶ running
 |---|---|---|
 | `schemaVersion` | `1` | Versão diferente da atual → padrões |
 | `processingEnabled` | `true` | Liga/desliga o motor ao abrir o app |
+| `manageDefaultInput` | `true` | Com `false`, o MicBoost nunca altera a entrada padrão do sistema ([política](audio-engine.md#política-de-entrada-padrão-defaultinputmanager)) |
 | `selectedInputUID` | `nil` | Primeira execução: entrada padrão atual, se elegível; senão, a primeira elegível |
 | `gainDB` | `0` | Faixa em [dsp.md](dsp.md#ganho) |
 | `muted` | `false` | |
