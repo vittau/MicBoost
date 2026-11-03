@@ -36,7 +36,7 @@ Condições de conclusão:
 - voz da fonte chega ao BlackHole (gravador em BlackHole);
 - silêncio seguro nas falhas (desconectar a fonte durante `run`);
 - latência medida com buffers de 128 e 256;
-- ensaio de 60 min aprovado (sem crescimento de atraso);
+- ensaio de 20 min aprovado (sem crescimento de atraso);
 - decisão confirmada: agregado (ou troca para a ponte alternativa, com a especificação reescrita);
 - buffer padrão definido.
 

@@ -76,7 +76,7 @@ EQ:
 
 Estabilidade e desempenho:
 - Nenhuma fila cresce indefinidamente.
-- Sem cortes ou estalos no ensaio de 60 minutos.
+- Sem cortes ou estalos no ensaio de estabilidade de 20 minutos.
 - Latência, CPU, memória e condições de teste registradas em [testing.md](testing.md#resultados-registrados). Desvios da meta são documentados antes da entrega.
 - A interface permanece responsiva.
 

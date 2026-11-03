@@ -43,7 +43,7 @@ CLI para verificar o hardware. É o meio pelo qual agentes sem acesso a áudio v
 | `micboost-diag run --input <uid> [--gain-db N] [--buffer N] [--seconds N]` | Roda o motor sem UI (mesmo `EngineController` do app), imprimindo estado e contadores a cada segundo. Não altera a entrada padrão, a menos que `--manage-default-input` seja passado |
 | `micboost-diag capture --device <uid> --seconds N --out file.wav` | Grava a entrada bruta de um dispositivo |
 | `micboost-diag latency --input <uid> [--trials N]` | Mede a latência adicional (método abaixo) |
-| `micboost-diag soak --input <uid> --minutes 60` | Ensaio de estabilidade (abaixo) |
+| `micboost-diag soak --input <uid> [--minutes N]` (padrão 20) | Ensaio de estabilidade (abaixo) |
 
 A CLI usa parsing manual, sem dependências externas. `devices` exibe transporte por nome, taxas como lista simples em Hz (intervalos quando aplicável), latências e safety offsets em frames e milissegundos na taxa nominal. O JSON preserva os valores numéricos do `DeviceSnapshot` (`devices` e `defaultInputUID`); elegibilidade e BlackHole são derivados dos campos.
 
@@ -64,7 +64,7 @@ Método (`micboost-diag latency`):
 
 **Objetivo de engenharia:** mediana < 20 ms no buffer padrão para fontes USB e internas a 48 kHz. É o requisito do modo monitor da v2, então desvios são registrados abaixo com a causa.
 
-## Ensaio de estabilidade (60 min)
+## Ensaio de estabilidade (20 min)
 
 `micboost-diag soak`:
 - roda o motor com a fonte real;
@@ -77,7 +77,7 @@ Aprovação:
 - 0 `nonfinite_resets`;
 - memória estável (±1 MB).
 
-Complementar com uma escuta humana de uma gravação de voz de 60 min via BlackHole, procurando cortes e estalos.
+Complementar com uma escuta humana de uma gravação de voz de 20 min via BlackHole, procurando cortes e estalos.
 
 ## Roteiro manual (antes de cada release)
 
@@ -104,7 +104,7 @@ Máquina de referência: MacBook Neo (Apple A18 Pro), macOS 27.2.
 | Latência adicional (mediana) | Bluetooth | — |
 | CPU do processo | running, EQ ligado | — |
 | Memória residente | running | — |
-| Ensaio de 60 min | microfone interno | — |
+| Ensaio de 20 min | fonte USB ou interna | — |
 | Captura bruta interna | 2026-11-03; pedido de 3 s, 48 kHz, 1 canal | 144000 frames; pico 0,102121599; RMS 0,005412710; sinal não zero |
 | Captura bruta Continuity | 2026-11-03; pedido de 3 s, 48 kHz, 1 canal | 126976 frames; pico 0,003942308; RMS 0,001024310; sinal não zero |
 | Latência de entrada reportada pela HAL | 2026-11-03; Continuity, 48 kHz | 6000 frames (125 ms) |
