@@ -76,6 +76,7 @@ Controles:
 - Comportamento com hardware real (latência, estabilidade, recuperação) é verificado com `micboost-diag`. Agentes não conseguem ouvir áudio: relate números medidos, não impressões.
 - A permissão de microfone pertence ao app de terminal que executa o `micboost-diag`. Se a captura vier zerada, verifique a permissão antes de depurar.
 - Não declare uma etapa concluída sem cumprir as condições de `docs/roadmap.md`. Diga explicitamente o que não foi possível verificar (por exemplo, "requer teste manual com USB").
+- Encerre todo processo que você iniciou (`MicBoost.app`, `micboost-diag run`/`soak`) antes de terminar a tarefa. Um app esquecido continua na barra de menus do mantenedor e pode alterar a entrada padrão.
 
 ## Git
 
