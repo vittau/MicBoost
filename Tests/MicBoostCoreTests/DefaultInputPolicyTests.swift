@@ -6,6 +6,10 @@ import Testing
 
 /// Device set and default input used by the policy tests. The BlackHole is the
 /// 2-channel virtual device installed on the reference machine.
+///
+/// Every policy test is `@MainActor` so `DefaultInputManager` (not `Sendable`,
+/// `nonisolated(nonsending)` methods) stays inside a single executor, as it does
+/// on the engine queue in the app.
 private struct PolicyFixture {
     let fake = FakeAudioHardware()
     let storage = MemorySettingsStorage()
@@ -36,7 +40,7 @@ private struct PolicyFixture {
     }
 }
 
-@Test func firstStartAdoptsBlackHoleAndSavesPreviousInput() async throws {
+@Test @MainActor func firstStartAdoptsBlackHoleAndSavesPreviousInput() async throws {
     let fixture = try PolicyFixture(defaultInput: 1)
     try await fixture.manager.engineDidStart(blackHole: fixture.blackHole)
 
@@ -58,7 +62,7 @@ private struct PolicyFixture {
     #expect(!status.unknown)
 }
 
-@Test func blackHoleAlreadyDefaultKeepsPersistedRecoveryState() async throws {
+@Test @MainActor func blackHoleAlreadyDefaultKeepsPersistedRecoveryState() async throws {
     let stored = Settings(previousDefaultInputUID: "usb", defaultInputManaged: true)
     let fixture = try PolicyFixture(defaultInput: 2, stored: stored)
     try await fixture.manager.engineDidStart(blackHole: fixture.blackHole)
@@ -75,7 +79,7 @@ private struct PolicyFixture {
     #expect(!current.defaultInputManaged)
 }
 
-@Test func blackHoleAlreadyDefaultWithoutRecoveryStateStaysUnmanaged() async throws {
+@Test @MainActor func blackHoleAlreadyDefaultWithoutRecoveryStateStaysUnmanaged() async throws {
     let fixture = try PolicyFixture(defaultInput: 2)
     try await fixture.manager.engineDidStart(blackHole: fixture.blackHole)
 
@@ -89,7 +93,7 @@ private struct PolicyFixture {
     #expect(fixture.fake.writes.isEmpty)
 }
 
-@Test func userDivergenceThenUseBlackHole() async throws {
+@Test @MainActor func userDivergenceThenUseBlackHole() async throws {
     let fixture = try PolicyFixture(defaultInput: 1)
     try await fixture.manager.engineDidStart(blackHole: fixture.blackHole)
 
@@ -116,7 +120,7 @@ private struct PolicyFixture {
     #expect(!adopted.unknown)
 }
 
-@Test func stopRestoresPreviousInput() async throws {
+@Test @MainActor func stopRestoresPreviousInput() async throws {
     let fixture = try PolicyFixture(defaultInput: 3)
     try await fixture.manager.engineDidStart(blackHole: fixture.blackHole)
     #expect(fixture.fake.input == fixture.blackHole.id)
@@ -129,7 +133,7 @@ private struct PolicyFixture {
     #expect(!current.defaultInputManaged)
 }
 
-@Test func stopDoesNotRestoreAfterUserChange() async throws {
+@Test @MainActor func stopDoesNotRestoreAfterUserChange() async throws {
     let fixture = try PolicyFixture(defaultInput: 1)
     try await fixture.manager.engineDidStart(blackHole: fixture.blackHole)
 
@@ -144,7 +148,7 @@ private struct PolicyFixture {
     #expect(!current.defaultInputManaged)
 }
 
-@Test func stopDoesNotRestoreWhenPreviousDeviceIsGone() async throws {
+@Test @MainActor func stopDoesNotRestoreWhenPreviousDeviceIsGone() async throws {
     let fixture = try PolicyFixture(defaultInput: 1)
     try await fixture.manager.engineDidStart(blackHole: fixture.blackHole)
 
@@ -168,7 +172,7 @@ private struct PolicyFixture {
     #expect(!current.defaultInputManaged)
 }
 
-@Test func engineErrorDoesNotRestore() async throws {
+@Test @MainActor func engineErrorDoesNotRestore() async throws {
     let fixture = try PolicyFixture(defaultInput: 1)
     try await fixture.manager.engineDidStart(blackHole: fixture.blackHole)
     #expect(fixture.fake.writes.count == 1)
@@ -186,7 +190,7 @@ private struct PolicyFixture {
     #expect(!current.defaultInputManaged)
 }
 
-@Test func policyOnlyWritesDefaultInput() async throws {
+@Test @MainActor func policyOnlyWritesDefaultInput() async throws {
     let fixture = try PolicyFixture(defaultInput: 1)
     try await fixture.manager.engineDidStart(blackHole: fixture.blackHole)
     _ = try await fixture.manager.defaultInputDidChange()
@@ -199,7 +203,7 @@ private struct PolicyFixture {
     #expect(fixture.fake.writes.allSatisfy { $0 == kAudioHardwarePropertyDefaultInputDevice })
 }
 
-@Test func statusIsUnknownBeforeStart() async throws {
+@Test @MainActor func statusIsUnknownBeforeStart() async throws {
     let fixture = try PolicyFixture(defaultInput: 1)
     let status = try await fixture.manager.defaultInputDidChange()
     #expect(status.unknown)
@@ -207,7 +211,7 @@ private struct PolicyFixture {
     #expect(!status.divergedByUser)
 }
 
-@Test func useBlackHoleRequiresStart() async throws {
+@Test @MainActor func useBlackHoleRequiresStart() async throws {
     let fixture = try PolicyFixture(defaultInput: 1)
     await #expect(throws: (any Error).self) { try await fixture.manager.useBlackHole() }
     #expect(fixture.fake.writes.isEmpty)

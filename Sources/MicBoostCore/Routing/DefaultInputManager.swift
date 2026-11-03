@@ -27,11 +27,17 @@ public struct DefaultInputStatus: Codable, Equatable, Sendable {
 /// sets a physical device as default outside the restore, and never reverts an
 /// external change.
 ///
-/// Not internally synchronized: every method must be called from the engine
-/// queue, which is also what serializes the calls (same rule as `DeviceService`).
-/// `@unchecked Sendable` is justified by that confinement. The manager does not
-/// register HAL listeners; `EngineController` calls it when they fire.
-public final class DefaultInputManager: @unchecked Sendable {
+/// Not internally synchronized: it must be owned by `EngineController`, whose
+/// executor (the `engine` queue) is the only place these methods and `lastStatus`
+/// may run. Every async method is `nonisolated(nonsending)`, so it inherits the
+/// caller's isolation, stays on the engine actor's executor and resumes there
+/// after each `await` to `SettingsStore`; a plain `nonisolated async` method
+/// would run on the cooperative pool and touch the HAL adapter off the queue.
+/// The class is deliberately not `Sendable`: moving it to another isolation
+/// domain is a compile error, and the adapter keeps a single owner on the queue.
+/// The manager does not register HAL listeners; `EngineController` calls it when
+/// they fire.
+public final class DefaultInputManager {
     public enum StopReason: Sendable {
         /// App quit or processing turned off: the restore policy applies.
         case user
@@ -55,7 +61,7 @@ public final class DefaultInputManager: @unchecked Sendable {
     public var lastStatus: DefaultInputStatus { status }
 
     /// Applies the input step when the engine reaches `running`.
-    public func engineDidStart(blackHole: AudioDevice) async throws {
+    public nonisolated(nonsending) func engineDidStart(blackHole: AudioDevice) async throws {
         self.blackHole = blackHole
         try await adoptBlackHole()
         running = true
@@ -63,7 +69,7 @@ public final class DefaultInputManager: @unchecked Sendable {
 
     /// Handles `kAudioHardwarePropertyDefaultInputDevice` while the engine runs.
     @discardableResult
-    public func defaultInputDidChange() async throws -> DefaultInputStatus {
+    public nonisolated(nonsending) func defaultInputDidChange() async throws -> DefaultInputStatus {
         let (currentID, device) = try currentDefaultInput()
         let isBlackHole = isBlackHoleDevice(currentID, device)
         if running, !isBlackHole {
@@ -81,12 +87,12 @@ public final class DefaultInputManager: @unchecked Sendable {
     }
 
     /// "Usar BlackHole" action: repeats the input step of the start.
-    public func useBlackHole() async throws {
+    public nonisolated(nonsending) func useBlackHole() async throws {
         try await adoptBlackHole()
     }
 
     /// Applies the restore policy when the engine leaves `running`.
-    public func engineWillStop(reason: StopReason = .user) async throws {
+    public nonisolated(nonsending) func engineWillStop(reason: StopReason = .user) async throws {
         defer { running = false }
         guard reason == .user, let blackHole else {
             status.divergedByUser = false
@@ -116,7 +122,7 @@ public final class DefaultInputManager: @unchecked Sendable {
         status = DefaultInputStatus(isBlackHole: false, divergedByUser: false, unknown: false)
     }
 
-    private func adoptBlackHole() async throws {
+    private nonisolated(nonsending) func adoptBlackHole() async throws {
         guard let blackHole else {
             throw EngineError.invalidArgument("DefaultInputManager used before engineDidStart")
         }
@@ -142,7 +148,7 @@ public final class DefaultInputManager: @unchecked Sendable {
         status = DefaultInputStatus(isBlackHole: true, divergedByUser: false, unknown: false)
     }
 
-    private func clearManaged() async {
+    private nonisolated(nonsending) func clearManaged() async {
         await settings.updateDefaultInput { $0.defaultInputManaged = false }
     }
 
