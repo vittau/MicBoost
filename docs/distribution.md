@@ -31,6 +31,10 @@ No Apple Silicon, todo binário precisa de assinatura válida para executar; a a
 
 Desenvolvimento: a assinatura ad hoc muda o cdhash a cada build, e o macOS pode pedir de novo a permissão de microfone. Opcionalmente, crie no Acesso às Chaves um certificado autoassinado local de assinatura de código ("MicBoost Dev", gratuito) e exporte `MICBOOST_SIGN_IDENTITY="MicBoost Dev"`, que o script usa no lugar de `-`. Nunca usar esse certificado nos artefatos de release.
 
+### Ícone do app
+
+A fonte em camadas está em `Resources/AppIcon.icon`, com SVGs e variantes clara, escura e tonalizada do material Liquid Glass do Icon Composer. `scripts/compile-icon.sh <diretório>` usa o `actool` do Xcode selecionado, com destino mínimo macOS 14.0, e completa o ícone legado com `ictool` e `iconutil`: grava `AppIcon.icns` (16 a 1024 px, compatível com macOS 14 e posteriores) e `Assets.car`, quando produzido pela ferramenta, no diretório informado. As prévias PNG, incluindo as aparências transparentes geradas pelo Icon Composer, ficam em `design/icon/previews/`; `design/icon/render-previews.sh` as regenera.
+
 ## Release (download direto)
 
 `scripts/package-release.sh <versão>`:
