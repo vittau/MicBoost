@@ -12,6 +12,8 @@ Canais excluídos: Mac App Store, `homebrew/cask` oficial (as regras exigem pass
 - Repositório: `github.com/vittau/MicBoost`. Tap: `github.com/vittau/homebrew-micboost` (`brew tap vittau/micboost`).
 - Versão: SemVer em `CFBundleShortVersionString` e contador de build em `CFBundleVersion`. A fonte da verdade é a tag git `vX.Y.Z`.
 
+- Doações: `.github/FUNDING.yml` (`github: vittau`, `buy_me_a_coffee: vittau`) ativa o botão Sponsor do repositório, junto com a opção Settings → General → Features → Sponsorships, que é ligada manualmente no GitHub.
+
 ## Build
 
 `scripts/build-app.sh [debug|release]`:
@@ -124,7 +126,7 @@ Estrutura, nesta ordem:
 4. Callout de status (`> [!WARNING]`) enquanto não houver release: o que já funciona e o que falta, coerente com [roadmap.md](roadmap.md).
 5. **Capturas:** grade em tabela com o painel (clara/escura), o EQ expandido, a janela de ajustes e um estado de erro, mais uma legenda dizendo como as imagens foram geradas. As capturas são renderizações das views SwiftUI reais com estado de exemplo, geradas por `scripts/render-screenshots.sh` em `docs/screenshots/`. Antes da interface (etapa 4), a seção mostra só o ícone nas variantes.
 6. **How it works:** diagrama da cadeia (fonte → EQ → ganho → proteção de pico → BlackHole → apps) e um parágrafo sobre o dispositivo agregado sem fila e o porquê da baixa latência.
-7. **Features**, **Requirements**, **Install** (só os canais validados; antes disso, só "Build from source"), **First launch** (fluxo "Abrir Mesmo Assim" de [Primeira abertura](#primeira-abertura-sem-notarização), sem `xattr` nem remoção de quarentena), **Usage** (passos numerados, incluindo selecionar "BlackHole 2ch" ou "padrão do sistema" no app de chamada), **Latency** (números medidos de [testing.md](testing.md#resultados-registrados) e o método), **Known limitations** (Bluetooth, Continuity, microfone interno com a tampa fechada, ganho digital), **Troubleshooting**, **Uninstall**, **Building from source**, **License**, **Credits** (BlackHole e as referências de inspiração, deixando claro que é uma implementação independente).
+7. **Features**, **Requirements**, **Install** (só os canais validados; antes disso, só "Build from source"), **First launch** (fluxo "Abrir Mesmo Assim" de [Primeira abertura](#primeira-abertura-sem-notarização), sem `xattr` nem remoção de quarentena), **Usage** (passos numerados, incluindo selecionar "BlackHole 2ch" ou "padrão do sistema" no app de chamada), **Latency** (números medidos de [testing.md](testing.md#resultados-registrados) e o método), **Known limitations** (Bluetooth, Continuity, microfone interno com a tampa fechada, ganho digital), **Troubleshooting**, **Uninstall**, **Building from source**, **Support** (GitHub Sponsors e Buy Me a Coffee, com botões/badges para `github.com/sponsors/vittau` e `buymeacoffee.com/vittau`), **License**, **Credits** (BlackHole e as referências de inspiração, deixando claro que é uma implementação independente).
 
 Manutenção: toda mudança visível ao usuário (recurso, instalação, limitação, medição) atualiza o README na mesma mudança. As capturas são regeneradas quando a UI muda.
 
