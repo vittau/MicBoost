@@ -5,7 +5,7 @@
 Amplificar e equalizar o microfone escolhido pelo usuário e disponibilizar o áudio processado pelo BlackHole 2ch, com:
 
 - interface com aparência de controle nativo do macOS (Volume/Bluetooth da Central de Controle);
-- resposta imediata dos controles e baixa latência de áudio (meta: < 20 ms adicionais, ver [testing.md](testing.md#medição-de-latência));
+- resposta imediata dos controles e latência de áudio adicional de no máximo 100 ms no uso normal (fonte → BlackHole), com arquitetura sem fila que mire < 20 ms, porque o modo monitor da v2 exige isso (ver [testing.md](testing.md#medição-de-latência));
 - ganho acima de 200% (+6,02 dB), sem teto herdado de outra solução;
 - instalação simples **sem notarização** e sem adesão paga ao Apple Developer Program.
 
@@ -34,7 +34,9 @@ Motivação: o VirtuMic tem interface pesada e atraso perceptível (o log dele m
 
 ## Fora de escopo da v1
 
-Redução de ruído, compressor avançado, ganho automático, monitoramento (ouvir a si mesmo), presets de EQ, gráfico de resposta, módulo da Central de Controle, Mac App Store, `homebrew/cask` oficial, notarização, iniciar no login.
+Redução de ruído, compressor avançado, ganho automático, modo monitor (ouvir a si mesmo; previsto para a v2, ver abaixo), presets de EQ, gráfico de resposta, módulo da Central de Controle, Mac App Store, `homebrew/cask` oficial, notarização, iniciar no login.
+
+Modo monitor (v2): ouvir a própria voz processada na saída de áudio (fones), com latência total da fonte à saída **< 20 ms**. Acima disso, o atraso é percebido como eco. Decisões de arquitetura da v1 não podem inviabilizar essa meta.
 
 Limitação inerente: o ganho digital também amplifica ruído e não recupera áudio já saturado na origem. O painel indica saturação da entrada quando ela ocorre.
 

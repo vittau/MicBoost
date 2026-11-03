@@ -60,7 +60,9 @@ Método (`micboost-diag latency`):
 4. A ferramenta captura dois segundos por tentativa, usa o host time do primeiro buffer para alinhamento, busca correlação normalizada em ±100 ms e exige correlação ≥ 0,5; sem sinal suficiente, falha explicitamente. A ferramenta alinha as duas gravações pelo host time, calcula a correlação cruzada e obtém o atraso. Repete N vezes (padrão 10) e reporta mediana, mínimo e máximo, em ms e em frames.
 5. Também imprime a latência reportada pela HAL e `io_delta_host`, para comparar.
 
-**Meta:** mediana < 20 ms na máquina de referência com buffer de 256 (e o valor com 128). É uma meta de engenharia, não uma garantia. Desvios são documentados abaixo.
+**Aceitação (v1, fonte → BlackHole):** mediana ≤ 100 ms em toda fonte suportada, exceto fontes cuja própria latência de entrada reportada já exceda esse valor (por exemplo, Continuity), que ficam documentadas como limitação.
+
+**Objetivo de engenharia:** mediana < 20 ms no buffer padrão para fontes USB e internas a 48 kHz. É o requisito do modo monitor da v2, então desvios são registrados abaixo com a causa.
 
 ## Ensaio de estabilidade (60 min)
 
