@@ -13,6 +13,7 @@ public struct EngineStatus: Sendable {
     public var source: AudioDevice?
     public var blackHole: AudioDevice?
     public var defaultInput: DefaultInputStatus
+    public var defaultInputName: String?
     public var sampleRate: Double
     public var bufferFrames: UInt32
     public var reportedLatencyMs: Double
@@ -34,6 +35,7 @@ public actor EngineController {
     nonisolated public var unownedExecutor: UnownedSerialExecutor { queue.asUnownedSerialExecutor() }
     private let settings: SettingsStore
     private var controls = Settings()
+    private lazy var routingManager = DefaultInputManager(hardware: hardware, settings: settings)
     private var channelSelection: ChannelSelection = .auto
     private var forceRebuild = false
     private let hardware: any EngineHardware
@@ -52,6 +54,7 @@ public actor EngineController {
     private var overloads: UInt64 = 0
     private var tokens: [UUID] = []
     private var pending: Task<Void, Never>?
+    private var defaultToken: UUID?
     public init(settings: SettingsStore = SettingsStore(storage: UserDefaultsStorage())) {
         hardware = CoreAudioHardware()
         self.settings = settings
@@ -63,6 +66,13 @@ public actor EngineController {
         self.settings = settings
     }
     public func start(inputUID: String, bufferFrames: UInt32? = nil) async throws {
+        if defaultToken == nil {
+            defaultToken = try hardware.addListener(
+                .init(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDefaultInputDevice), queue: queue
+            ) { [weak self] in
+                Task { try? await self?.defaultChanged() }
+            }
+        }
         let stored = await settings.current
         controls = stored
         let bufferFrames = bufferFrames ?? UInt32(stored.bufferFrames)
@@ -79,9 +89,9 @@ public actor EngineController {
                     queue: queue
                 ) { [weak self] in Task { await self?.changed() } })
         }
-        try build()
+        try await build()
     }
-    private func build() throws {
+    private func build() async throws {
         state = .starting
         do {
             guard hardware.microphoneAuthorized else {
@@ -117,7 +127,7 @@ public actor EngineController {
             let deadline = Date().addingTimeInterval(2)
             while !(try hardware.devices().contains(where: { $0.id == id && $0.alive })) {
                 guard Date() < deadline else { throw EngineError.halFailure(-1, "Wait for aggregate") }
-                Thread.sleep(forTimeInterval: 0.01)
+                try await Task.sleep(for: .milliseconds(10))
             }
             buffer = try hardware.setBuffer(id, frames: requested)
             let sourceLayout = try hardware.layout(source.id)
@@ -168,6 +178,7 @@ public actor EngineController {
                 + hardware.latencyFrames(id, scope: kAudioObjectPropertyScopeInput) + buffer
             hasRun = true
             state = .running
+            try await routingManager.engineDidStart(blackHole: blackHole)
         } catch {
             state = .error((error as? EngineError) ?? .invalidArgument(String(describing: error)))
             try tearDown()
@@ -221,10 +232,20 @@ public actor EngineController {
             }
         }
     }
+    public func applyVoicePreset() async {
+        await updateControls {
+            let enabled = $0.eq.enabled
+            $0.eq = EQSettings()
+            $0.eq.enabled = enabled
+        }
+    }
     public func resetEQ() async {
         await updateControls {
             let enabled = $0.eq.enabled
             $0.eq = EQSettings()
+            $0.eq.low.gainDB = 0
+            $0.eq.mid.gainDB = 0
+            $0.eq.high.gainDB = 0
             $0.eq.enabled = enabled
         }
     }
@@ -248,7 +269,7 @@ public actor EngineController {
             await self?.recover()
         }
     }
-    private func recover() {
+    private func recover() async {
         guard selected != nil else { return }
         let forced = forceRebuild
         forceRebuild = false
@@ -262,10 +283,13 @@ public actor EngineController {
         state = .recovering("formatChanged")
         do {
             try tearDown()
-            try build()
+            try await build()
         } catch { state = .error((error as? EngineError) ?? .invalidArgument(String(describing: error))) }
     }
     private func tearDown() throws {
+        for token in tokens.dropFirst() { try hardware.removeListener(token) }
+        if tokens.count > 1 { tokens.removeSubrange(1...) }
+
         let aggregateExists: Bool
         if let aggregate {
             aggregateExists = try hardware.devices().contains { $0.id == aggregate && $0.uid == AggregateBuilder.uid }
@@ -297,10 +321,9 @@ public actor EngineController {
             if aggregateExists { try hardware.destroyAggregate(aggregate) }
             self.aggregate = nil
         }
-        for token in tokens.dropFirst() { try hardware.removeListener(token) }
-        if tokens.count > 1 { tokens.removeSubrange(1...) }
     }
     public func willSleep() throws {
+        guard selected != nil else { return }
         try tearDown()
         state = .recovering("sleep")
     }
@@ -311,14 +334,26 @@ public actor EngineController {
             await self?.recover()
         }
     }
-    public func stop() throws {
+    public func stop() async throws {
         selected = nil
         pending?.cancel()
         try tearDown()
         for token in tokens { try hardware.removeListener(token) }
         tokens.removeAll()
+        if let defaultToken {
+            try hardware.removeListener(defaultToken)
+            self.defaultToken = nil
+        }
         state = .stopped
+        try await routingManager.engineWillStop()
+        await settings.flush()
     }
+    private func defaultChanged() async throws {
+        try await routingManager.defaultInputDidChange()
+    }
+    public func setDefaultInputManagement(_ enabled: Bool) async { await routingManager.setManagementEnabled(enabled) }
+    public func useBlackHole() async throws { try await routingManager.useBlackHole() }
+    public func availableDevices() throws -> [AudioDevice] { try hardware.devices() }
     public func status() -> EngineStatus {
         var counters = mb_counters()
         if let engine { mb_engine_read_counters(engine, &counters) }
@@ -330,12 +365,16 @@ public actor EngineController {
         let latency = Double(reportedFrames)
         let defaultStatus: DefaultInputStatus
         if let current = try? hardware.defaultInput() {
-            defaultStatus = DefaultInputStatus(isBlackHole: current == destination?.id)
+            defaultStatus = DefaultInputStatus(
+                isBlackHole: current == destination?.id, divergedByUser: state == .running && current != destination?.id
+            )
         } else {
             defaultStatus = .unresolved
         }
         return EngineStatus(
-            state: state, source: source, blackHole: destination, defaultInput: defaultStatus, sampleRate: rate,
+            state: state, source: source, blackHole: destination, defaultInput: defaultStatus,
+            defaultInputName: (try? hardware.devices().first { $0.id == (try? hardware.defaultInput()) }?.name),
+            sampleRate: rate,
             bufferFrames: buffer, reportedLatencyMs: rate > 0 ? latency * 1000 / rate : 0,
             overloads: overloads, cycles: counters.cycles, inputMissing: counters.input_missing,
             nonfiniteResets: counters.nonfinite_resets, ioDeltaHost: counters.io_delta_host)

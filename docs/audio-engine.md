@@ -159,3 +159,8 @@ Invariantes: nunca definir uma fonte física como padrão, exceto na restauraç�
 Uma fonte que entrega apenas zeros mantém o motor em `running`; não há detecção automática de fonte silenciosa na v1.
 
 Silêncio seguro: sempre que o processador não tiver entrada válida ou detectar não-finitos, a saída para o BlackHole é zero. Antes de qualquer stop voluntário, rampa de saída.
+
+A enumeração tolera `kAudioHardwareBadObjectError` por dispositivo: um objeto pode
+sumir entre a leitura da lista de IDs e suas propriedades, inclusive logo após destruir
+um agregado. Outros erros continuam sendo propagados como `EngineError.halFailure`.
+Listeners do agregado são removidos antes de destruí-lo, preservando a ordem de teardown.

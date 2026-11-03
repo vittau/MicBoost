@@ -21,9 +21,12 @@ import Testing
     await controller.resetEQ()
     await store.flush()
     let reset = await store.current
-    #expect(reset.eq.low == EQSettings().low)
-    #expect(reset.eq.mid == EQSettings().mid)
-    #expect(reset.eq.high == EQSettings().high)
+    #expect(reset.eq.low.frequency == 70)
+    #expect(reset.eq.low.gainDB == 0)
+    #expect(reset.eq.mid.frequency == 3000)
+    #expect(reset.eq.mid.gainDB == 0)
+    #expect(reset.eq.high.frequency == 8000)
+    #expect(reset.eq.high.gainDB == 0)
     #expect(!reset.eq.enabled && reset.muted && reset.gainDB == 12)
     #expect(reset.channelSelectionByUID == values.channelSelectionByUID)
     #expect(await controller.status().state == .stopped)
@@ -61,4 +64,18 @@ import Testing
     #expect(status.bufferFrames == 256)
     #expect(await store.current.gainDB == 12)
     try await controller.stop()
+}
+
+@Test func voicePresetKeepsOtherControls() async {
+    let store = SettingsStore(storage: MemorySettingsStorage())
+    let controller = EngineController(hardware: FakeAudioHardware(), settings: store)
+    await controller.setGain(db: 12)
+    await controller.setMuted(true)
+    await controller.setEQEnabled(false)
+    await controller.applyVoicePreset()
+    let settings = await store.current
+    #expect(settings.eq.low.frequency == 70 && settings.eq.low.gainDB == -6)
+    #expect(settings.eq.mid.frequency == 3000 && settings.eq.mid.gainDB == 2 && settings.eq.mid.q == 1)
+    #expect(settings.eq.high.frequency == 8000 && settings.eq.high.gainDB == 1.5)
+    #expect(!settings.eq.enabled && settings.muted && settings.gainDB == 12)
 }

@@ -7,7 +7,7 @@
 - Parecer parte do sistema: materiais, tipografia (fonte do sistema, tamanhos de controle `.regular`/`.small`), espaçamento e cantos dos módulos de Som/Bluetooth da Central de Controle; ícones SF Symbols; sliders, toggles e listas nativos.
 - Sem aparência de mixer de estúdio e sem animações contínuas. Os medidores são o único elemento atualizado periodicamente, e só com o painel visível.
 - Toda a UI vem do `AppModel` (`@Observable`, `@MainActor`), que reflete o `EngineStatus` e encaminha comandos ao `EngineController`. A UI nunca chama a HAL.
-- Idiomas: pt-BR e en, via String Catalog (`Localizable.xcstrings`) nos recursos do target `MicBoostApp`, usando `String(localized:)`/`LocalizedStringKey`. Idioma de desenvolvimento: en.
+- Idiomas: pt-BR e en, via `Localization/{en,pt-BR}.lproj/Localizable.strings` nos recursos do target `MicBoostUI`, usando `NSLocalizedString` com `Bundle.module` (recursos nativos suportados pelo SwiftPM). Idioma de desenvolvimento: en.
 
 ## Item da barra de menus
 
@@ -93,3 +93,13 @@ Uma faixa no topo do conteúdo, abaixo do cabeçalho, mostra uma mensagem por ve
 1. Pedir a permissão de microfone (`AVCaptureDevice.requestAccess(for: .audio)`), com texto de `NSMicrophoneUsageDescription`: "O MicBoost captura o microfone escolhido para amplificá-lo e entregá-lo aos seus apps."
 2. Se faltar o BlackHole, mostrar a mensagem correspondente.
 3. Abrir o painel automaticamente uma vez, para o usuário ver onde o app fica.
+
+## Renderização e verificação
+
+`MicBoostUI` contém o modelo e as views compartilhadas com o executável auxiliar
+`render-screenshots`, fora do produto do app. `scripts/render-screenshots.sh` usa
+`NSHostingView.cacheDisplay` numa janela fora da tela para incluir controles AppKit
+nativos, em ambas as aparências; `ImageRenderer` não rasteriza esses controles.
+O app consulta snapshots de estado a 1 Hz; os medidores têm tarefa separada de 20 Hz,
+cancelada ao fechar o painel. A expansão do EQ fica em `UserDefaults.eqExpanded`.
+A validação manual de VoiceOver, contraste e preferências de acessibilidade está pendente.

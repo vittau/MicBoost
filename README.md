@@ -17,20 +17,21 @@ calls, recorders, anything — hears the processed voice.
 > review of its human maintainer.
 
 > [!WARNING]
-> **Pre-release: the app is a menu bar icon with a Quit item, and there is no download or
-> Homebrew tap yet.**
->
-> **Working today:** a device-agnostic capture → BlackHole 2ch bridge, driven by the
-> `micboost-diag` command-line tool. It captures any Core Audio input by UID through a private
-> aggregate device, with no queue between callbacks. Measured on a USB microphone at 48 kHz:
-> median **15.3 ms** of added latency at the default buffer, a 20-minute stability run with no
-> overloads, automatic recovery after unplugging the microphone, and safe silence when the
-> source delivers no signal. Gain up to +24 dB, mute, peak protection and a 3-band EQ
-> with bypass are available through the diagnostic tool.
->
-> **Still planned:** the menu bar
-> panel and settings window (stage 4), full recovery coverage — sleep/wake, format changes (stage 5), and the Homebrew tap with a `.zip`
-> release (stage 6). Progress lives in [the roadmap](docs/roadmap.md).
+> **Pre-release:** the menu bar panel, EQ and settings are available from source. Releases,
+> the Homebrew tap and full recovery/accessibility validation remain pending.
+
+## Screenshots
+
+| Panel (light) | Panel (dark) |
+| --- | --- |
+| ![Panel](docs/screenshots/panel-light.png) | ![Panel dark](docs/screenshots/panel-dark.png) |
+| EQ expanded | Settings |
+| ![EQ](docs/screenshots/eq-light.png) | ![Settings](docs/screenshots/settings-light.png) |
+| Missing driver | Missing driver (dark) |
+| ![Error](docs/screenshots/error-light.png) | ![Error dark](docs/screenshots/error-dark.png) |
+
+Off-screen renders of the real SwiftUI views with sample state, generated with
+`scripts/render-screenshots.sh`. Both appearances for every view are in `docs/screenshots/`.
 
 ## How it works
 
@@ -45,7 +46,7 @@ The added latency is bounded by the buffer and the device safety offsets, and th
 the two clocks is handled by Core Audio's drift resampler instead of a ring buffer that grows.
 The aggregate is private: other apps never see it, and it disappears with the process.
 
-Gain, mute and the 3-band EQ can be adjusted with the diagnostic tool. Peak protection
+Gain, mute and the 3-band EQ can be adjusted in the menu bar panel. Peak protection
 keeps the output below −1 dBFS; human voice calibration and listening checks remain pending.
 
 ## Features
@@ -64,10 +65,14 @@ Available today:
 - **Safe silence on zero input**: a source that delivers zeros — the built-in microphone with the
   lid closed, for example — produces silence in BlackHole, not noise.
 
+- **Menu bar panel** with gain, meters, routing status, microphones and EQ, plus settings for
+  buffer, channels, automatic system input switching and diagnostics.
+- **Voice preset** for rumble reduction and gentle presence, plus a flat EQ reset.
+- **Processing switch** releases the microphone; quitting restores the previous system input
+  when MicBoost still manages it.
+
 Planned for v1:
 
-- **Menu bar panel** with gain, meters, routing status, source list and the EQ section, plus a
-  settings window for buffer, channels and diagnostics (stage 4).
 - **Recovery** from a disconnected source, sleep/wake, format changes and a missing BlackHole
   (stage 5).
 - **Homebrew tap and `.zip` release** (stage 6).
@@ -76,8 +81,7 @@ Planned for v1:
 
 - macOS 14 Sonoma or later, on Apple Silicon or Intel.
 - [BlackHole 2ch](https://existential.audio/blackhole/) installed as a separate driver.
-- Microphone permission for MicBoost — or, while there is no UI, for the terminal application
-  that runs `micboost-diag`.
+- Microphone permission for MicBoost (and for your terminal when using diagnostics).
 - To build from source: Xcode 27.2 / Swift 6.4.
 
 ## Install
@@ -110,34 +114,18 @@ never disables Gatekeeper or SIP and never removes the quarantine flag, and neit
 
 ## Usage
 
-The bridge runs from the diagnostic CLI until the menu bar panel exists:
+1. Open MicBoost and allow microphone access.
+2. Click its menu bar icon and choose your microphone. MicBoost sets the processed input as
+   the system input automatically by default; disable this in Audio settings if desired.
+3. Adjust gain, mute and EQ in the panel. Close the panel whenever you like; audio keeps running.
+4. In your calling or recording app, choose **BlackHole 2ch** or **System Default**.
+5. Turn processing off to release the microphone, or choose **Quit MicBoost**. The previous
+   system input is restored if automatic switching is enabled and you have not changed it yourself.
 
-1. Install BlackHole 2ch and grant microphone permission to your terminal application.
-2. List the inputs and note the UID of the microphone you want:
+### Diagnostics
 
-   ```sh
-   swift run micboost-diag devices
-   ```
-
-3. Make BlackHole 2ch the system input in System Settings → Sound → Input. Apps that use the
-   "system default" microphone read it. Until the app has a UI, MicBoost does not change the
-   system input for you.
-4. Start the bridge:
-
-   ```sh
-   swift run micboost-diag run --input <uid> --seconds 300
-   ```
-
-5. In the calling or recording app, select **BlackHole 2ch** — or **System Default** — as the
-   microphone.
-6. Stop with Control-C when you are done, and set your microphone back in System Settings →
-   Sound → Input. The private aggregate device disappears with the process.
-
-The CLI also reports microphone authorization (`micboost-diag permission`), records raw input
-(`micboost-diag capture --device <uid> --seconds 3 --out take.wav`), measures latency
-(`micboost-diag latency --input <uid>`) and runs a stability soak
-(`micboost-diag soak --input <uid> --minutes 20`). See [docs/testing.md](docs/testing.md) for
-every option.
+`swift run micboost-diag devices` lists inputs. The CLI also supports capture, latency and
+stability measurements; see [the diagnostic reference](docs/testing.md).
 
 ## Latency
 
@@ -186,7 +174,7 @@ Full results and conditions: [docs/testing.md](docs/testing.md#resultados-regist
   permission granted and the callbacks keep firing, but they deliver zeros; MicBoost cannot
   capture audio in that state.
 - **Digital gain amplifies noise too**, and it cannot recover audio that was already clipped at
-  the source. The panel will show input clipping once the UI exists.
+  the source. The panel shows input clipping.
 
 ## Troubleshooting
 
@@ -212,9 +200,8 @@ feedback, the calling app is monitoring its own output.
 
 ## Uninstall
 
-MicBoost is not installed anywhere yet. To clean up a local build, quit the CLI with Control-C,
-restore your microphone in System Settings → Sound → Input, then delete the checkout and its
-`build/` directory. Settings, once the app writes them, are removed with:
+MicBoost is not installed anywhere yet. To clean up a local build, quit MicBoost from its panel, then delete the checkout and its
+`build/` directory. Settings are removed with:
 
 ```sh
 defaults delete io.github.vittau.MicBoost
@@ -235,8 +222,7 @@ open build/MicBoost.app
 ```
 
 `swift test` runs without audio hardware, BlackHole or microphone permission. `build-app.sh`
-assembles and ad-hoc signs `build/MicBoost.app`. The app currently opens a menu bar item with only
-**Quit**; the panel arrives with the UI stage. The project is a single SwiftPM package — there is
+assembles and ad-hoc signs `build/MicBoost.app`. The app opens a menu bar panel. The project is a single SwiftPM package — there is
 no `.xcodeproj`.
 
 ## Support

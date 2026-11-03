@@ -144,3 +144,25 @@ Observações de hardware:
 - As pequenas diferenças de nível entre fonte e BlackHole vêm do resampler de drift e de capturas que começam em instantes distintos.
 - A queda lenta de latência no ensaio de 20 min passa no critério, mas não está claro se ela se estabiliza (resampler de deriva acomodando) ou continua (deriva residual). Um ensaio de várias horas antes da release decide.
 - Reinício real do `coreaudiod` e escuta humana são verificações manuais. A HAL falsa cobre perda e retorno da fonte e do BlackHole.
+
+### Interface e ciclo de vida do app
+
+Na máquina de referência, com a C920 USB a 16 kHz e buffer 256:
+- entrada padrão antes: `BuiltInMicrophoneDevice`;
+- app rodando: `BlackHole2ch_UID`, confirmado por `micboost-diag devices` e pela linha de roteamento da árvore de acessibilidade;
+- switch de processamento desligado pelo controle real (valor AX 0): entrada restaurada para `BuiltInMicrophoneDevice`, sem agregado MicBoost enumerado;
+- saída via AppleScript apontando para o bundle construído: entrada `BuiltInMicrophoneDevice`;
+- verificação final após `micboost-diag run --input BuiltInMicrophoneDevice --seconds 2`: BlackHole a 48000 Hz, entrada padrão `BuiltInMicrophoneDevice`, sem processos MicBoost ou diagnóstico iniciados pela tarefa.
+
+O agregado é privado; sua ausência na enumeração externa é uma verificação adicional,
+não prova isolada da liberação. O caminho de stop destrói IOProc e agregado, coberto
+pelos testes com HAL falsa. Não houve captura de Continuity ou Bluetooth.
+Capturas claras/escuras verificadas visualmente; sliders sem marcas de passo.
+VoiceOver, todos os atalhos, reduzir movimento/transparência e contraste aumentado
+permanecem sem validação manual completa. A etapa 4 permanece em andamento.
+
+Verificação automatizada da interface: 54 testes (3 UI, 11 DSP, 40 Core),
+execução somada de 1,72 s; a suíte Core inclui o caso negativo
+`fakeRejectsOutputWrite`, que registra uma issue conhecida intencionalmente.
+`swift build`, `swift test`, lint recursivo de formatação, montagem debug e
+`codesign --verify --strict` passam na máquina de referência.

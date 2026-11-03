@@ -117,3 +117,13 @@ stopped ──start──▶ starting ──ok──▶ running
 | `defaultInputManaged` | `false` | `true` enquanto a entrada padrão atual foi definida pelo MicBoost |
 
 Cada campo é decodificado isoladamente (`decodeIfPresent`), então um campo ausente mantém o padrão. Esquemas desconhecidos ou dados corrompidos caem nos padrões, sem crash. Valores fora das faixas documentadas (ganho, buffer, frequência/ganho/Q do EQ) são limitados, e seleções de canal inválidas são descartadas na leitura. Os campos de entrada padrão são gravados imediatamente, sem debounce, porque servem de recuperação após crash.
+
+## Interface do app
+
+`MicBoostUI` é uma biblioteca interna com `AppModel`, `PanelView` e `SettingsView`,
+localizações `.strings` e dependência apenas de MicBoostCore e frameworks do sistema.
+O executável auxiliar `render-screenshots` reutiliza as views sem iniciar captura.
+`AppDelegate` mantém o item, painel, janela e notificações de suspensão; o encerramento
+assíncrono aguarda `AppModel.shutdown`, stop com fade, restauração e flush dos ajustes.
+O controller mantém `DefaultInputManager` e seu listener de entrada padrão na fila engine.
+Comandos de processamento são serializados pelo modelo para preservar a ordem dos cliques.

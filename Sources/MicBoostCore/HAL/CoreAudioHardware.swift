@@ -49,46 +49,53 @@ public final class CoreAudioHardware: AudioHardware {
     public func devices() throws -> [AudioDevice] {
         try values(
             .init(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDevices), as: AudioObjectID.self
-        ).map { id in
-            var d = AudioDevice(
-                id: id, uid: try string(id, kAudioDevicePropertyDeviceUID),
-                name: try string(id, kAudioObjectPropertyName))
-            d.manufacturer = try string(id, kAudioObjectPropertyManufacturer)
-            d.transport = try scalar(.init(id, kAudioDevicePropertyTransportType), as: UInt32.self)
-            d.inputChannels = try channels(id, kAudioObjectPropertyScopeInput)
-            d.outputChannels = try channels(id, kAudioObjectPropertyScopeOutput)
-            d.sampleRate = try scalar(.init(id, kAudioDevicePropertyNominalSampleRate), as: Double.self)
-            d.availableSampleRates = try values(
-                .init(id, kAudioDevicePropertyAvailableNominalSampleRates), as: AudioValueRange.self
-            ).map { .init($0.mMinimum, $0.mMaximum) }
-            let range = try scalar(.init(id, kAudioDevicePropertyBufferFrameSizeRange), as: AudioValueRange.self)
-            d.bufferRange = .init(range.mMinimum, range.mMaximum)
-            d.alive = try scalar(.init(id, kAudioDevicePropertyDeviceIsAlive), as: UInt32.self) != 0
-            if d.inputChannels > 0 {
-                d.inputLatency = try scalar(
-                    .init(id, kAudioDevicePropertyLatency, kAudioObjectPropertyScopeInput), as: UInt32.self)
-                d.inputSafetyOffset = try scalar(
-                    .init(id, kAudioDevicePropertySafetyOffset, kAudioObjectPropertyScopeInput), as: UInt32.self)
+        ).compactMap { id in
+            do { return try readDevice(id) } catch EngineError.halFailure(let status, _)
+                where status == kAudioHardwareBadObjectError
+            {
+                return nil
             }
-            if d.outputChannels > 0 {
-                d.outputLatency = try scalar(
-                    .init(id, kAudioDevicePropertyLatency, kAudioObjectPropertyScopeOutput), as: UInt32.self)
-                d.outputSafetyOffset = try scalar(
-                    .init(id, kAudioDevicePropertySafetyOffset, kAudioObjectPropertyScopeOutput), as: UInt32.self)
-            }
-            if d.transport == kAudioDeviceTransportTypeAggregate {
-                var address = HardwareProperty(id, kAudioAggregateDevicePropertyFullSubDeviceList).address
-                var list: Unmanaged<CFArray>?
-                var size = UInt32(MemoryLayout.size(ofValue: list))
-                try checkHAL(
-                    AudioObjectGetPropertyData(id, &address, 0, nil, &size, &list), "Read aggregate subdevice UIDs")
-                guard let list, let uids = list.takeUnretainedValue() as? [String] else {
-                    throw EngineError.formatUnsupported
-                }
-                d.subdeviceUIDs = uids
-            }
-            return d
         }
+    }
+    private func readDevice(_ id: AudioObjectID) throws -> AudioDevice {
+        var d = AudioDevice(
+            id: id, uid: try string(id, kAudioDevicePropertyDeviceUID),
+            name: try string(id, kAudioObjectPropertyName))
+        d.manufacturer = try string(id, kAudioObjectPropertyManufacturer)
+        d.transport = try scalar(.init(id, kAudioDevicePropertyTransportType), as: UInt32.self)
+        d.inputChannels = try channels(id, kAudioObjectPropertyScopeInput)
+        d.outputChannels = try channels(id, kAudioObjectPropertyScopeOutput)
+        d.sampleRate = try scalar(.init(id, kAudioDevicePropertyNominalSampleRate), as: Double.self)
+        d.availableSampleRates = try values(
+            .init(id, kAudioDevicePropertyAvailableNominalSampleRates), as: AudioValueRange.self
+        ).map { .init($0.mMinimum, $0.mMaximum) }
+        let range = try scalar(.init(id, kAudioDevicePropertyBufferFrameSizeRange), as: AudioValueRange.self)
+        d.bufferRange = .init(range.mMinimum, range.mMaximum)
+        d.alive = try scalar(.init(id, kAudioDevicePropertyDeviceIsAlive), as: UInt32.self) != 0
+        if d.inputChannels > 0 {
+            d.inputLatency = try scalar(
+                .init(id, kAudioDevicePropertyLatency, kAudioObjectPropertyScopeInput), as: UInt32.self)
+            d.inputSafetyOffset = try scalar(
+                .init(id, kAudioDevicePropertySafetyOffset, kAudioObjectPropertyScopeInput), as: UInt32.self)
+        }
+        if d.outputChannels > 0 {
+            d.outputLatency = try scalar(
+                .init(id, kAudioDevicePropertyLatency, kAudioObjectPropertyScopeOutput), as: UInt32.self)
+            d.outputSafetyOffset = try scalar(
+                .init(id, kAudioDevicePropertySafetyOffset, kAudioObjectPropertyScopeOutput), as: UInt32.self)
+        }
+        if d.transport == kAudioDeviceTransportTypeAggregate {
+            var address = HardwareProperty(id, kAudioAggregateDevicePropertyFullSubDeviceList).address
+            var list: Unmanaged<CFArray>?
+            var size = UInt32(MemoryLayout.size(ofValue: list))
+            try checkHAL(
+                AudioObjectGetPropertyData(id, &address, 0, nil, &size, &list), "Read aggregate subdevice UIDs")
+            guard let list, let uids = list.takeUnretainedValue() as? [String] else {
+                throw EngineError.formatUnsupported
+            }
+            d.subdeviceUIDs = uids
+        }
+        return d
     }
     public func defaultInput() throws -> AudioObjectID {
         try scalar(

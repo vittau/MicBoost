@@ -216,3 +216,26 @@ private struct PolicyFixture {
     await #expect(throws: (any Error).self) { try await fixture.manager.useBlackHole() }
     #expect(fixture.fake.writes.isEmpty)
 }
+
+@Test @MainActor func disabledManagementNeverAdoptsOrRestores() async throws {
+    let fixture = try PolicyFixture(defaultInput: 1, stored: Settings(manageDefaultInput: false))
+    try await fixture.manager.engineDidStart(blackHole: fixture.blackHole)
+    try await fixture.manager.engineWillStop()
+    #expect(fixture.fake.writes.isEmpty)
+    #expect(fixture.fake.input == 1)
+    try await fixture.manager.useBlackHole()
+    #expect(fixture.fake.input == 2)
+    #expect(!(await fixture.store.current).defaultInputManaged)
+    try await fixture.manager.engineWillStop()
+    #expect(fixture.fake.input == 2)
+}
+
+@Test @MainActor func turningManagementOffKeepsCurrentInput() async throws {
+    let fixture = try PolicyFixture(defaultInput: 1)
+    try await fixture.manager.engineDidStart(blackHole: fixture.blackHole)
+    await fixture.manager.setManagementEnabled(false)
+    #expect(!(await fixture.store.current).defaultInputManaged)
+    try await fixture.manager.engineWillStop()
+    #expect(fixture.fake.input == 2)
+    #expect(fixture.fake.writes.count == 1)
+}
