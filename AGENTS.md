@@ -7,6 +7,7 @@ MicBoost é um app nativo de barra de menus para macOS: captura o microfone esco
 - `docs/` é a fonte da verdade. Comece por `docs/README.md`. Antes de mexer em uma área, leia o documento dela (motor → `docs/audio-engine.md`, DSP → `docs/dsp.md`, UI → `docs/ui.md`…).
 - O código implementa a especificação. Se for preciso divergir (a API não existe, a medição reprova a decisão), atualize o documento **na mesma mudança**. Nunca deixe código e documentação discordarem.
 - Os documentos descrevem apenas o estado atual: sem histórico, sem "antes era X" e sem diário de decisões. Os documentos são enxutos e completos; o detalhe técnico necessário para continuar o trabalho fica neles, não em comentários soltos nem em mensagens de commit.
+- Mudança visível ao usuário também atualiza o `README.md` público (inglês), conforme `docs/distribution.md#readme-do-repositório`.
 - Medições vão para `docs/testing.md#resultados-registrados`. O status das etapas fica em `docs/roadmap.md`.
 - Documentação em pt-BR. Código, identificadores, comentários e mensagens de commit em inglês.
 
