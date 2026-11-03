@@ -4,7 +4,7 @@ Status: `não iniciado` · `em andamento` · `concluído`. Uma etapa só é conc
 
 | # | Etapa | Status |
 |---|---|---|
-| 0 | Estrutura e diagnóstico | em andamento |
+| 0 | Estrutura e diagnóstico | concluído |
 | 1 | Ponte mínima | não iniciado |
 | 2 | Ganho e proteção de pico | não iniciado |
 | 3 | Equalizador | não iniciado |
@@ -27,8 +27,6 @@ Condições de conclusão:
 - `micboost-diag devices` lista corretamente os dispositivos da máquina de referência, com o BlackHole instalado;
 - o UID real do BlackHole foi confirmado e [audio-engine.md](audio-engine.md#identificação-do-blackhole) atualizado;
 - houve captura bruta do microfone interno e de um segundo tipo de entrada (USB/Continuity).
-
-Pendente: confirmar o UID real do BlackHole na HAL.
 
 ## 1 — Ponte mínima
 
@@ -98,4 +96,3 @@ Condições de conclusão:
 | Buffer padrão | 256 provisório | etapa 1 |
 | Agregado vs. ponte com buffer circular | agregado | etapa 1 |
 | Qualidade do resampler de drift | padrão do sistema | etapa 1 |
-| UID do BlackHole | `BlackHole2ch_UID` | etapa 0 |

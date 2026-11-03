@@ -36,10 +36,10 @@ Mudanças chegam em rajadas. O controller agrupa eventos com 100 ms de coalescê
 
 ## Identificação do BlackHole
 
-- Primária: UID `BlackHole2ch_UID` (UID padrão do build upstream de 2 canais).
+- Primária: UID `BlackHole2ch_UID` (UID padrão do build upstream de 2 canais, confirmado na máquina de referência).
 - Alternativa: fabricante contendo "Existential Audio" e nome contendo "BlackHole", com exatamente 2 canais de saída.
 - Qualquer dispositivo cujo UID ou nome comece com "BlackHole" é excluído como fonte, seja qual for a contagem de canais.
-- **Pendente:** confirmar o UID real do BlackHole instalado na máquina de referência.
+- Propriedades observadas no BlackHole 2ch instalado: fabricante "Existential Audio Inc.", transporte `virtual`, 2 canais de entrada e 2 de saída, taxas de 8 kHz a 768 kHz, latência e safety offset 0 nos dois escopos, buffer de 15 a 4096 frames.
 
 ## Construção do agregado
 
