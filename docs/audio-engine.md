@@ -9,7 +9,7 @@ Por quê:
 - A diferença entre os relógios da fonte e do BlackHole fica a cargo do resampler de drift do Core Audio. Assim a fila não cresce, sem buffer circular nem descarte e inserção de amostras.
 - O agregado privado (`kAudioAggregateDeviceIsPrivateKey = 1`) não aparece para outros apps e morre com o processo.
 
-Alternativa reservada (não implementar sem necessidade): ponte com dois IOProcs (fonte e BlackHole separados), buffer circular SPSC pré-alocado e resampler adaptativo controlado pelo nível do buffer. Só será adotada se o agregado reprovar na etapa 1 do [roadmap](roadmap.md), por exemplo com Bluetooth ou com latência acima da meta. Nesse caso, este documento é reescrito.
+Alternativa reservada (não implementar sem necessidade): ponte com dois IOProcs (fonte e BlackHole separados), buffer circular SPSC pré-alocado e resampler adaptativo controlado pelo nível do buffer. O agregado está adotado: no ensaio de estabilidade, a deriva de latência ficou em −0,06 ms ([testing.md](testing.md#resultados-registrados)). A alternativa só volta a ser considerada se uma fonte suportada (por exemplo, Bluetooth) não funcionar com o agregado; nesse caso, este documento é reescrito.
 
 ## Enumeração e elegibilidade
 

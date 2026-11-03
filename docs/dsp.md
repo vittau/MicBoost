@@ -59,7 +59,7 @@ Filtros biquad do Audio EQ Cookbook (RBJ) em Transposed Direct Form II. Shelves 
 
 ## Ganho
 
-- Faixa do controle: **−12 dB a +24 dB** (6,3% a 1.585%), passo de 0,5 dB, padrão 0 dB. O máximo é recalibrado na etapa 3 com voz real e documentado aqui.
+- Faixa do controle: **−12 dB a +24 dB** (6,3% a 1.585%), passo de 0,5 dB, padrão 0 dB. O máximo é recalibrado na etapa 2 com voz real e documentado aqui.
 - Exibição: `+12,0 dB · 398%`, com percentual = 100 · 10^(dB/20) arredondado ao inteiro. 0 dB = 100%, +6,02 dB ≈ 200%.
 - O percentual é de amplitude, não de volume percebido, e a proteção de pico pode reduzir o ganho efetivo.
 - Aplicação: ganho linear por amostra, suavizado por filtro de um polo com τ = 20 ms rumo a `10^(dB/20)`, ou a 0 com mute.

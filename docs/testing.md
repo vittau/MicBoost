@@ -96,36 +96,29 @@ Complementar com uma escuta humana de uma gravação de voz de 20 min via BlackH
 
 ## Resultados registrados
 
-Máquina de referência: MacBook Neo (Apple A18 Pro), macOS 27.2. Medições da ponte: 2026-11-03.
+Máquina de referência: MacBook Neo (Apple A18 Pro), macOS 27.2. Latências medidas por correlação com o som da sala, 3 tentativas cada (mediana/mín./máx.).
 
 | Medida | Condição | Resultado |
 |---|---|---|
-| Latência adicional (mediana) | microfone interno, 48 kHz, buffer 256 | — |
-| Latência adicional (mediana) | microfone interno, 48 kHz, buffer 128 | — |
-| Latência adicional USB | C920, 16 kHz, buffer 256; 3 tentativas; correlação com som da sala | mediana/mín./máx. 38,875 ms; correlação 0,9994–0,99997; HAL parcial 19,25 ms; io_delta_host ≈ 834000 ticks |
-| Latência adicional USB | C920, 16 kHz, buffer 128; 3 tentativas | mediana/mín./máx. 22,875/22,875/22,875 ms; HAL 14,5 ms; io_delta_host ≈ 449998 ticks |
-| Latência adicional USB | C920, 16 kHz, buffer 64; 3 tentativas | mediana/mín./máx. 14,9375/14,875/14,9375 ms; HAL 10,5 ms; io_delta_host ≈ 257998 ticks |
-| Latência adicional USB | C920, 16 kHz, buffer 256; 3 tentativas com soma HAL completa | mediana/mín./máx. 38,9375/38,875/38,9375 ms; HAL 22,5 ms; io_delta_host ≈ 833996 ticks |
-| Latência adicional (mediana) | Bluetooth | — |
+| Latência adicional | microfone interno, 48 kHz, buffer 256 | — |
+| Latência adicional | microfone interno, 48 kHz, buffer 128 | — |
+| Latência adicional | USB 48 kHz, buffer 256 | — |
+| Latência adicional | USB (C920), 16 kHz, buffer 64 | 14,94 / 14,88 / 14,94 ms; HAL 10,5 ms (2026-11-03) |
+| Latência adicional | USB (C920), 16 kHz, buffer 128 | 22,88 / 22,88 / 22,88 ms; HAL 14,5 ms (2026-11-03) |
+| Latência adicional | USB (C920), 16 kHz, buffer 256 | 38,94 / 38,88 / 38,94 ms; HAL 22,5 ms (2026-11-03) |
+| Latência adicional | Bluetooth | — |
+| Passagem fonte → BlackHole | C920, 16 kHz, `run` + capturas simultâneas | fonte pico/RMS 0,0654 / 0,0056; BlackHole L = R 0,0630 / 0,0057 (2026-11-03) |
+| Silêncio seguro | fonte que entrega zeros (microfone interno com a tampa fechada) | BlackHole pico/RMS 0 nos dois canais (2026-11-03) |
+| Ensaio de estabilidade | C920, 16 kHz, buffer 256, 18 min | deriva −0,06 ms (38,88 → 38,81 ms); 0 overloads, `input_missing` e `nonfinite_resets`; CPU ≈ 0,4% de um núcleo; memória só como pico (maxRSS constante 15,6 MB) (2026-11-03) |
+| Ensaio de estabilidade | 20 min com RSS instantânea | — |
 | CPU do processo | running, EQ ligado | — |
-| Memória residente | diagnóstico USB, buffer 256, três tentativas | task_info: 15.024.128–15.777.792 bytes; máximo observado no ensaio abreviado: 15.630.336 bytes (maxRSS) |
-| Ensaio abreviado | C920, 16 kHz, buffer 256; 18 minutos completos; encerrado por solicitação do mantenedor | latência inicial/final 38,875/38,8125 ms; deriva −0,0625 ms; faixa 38,5–38,875 ms; 0 overloads/input_missing/nonfinite_resets; maxRSS constante 15.630.336 bytes; CPU user acumulada 4 s |
-| Captura bruta interna | 2026-11-03; pedido de 3 s, 48 kHz, 1 canal | 144000 frames; pico 0,102121599; RMS 0,005412710; sinal não zero |
-| Captura bruta Continuity | 2026-11-03; pedido de 3 s, 48 kHz, 1 canal | 126976 frames; pico 0,003942308; RMS 0,001024310; sinal não zero |
-| Latência de entrada reportada pela HAL | 2026-11-03; Continuity, 48 kHz | 6000 frames (125 ms) |
-
-Microfone interno: a tampa fechada silencia a captura por hardware, embora a autorização seja concedida e os callbacks continuem. Captura de 2 s: 96000 frames, pico/RMS 0; medição de latência recusada por correlação 0. A latência interna em 128/256 permanece pendente com a tampa aberta. A fifine estava desconectada; a webcam USB substitui a segunda fonte por autorização do coordenador.
-
-Captura bruta C920 (16 kHz, 2 s): 32000 frames; canal 1 pico 0,106262207 e RMS 0,015375519; canal 2 pico 0,092010498 e RMS 0,012545472. Captura simultânea de fonte/BlackHole durante a correlação: picos 0,15270996/0,15269819, 0,21069336/0,2104089 e 0,19293213/0,19246516; diferenças incluem o resampler de drift.
-
-Prova simultânea com `run` + duas capturas WAV de 3 s: fonte USB canal 1 pico/RMS 0,0654296875/0,0056471225 (47616 frames), canal 2 0,0459289551/0,0043213798; BlackHole L/R idênticos, pico/RMS 0,0629787594/0,0056971246 (48000 frames). O modo auto seleciona o primeiro canal; os intervalos de captura começam em instantes distintos e o drift usa resampling. Com a fonte interna silenciada, BlackHole entregou 95744 frames a 48 kHz com pico/RMS zero nos dois canais.
-
-O ensaio abreviado preservou 18 linhas completas, uma por minuto; a linha 19 ficou incompleta no encerramento externo. A CPU user de 4 s corresponde a aproximadamente 0,37% de um núcleo em 18 min; tempo de sistema e RSS instantânea não foram coletados nesse ensaio. maxRSS constante comprova ausência de crescimento do máximo observado, mas não substitui a medição de RSS instantânea ±1 MB. A CLI usa `task_info` para RSS e `getrusage` para CPU user+system nas execuções atuais e grava cada linha imediatamente. O padrão de `soak` é 20 minutos; não há teste de estabilidade longo na suíte unitária.
-
-A recuperação física por desconexão USB, escuta humana e teste real de reinício de coreaudiod permanecem manuais. A HAL falsa verifica `running` → fonte perdida → retorno do mesmo UID → `running`, remoção/retorno do BlackHole e stop; o IOProc offline verifica silêncio com entrada nula, saídas físicas zeradas e contadores por ciclo inclusive em blocos grandes. As medições completas em 48 kHz e o ensaio integral de 20 min com RSS instantânea permanecem pendentes.
-
-A ponte agregada e a qualidade padrão de drift ficam adotadas pelos resultados numéricos; a escuta não foi realizada por agente. O buffer padrão permanece 256 pela estabilidade medida e pelo limite de 100 ms; a opção 64 alcança o objetivo de engenharia de menos de 20 ms a 16 kHz. Uma seleção automática por duração exigiria estabilidade medida nos buffers menores antes de substituir esse padrão.
-
-Conferência final do ambiente: nenhum agregado `io.github.vittau.MicBoost.engine`, BlackHole restaurado a 48000 Hz e entrada padrão `BuiltInMicrophoneDevice`, igual ao início da execução. A fifine estava ausente; nenhuma captura Continuity/Bluetooth foi iniciada.
+| Captura bruta | microfone interno, 48 kHz, 3 s | pico 0,102; RMS 0,0054 (2026-11-03) |
+| Captura bruta | Continuity, 48 kHz, 3 s | pico 0,0039; RMS 0,0010 (2026-11-03) |
+| Latência de entrada reportada pela HAL | Continuity, 48 kHz | 6000 frames (125 ms) |
 
 (— = ainda não medido. Substituir pelo valor e pela data da medição.)
+
+Observações de hardware:
+- Com a tampa fechada, o macOS silencia o microfone interno por hardware: a permissão continua concedida e os callbacks entregam zeros. A medição de latência recusa esse sinal (correlação 0).
+- As pequenas diferenças de nível entre fonte e BlackHole vêm do resampler de drift e de capturas que começam em instantes distintos.
+- Recuperação física (desconectar o USB), reinício real do `coreaudiod` e escuta humana são verificações manuais. A HAL falsa cobre perda e retorno da fonte e do BlackHole.

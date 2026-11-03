@@ -40,7 +40,7 @@ Condições de conclusão:
 - decisão confirmada: agregado (ou troca para a ponte alternativa, com a especificação reescrita);
 - buffer padrão definido.
 
-A ponte e os diagnósticos estão implementados e validados com a webcam USB nos buffers 64/128/256. O ensaio autorizado foi abreviado a 18 minutos e passou nos contadores e na deriva; faltam o ensaio integral de 20 minutos com RSS instantânea, a latência em 48 kHz (microfone interno silenciado pela tampa fechada) e a confirmação manual de desconexão física. A etapa permanece em andamento por essas condições de validação.
+Pendente: ensaio de 20 min com RSS instantânea, latência a 48 kHz (interno ou USB) e desconexão física da fonte durante `run`.
 
 ## 2 — Ganho e proteção de pico
 
