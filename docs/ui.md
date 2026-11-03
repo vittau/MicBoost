@@ -29,7 +29,7 @@ Fecha com clique fora (monitor global de mouse), `Esc` ou novo clique no ícone.
 
 Conteúdo, de cima para baixo (SwiftUI, `PanelView`):
 
-1. **Cabeçalho:** "MicBoost" + `Toggle` estilo switch para o processamento (`processingEnabled`), sempre visível no topo e alcançável com um clique ao abrir o painel. É o jeito principal de parar o MicBoost e **soltar o microfone**:
+1. **Cabeçalho:** no mesmo layout do topo dos menus de Wi-Fi e Bluetooth do macOS: título "MicBoost" em negrito à esquerda e um `Toggle` com `.toggleStyle(.switch)` alinhado à direita, controlando o processamento (`processingEnabled`). Fica sempre visível no topo e alcançável com um clique ao abrir o painel. É o jeito principal de parar o MicBoost e **soltar o microfone**:
    - **Desligar:** para o motor por completo (rampa, `AudioDeviceStop`, IOProc e agregado destruídos), de modo que o microfone deixa de ser capturado e o indicador de microfone do macOS apaga. A entrada padrão é restaurada conforme a [política](audio-engine.md#política-de-entrada-padrão-defaultinputmanager), e o ícone vira `mic`.
    - **Ligar:** reconstrói o motor com a fonte e os ajustes persistidos e reaplica a política de entrada padrão.
    - O estado persiste (`processingEnabled`), e a troca nunca fecha o painel.
