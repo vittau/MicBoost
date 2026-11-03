@@ -24,7 +24,7 @@ Motivação: o VirtuMic tem interface pesada e atraso perceptível (o log dele m
 1. App de barra de menus (`LSUIElement`), sem ícone no Dock, com painel compacto próprio ([ui.md](ui.md)).
 2. Seletor de microfone, com captura explícita independente da entrada padrão.
 3. Ganho manual em dB (com percentual equivalente), mute e proteção de pico com indicação de atuação.
-4. EQ com exatamente 3 bandas (graves low shelf, médios paramétrico, agudos high shelf), chave de bypass e ação "Zerar EQ".
+4. EQ com exatamente 3 bandas (graves low shelf, médios paramétrico, agudos high shelf), chave de bypass, um padrão de voz discreto como valor inicial e as ações "Padrão de voz" e "Zerar EQ".
 5. Medidores discretos de entrada e de saída.
 6. Estado da conexão: fonte física, destino BlackHole e estado da entrada padrão.
 7. Persistência de ganho, mute, EQ, dispositivo selecionado e seleção de canais.
@@ -72,7 +72,7 @@ EQ:
 - Exatamente low shelf, uma banda paramétrica central e high shelf.
 - Resposta plana com as bandas em 0 dB. O bypass preserva o resto da cadeia.
 - Resposta conferida com sinal conhecido nas taxas suportadas.
-- Os parâmetros persistem; "Zerar EQ" não altera os demais controles.
+- Os parâmetros persistem; "Padrão de voz" e "Zerar EQ" não alteram os demais controles.
 
 Estabilidade e desempenho:
 - Nenhuma fila cresce indefinidamente.

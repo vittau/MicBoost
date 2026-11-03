@@ -47,7 +47,7 @@ Conteúdo, de cima para baixo (SwiftUI, `PanelView`):
    - Graves: slider de ganho (dB) + campo de frequência (Hz);
    - Médios: slider de ganho + campo de frequência + slider "Largura" com o valor de Q mostrado (Q maior = banda mais estreita);
    - Agudos: slider de ganho + campo de frequência;
-   - botão "Zerar EQ".
+   - botões "Padrão de voz" e "Zerar EQ".
 
    Valores editáveis, validados e limitados às faixas de [dsp.md](dsp.md#equalizador). Sem gráfico de resposta.
 7. **Rodapé:** "Ajustes…" (abre a janela de ajustes) e "Sair do MicBoost".

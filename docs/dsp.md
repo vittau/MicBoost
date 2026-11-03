@@ -46,14 +46,18 @@ Filtros biquad do Audio EQ Cookbook (RBJ) em Transposed Direct Form II. Shelves 
 
 | Banda | Tipo | Frequência (padrão / faixa) | Ganho | Q |
 |---|---|---|---|---|
-| Graves | low shelf | 120 Hz / 40–500 Hz | 0 dB / −12…+12 dB | fixo (S = 1) |
-| Médios | peaking | 1.000 Hz / 200–6.000 Hz | 0 dB / −12…+12 dB | 0,9 / 0,3–4,0 ("Largura") |
-| Agudos | high shelf | 6.000 Hz / 2.000–14.000 Hz | 0 dB / −12…+12 dB | fixo (S = 1) |
+| Graves | low shelf | 120 Hz / 40–500 Hz | −2 dB / −12…+12 dB | fixo (S = 1) |
+| Médios | peaking | 3.000 Hz / 200–6.000 Hz | +2 dB / −12…+12 dB | 1,0 / 0,3–4,0 ("Largura") |
+| Agudos | high shelf | 8.000 Hz / 2.000–14.000 Hz | +1,5 dB / −12…+12 dB | fixo (S = 1) |
+
+Os valores padrão formam o "padrão de voz": um realce discreto de fala para microfones em geral. Os graves levemente reduzidos tiram ronco e o excesso do efeito de proximidade; a presença em 3 kHz melhora a inteligibilidade; os agudos suaves acrescentam clareza. O EQ vem ligado com esse padrão.
 
 - Estabilidade: toda frequência é limitada a `[20 Hz, 0,45 · fs]` no momento do cálculo dos coeficientes. A UI limita o slider ao máximo efetivo para a taxa atual (exemplo: Bluetooth a 16 kHz → agudos até 7.200 Hz).
 - Resposta plana: com ganho 0 dB, a banda é tratada como identidade exata (coeficientes b0 = 1, demais 0), sem depender de arredondamento.
 - Bypass (`eq.enabled = false`): os filtros continuam rodando, com estado aquecido, e a saída faz crossfade linear de 20 ms entre o sinal com EQ e o sem EQ.
-- "Zerar EQ": volta as três bandas aos valores padrão da tabela (ganho 0 dB) e mantém `eq.enabled`, ganho geral, mute e fonte.
+- "Padrão de voz": volta as três bandas aos valores padrão da tabela.
+- "Zerar EQ": põe o ganho das três bandas em 0 dB (resposta plana) e as frequências e o Q nos valores padrão.
+- As duas ações mantêm `eq.enabled`, ganho geral, mute e fonte.
 - Suavização de parâmetros: a cada bloco, os parâmetros correntes se aproximam dos alvos por um filtro de um polo com τ = 30 ms. A frequência é suavizada em escala logarítmica e o ganho em dB. Os coeficientes são recalculados por bloco somente enquanto algum parâmetro da banda está em transição (|alvo − atual| > ε). O valor é fixado no alvo quando a diferença fica abaixo de 1e−7 (log natural de Hz, dB ou Q); blocos maiores que `max_frames` são subdivididos antes dessa atualização.
 - Denormais: o estado do filtro com |s| < 1e−25 é zerado ao fim de cada bloco.
 
