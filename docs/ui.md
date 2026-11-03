@@ -50,7 +50,7 @@ Conteúdo, de cima para baixo (SwiftUI, `PanelView`):
    - botões "Padrão de voz" e "Zerar EQ".
 
    Valores editáveis, validados e limitados às faixas de [dsp.md](dsp.md#equalizador). Sem gráfico de resposta.
-7. **Rodapé:** "Ajustes…" (abre a janela de ajustes) e "Sair do MicBoost".
+7. **Rodapé:** opções de menu em texto puro, uma por linha e alinhadas à esquerda, "Ajustes…" (abre a janela de ajustes) e "Sair do MicBoost". Sem moldura de botão; a linha inteira é clicável e ganha destaque semântico ao passar o ponteiro ou pressionar, como as ações nos painéis de Som do macOS.
 
 ### Mensagens de estado
 

@@ -119,7 +119,8 @@ never disables Gatekeeper or SIP and never removes the quarantine flag, and neit
    the system input automatically by default; disable this in Audio settings if desired.
 3. Adjust gain, mute and EQ in the panel. Close the panel whenever you like; audio keeps running.
 4. In your calling or recording app, choose **BlackHole 2ch** or **System Default**.
-5. Turn processing off to release the microphone, or choose **Quit MicBoost**. The previous
+5. Turn processing off to release the microphone, or choose **Quit MicBoost** from the text menu
+   at the bottom of the panel. The previous
    system input is restored if automatic switching is enabled and you have not changed it yourself.
 
 ### Diagnostics

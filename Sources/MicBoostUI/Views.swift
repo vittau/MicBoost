@@ -116,11 +116,10 @@ import SwiftUI
                 }.padding(.top, 8)
             }
             Divider()
-            HStack {
+            VStack(spacing: 0) {
                 Button(localized("Settings…"), action: model.onSettings).keyboardShortcut(",")
-                Spacer()
                 Button(localized("Quit MicBoost"), action: model.onQuit)
-            }.font(.caption)
+            }.buttonStyle(PanelMenuItemStyle())
         }.padding(16).frame(width: 320).fixedSize(horizontal: false, vertical: true)
     }
     private func meter(_ title: String, _ db: Double) -> some View {
@@ -245,5 +244,28 @@ import SwiftUI
             value == 0 ? .auto : value == -1 ? .monoMix : value == -2 ? .stereo(firstChannel: 1) : .mono(channel: value)
         model.controls.channelSelectionByUID[uid] = selection
         Task { await model.engine.setChannelSelection(selection, forUID: uid) }
+    }
+}
+
+/// Text-only rows matching the actions at the bottom of system menu bar panels.
+private struct PanelMenuItemStyle: ButtonStyle {
+    @State private var hovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        let highlighted = hovered || configuration.isPressed
+        configuration.label
+            .font(.body)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 5)
+            .foregroundStyle(
+                highlighted ? Color(nsColor: .selectedMenuItemTextColor) : Color.primary
+            )
+            .background(
+                highlighted ? Color(nsColor: .selectedContentBackgroundColor) : Color.clear,
+                in: RoundedRectangle(cornerRadius: 5)
+            )
+            .contentShape(Rectangle())
+            .onHover { hovered = $0 }
     }
 }
