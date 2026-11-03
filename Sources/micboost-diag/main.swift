@@ -1,3 +1,4 @@
+import AVFoundation
 import CoreAudio
 import Foundation
 import MicBoostCore
@@ -8,6 +9,8 @@ do {
     let hardware = CoreAudioHardware()
     guard let command = args.first else { throw EngineError.invalidArgument(usage) }
     switch command {
+    case "permission":
+        print("microphoneAuthorization=\(AVCaptureDevice.authorizationStatus(for: .audio).rawValue)")
     case "devices":
         guard args.count == 1 || args == ["devices", "--json"] else { throw EngineError.invalidArgument(usage) }
         let service = DeviceService(hardware: hardware, queue: DispatchQueue(label: "diag.devices")) { _ in }
@@ -40,6 +43,83 @@ do {
                 print("  Output safety offset: \(frameDuration(device.outputSafetyOffset, rate: device.sampleRate))")
                 print("  Alive: \(device.alive), eligible source: \(device.isEligible(in: snapshot.devices))")
             }
+        }
+    case "latency", "soak":
+        var options: [String: String] = [:]
+        guard args.count % 2 == 1 else { throw EngineError.invalidArgument(usage) }
+        for i in stride(from: 1, to: args.count, by: 2) {
+            guard ["--input", "--buffer", "--trials", "--minutes"].contains(args[i]), options[args[i]] == nil else {
+                throw EngineError.invalidArgument(usage)
+            }
+            options[args[i]] = args[i + 1]
+        }
+        guard let uid = options["--input"], let buffer = UInt32(options["--buffer"] ?? "256"), buffer > 0,
+            let trials = Int(options["--trials"] ?? "10"), trials > 0, trials <= 100,
+            let minutes = Int(options["--minutes"] ?? "60"), minutes > 0, minutes <= 1440
+        else {
+            throw EngineError.invalidArgument(usage)
+        }
+        let controller = EngineController()
+        do {
+            try await controller.start(inputUID: uid, bufferFrames: buffer)
+            try await Task.sleep(for: .seconds(1))
+            var values: [Double] = []
+            let iterations = command == "soak" ? minutes : trials
+            let begin = Date()
+            for iteration in 0..<iterations {
+                let status = await controller.status()
+                guard let source = status.source, let destination = status.blackHole else {
+                    throw EngineError.invalidArgument("Engine not running")
+                }
+                let result = try hardware.measureLatency(source: source, destination: destination)
+                values.append(result.milliseconds)
+                var usage = rusage()
+                getrusage(RUSAGE_SELF, &usage)
+                print(
+                    "trial=\(iteration + 1) latency_ms=\(result.milliseconds) correlation=\(result.correlation) source_peak=\(result.sourcePeak) BlackHole_peak=\(result.destinationPeak) HAL_ms=\(status.reportedLatencyMs) io_delta_host=\(status.ioDeltaHost) overloads=\(status.overloads) input_missing=\(status.inputMissing) nonfinite_resets=\(status.nonfiniteResets) maxrss=\(usage.ru_maxrss) cpu_user_s=\(usage.ru_utime.tv_sec)"
+                )
+
+                if command == "soak" {
+                    let remaining = begin.addingTimeInterval(Double(iteration + 1) * 60).timeIntervalSinceNow
+                    if remaining > 0 { try await Task.sleep(for: .seconds(remaining)) }
+                }
+            }
+            values.sort()
+            print("latency_ms median=\(values[values.count / 2]) min=\(values.first ?? 0) max=\(values.last ?? 0)")
+            try await controller.stop()
+        } catch {
+            try await controller.stop()
+            throw error
+        }
+    case "run":
+        var options: [String: String] = [:]
+        guard args.count % 2 == 1 else { throw EngineError.invalidArgument(usage) }
+        for i in stride(from: 1, to: args.count, by: 2) {
+            guard ["--input", "--buffer", "--seconds"].contains(args[i]), options[args[i]] == nil else {
+                throw EngineError.invalidArgument(usage)
+            }
+            options[args[i]] = args[i + 1]
+        }
+        guard let uid = options["--input"], let seconds = Double(options["--seconds"] ?? "30"),
+            seconds.isFinite, seconds > 0, let buffer = UInt32(options["--buffer"] ?? "256"), buffer > 0
+        else {
+            throw EngineError.invalidArgument(usage)
+        }
+        let controller = EngineController()
+        do {
+            try await controller.start(inputUID: uid, bufferFrames: buffer)
+            let deadline = Date().addingTimeInterval(seconds)
+            repeat {
+                let status = await controller.status()
+                print(
+                    "state=\(status.state) rate=\(status.sampleRate) buffer=\(status.bufferFrames) HAL_ms=\(status.reportedLatencyMs) cycles=\(status.cycles) overloads=\(status.overloads) input_missing=\(status.inputMissing) nonfinite_resets=\(status.nonfiniteResets) io_delta_host=\(status.ioDeltaHost)"
+                )
+                try await Task.sleep(for: .seconds(min(1, max(0, deadline.timeIntervalSinceNow))))
+            } while Date() < deadline
+            try await controller.stop()
+        } catch {
+            try await controller.stop()
+            throw error
         }
     case "capture":
         guard args.count == 7 else { throw EngineError.invalidArgument(usage) }

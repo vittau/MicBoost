@@ -12,6 +12,8 @@ typedef struct mb_capture mb_capture;
 /* Preallocate interleaved Float32 storage; return NULL for invalid sizes or allocation failure. */
 mb_capture * _Nullable mb_capture_create(size_t frames, unsigned channels);
 
+uint64_t mb_capture_host_time(const mb_capture * _Nonnull capture);
+
 /* Free capture storage after stopping and destroying its IOProc. */
 void mb_capture_destroy(mb_capture * _Nonnull capture);
 
