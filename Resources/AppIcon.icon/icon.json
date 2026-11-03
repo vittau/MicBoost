@@ -1,0 +1,168 @@
+{
+  "features": [
+    "refractivity",
+    "specular-location"
+  ],
+  "fill-specializations": [
+    {
+      "value": {
+        "linear-gradient": [
+          "srgb:0.13,0.46,0.63,1",
+          "srgb:0.05,0.23,0.39,1"
+        ]
+      }
+    },
+    {
+      "appearance": "dark",
+      "value": {
+        "linear-gradient": [
+          "srgb:0.08,0.20,0.28,1",
+          "srgb:0.025,0.065,0.12,1"
+        ]
+      }
+    },
+    {
+      "appearance": "tinted",
+      "value": "automatic"
+    }
+  ],
+  "groups": [
+    {
+      "blur-material": 0.25,
+      "layers": [
+        {
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "srgb:0.62,0.98,0.91,1",
+                  "srgb:0.25,0.79,0.79,1"
+                ]
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "linear-gradient": [
+                  "srgb:0.58,0.98,0.91,1",
+                  "srgb:0.13,0.66,0.75,1"
+                ]
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "gray:0.82,1"
+              }
+            }
+          ],
+          "glass": true,
+          "image-name": "boost.svg",
+          "name": "Rising levels"
+        }
+      ],
+      "lighting": "individual",
+      "name": "Amplification",
+      "refractivity": {
+        "depth": 0.42,
+        "enabled": true,
+        "strength": 0.35
+      },
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.3
+      },
+      "specular": true,
+      "specular-highlight-placement": "inside",
+      "translucency": {
+        "enabled": true,
+        "value": 0.38
+      }
+    },
+    {
+      "blur-material": 0.3,
+      "layers": [
+        {
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "srgb:0.99,1,1,1",
+                  "srgb:0.72,0.88,0.94,1"
+                ]
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "linear-gradient": [
+                  "srgb:0.94,0.99,1,1",
+                  "srgb:0.56,0.75,0.85,1"
+                ]
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "gray:1,1"
+              }
+            }
+          ],
+          "glass": true,
+          "image-name": "microphone.svg",
+          "name": "Capsule"
+        },
+        {
+          "fill-specializations": [
+            {
+              "value": {
+                "linear-gradient": [
+                  "srgb:0.92,0.98,1,1",
+                  "srgb:0.65,0.83,0.92,1"
+                ]
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "linear-gradient": [
+                  "srgb:0.87,0.96,1,1",
+                  "srgb:0.5,0.7,0.82,1"
+                ]
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "gray:0.92,1"
+              }
+            }
+          ],
+          "glass": true,
+          "image-name": "support.svg",
+          "name": "Cradle and stand"
+        }
+      ],
+      "lighting": "combined",
+      "name": "Microphone",
+      "refractivity": {
+        "depth": 0.6,
+        "enabled": true,
+        "strength": 0.5
+      },
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.35
+      },
+      "specular": true,
+      "specular-highlight-placement": "inside",
+      "translucency": {
+        "enabled": true,
+        "value": 0.52
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}
