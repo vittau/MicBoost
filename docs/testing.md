@@ -166,3 +166,10 @@ execução somada de 1,72 s; a suíte Core inclui o caso negativo
 `fakeRejectsOutputWrite`, que registra uma issue conhecida intencionalmente.
 `swift build`, `swift test`, lint recursivo de formatação, montagem debug e
 `codesign --verify --strict` passam na máquina de referência.
+
+O contêiner `PanelSurface` foi conferido em captura da janela real no macOS 27:
+vidro nativo `.regular`, fundo transparente da janela e cantos sem vazamento de
+subviews. A captura do WindowServer fica como evidência local de desenvolvimento;
+as imagens públicas fora da tela documentam apenas o conteúdo SwiftUI. O fallback
+de material `.menu` foi compilado com alvo macOS 14, mas requer verificação visual
+nessa versão do sistema.

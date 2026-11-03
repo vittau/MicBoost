@@ -24,11 +24,12 @@
 `MenuBarPanel`: subclasse de `NSPanel` com:
 - estilo `.nonactivatingPanel` + `.borderless`;
 - `canBecomeKey = true`, para foco de teclado;
-- conteúdo em `NSVisualEffectView` (`material: .popover`, `state: .active`, cantos arredondados de 12 pt);
+- conteúdo transparente de SwiftUI em `PanelSurface`: `NSGlassEffectView` `.regular` no macOS 26 ou posterior, com `contentView` e cantos de 12 pt definidos pela API nativa; no macOS 14–15, `NSVisualEffectView` `.menu`, `.behindWindow`, `.active`, com o mesmo raio e recorte de subviews;
+- sem cor de fundo, opacidade ou borda sobrepostas ao material do sistema; o host recorta seu conteúdo para impedir vazamento nos cantos;
 - largura fixa de 320 pt e altura que segue o conteúdo;
 - ancorado abaixo do item de status, alinhado à borda direita do botão e mantido dentro da tela visível.
 
-Fecha com clique fora (monitor global de mouse), `Esc` ou novo clique no ícone. **Fechar o painel nunca afeta o motor.** Com "Reduzir transparência" ativo, o sistema troca o material por uma cor sólida (comportamento nativo do `NSVisualEffectView`); não desativar.
+Fecha com clique fora (monitor global de mouse), `Esc` ou novo clique no ícone. **Fechar o painel nunca afeta o motor.** O material acompanha a aparência e as preferências de transparência/acessibilidade do sistema; não aplicar um alpha fixo nem simular o vidro com cores.
 
 Conteúdo, de cima para baixo (SwiftUI, `PanelView`):
 
@@ -111,3 +112,7 @@ nativos, em ambas as aparências; `ImageRenderer` não rasteriza esses controles
 O app consulta snapshots de estado a 1 Hz; os medidores têm tarefa separada de 20 Hz,
 cancelada ao fechar o painel. A expansão do EQ fica em `UserDefaults.eqExpanded`.
 A validação manual de VoiceOver, contraste e preferências de acessibilidade está pendente.
+
+As capturas fora da tela documentam o conteúdo SwiftUI, não a composição do material
+com o desktop. Cantos, borda e transparência de `PanelSurface` exigem conferir a janela
+real composta pelo WindowServer.

@@ -30,7 +30,8 @@ calls, recorders, anything — hears the processed voice.
 | Missing driver | Missing driver (dark) |
 | ![Error](docs/screenshots/error-light.png) | ![Error dark](docs/screenshots/error-dark.png) |
 
-Off-screen renders of the real SwiftUI views with sample state, generated with
+Off-screen renders of the real SwiftUI views with sample state; live panel transparency
+adapts to your desktop and macOS appearance. Generated with
 `scripts/render-screenshots.sh`. Both appearances for every view are in `docs/screenshots/`.
 
 ## How it works
@@ -65,6 +66,7 @@ Available today:
 - **Safe silence on zero input**: a source that delivers zeros — the built-in microphone with the
   lid closed, for example — produces silence in BlackHole, not noise.
 
+- **Native panel materials**, using Liquid Glass on macOS 26+ and the system menu material on earlier versions.
 - **Menu bar panel** with gain, meters, routing status, microphones and EQ, plus settings for
   buffer, channels, automatic system input switching and diagnostics, using native grouped
   sections and switches.

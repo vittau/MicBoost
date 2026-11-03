@@ -61,8 +61,8 @@ import SwiftUI
         NSApplication.shared.mainMenu = main
     }
     private func update() {
-        if let panel, panel.isVisible, let material = panel.contentView, let host = material.subviews.first {
-            let size = host.fittingSize
+        if let panel, panel.isVisible, let surface = panel.contentView as? PanelSurface {
+            let size = surface.contentSize
             if abs(size.height - panel.frame.height) > 1 {
                 let top = panel.frame.maxY
                 panel.setContentSize(size)
@@ -83,20 +83,12 @@ import SwiftUI
         if panel?.isVisible == true { closePanel() } else { showPanel() }
     }
     private func showPanel() {
-        let host = NSHostingView(rootView: PanelView(model: model))
-        let size = host.fittingSize
+        let surface = PanelSurface(model: model)
+        let size = surface.contentSize
         let panel = MenuBarPanel(
             contentRect: NSRect(origin: .zero, size: size), styleMask: [.nonactivatingPanel, .borderless],
             backing: .buffered, defer: false)
-        let material = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
-        material.material = .popover
-        material.state = .active
-        material.wantsLayer = true
-        material.layer?.cornerRadius = 12
-        host.frame = material.bounds
-        host.autoresizingMask = [.width, .height]
-        material.addSubview(host)
-        panel.contentView = material
+        panel.contentView = surface
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
