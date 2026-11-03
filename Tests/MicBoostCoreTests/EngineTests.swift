@@ -25,6 +25,8 @@ import Testing
 }
 
 extension FakeAudioHardware: EngineHardware {
+    func maximumFrames(_ device: AudioObjectID, buffer: UInt32) throws -> UInt32 { buffer }
+    func latencyFrames(_ device: AudioObjectID, scope: AudioObjectPropertyScope) throws -> UInt32 { 0 }
     func layout(_ device: AudioObjectID) throws -> StreamLayout {
         guard let d = deviceList.first(where: { $0.id == device }) else { throw EngineError.formatUnsupported }
         return .init(
@@ -53,7 +55,7 @@ extension FakeAudioHardware: EngineHardware {
 @Test func missingBlackHoleState() async throws {
     let controller = EngineController(hardware: FakeAudioHardware())
     try await controller.start(inputUID: "source")
-    #expect(await controller.status().state == .error("blackHoleMissing"))
+    #expect(await controller.status().state == .error(.blackHoleMissing))
     try await controller.stop()
     #expect(await controller.status().state == .stopped)
 }

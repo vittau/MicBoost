@@ -5,13 +5,19 @@ import MicBoostDSP
 public struct StreamLayout: Sendable, Equatable {
     public var inputs: [UInt32]
     public var outputs: [UInt32]
-    public init(inputs: [UInt32], outputs: [UInt32]) {
+    public var inputStreams: Int
+    public var outputStreams: Int
+    public init(inputs: [UInt32], outputs: [UInt32], inputStreams: Int? = nil, outputStreams: Int? = nil) {
         self.inputs = inputs
         self.outputs = outputs
+        self.inputStreams = inputStreams ?? inputs.count
+        self.outputStreams = outputStreams ?? outputs.count
     }
 }
 public protocol EngineHardware: AudioHardware {
     func layout(_ device: AudioObjectID) throws -> StreamLayout
+    func maximumFrames(_ device: AudioObjectID, buffer: UInt32) throws -> UInt32
+    func latencyFrames(_ device: AudioObjectID, scope: AudioObjectPropertyScope) throws -> UInt32
     func setRate(_ device: AudioObjectID, rate: Double) throws
     func createAggregate(source: String, destination: String) throws -> AudioObjectID
     func destroyAggregate(_ device: AudioObjectID) throws
@@ -80,7 +86,26 @@ extension CoreAudioHardware: EngineHardware {
                 \.mNumberChannels)
         }
         return try StreamLayout(
-            inputs: buffers(kAudioObjectPropertyScopeInput), outputs: buffers(kAudioObjectPropertyScopeOutput))
+            inputs: buffers(kAudioObjectPropertyScopeInput), outputs: buffers(kAudioObjectPropertyScopeOutput),
+            inputStreams: values(
+                .init(device, kAudioDevicePropertyStreams, kAudioObjectPropertyScopeInput), as: AudioStreamID.self
+            ).count,
+            outputStreams: values(
+                .init(device, kAudioDevicePropertyStreams, kAudioObjectPropertyScopeOutput), as: AudioStreamID.self
+            ).count)
+    }
+    public func maximumFrames(_ device: AudioObjectID, buffer: UInt32) throws -> UInt32 {
+        var address = HardwareProperty(device, kAudioDevicePropertyUsesVariableBufferFrameSizes).address
+        guard AudioObjectHasProperty(device, &address) else { return buffer }
+        return max(buffer, try scalar(.init(device, kAudioDevicePropertyUsesVariableBufferFrameSizes), as: UInt32.self))
+    }
+    public func latencyFrames(_ device: AudioObjectID, scope: AudioObjectPropertyScope) throws -> UInt32 {
+        let latency = try scalar(.init(device, kAudioDevicePropertyLatency, scope), as: UInt32.self)
+        let safety = try scalar(.init(device, kAudioDevicePropertySafetyOffset, scope), as: UInt32.self)
+        let streams = try values(.init(device, kAudioDevicePropertyStreams, scope), as: AudioStreamID.self)
+        let streamLatency =
+            try streams.map { try scalar(.init($0, kAudioStreamPropertyLatency), as: UInt32.self) }.max() ?? 0
+        return latency + safety + streamLatency
     }
     public func setRate(_ device: AudioObjectID, rate: Double) throws {
         try write(.init(device, kAudioDevicePropertyNominalSampleRate), value: rate)

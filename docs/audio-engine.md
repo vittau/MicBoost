@@ -56,6 +56,8 @@ Mudanças chegam em rajadas. O controller agrupa eventos com 100 ms de coalescê
 
 Depois da criação, aguardar que o agregado apareça na lista de dispositivos e responda a `kAudioDevicePropertyDeviceIsAlive` (limite de 2 s). Se falhar, `error(.halFailure)`. Destruir com `AudioHardwareDestroyAggregateDevice` no stop. No launch, se existir um agregado com o UID acima (sobra de outra instância), destruí-lo antes de criar.
 
+O adaptador exige formato virtual Float32 nativo e recusa os demais formatos sem alterar a fonte.
+
 A qualidade do resampler de drift (`kAudioSubDeviceDriftCompensationQualityKey`) é avaliada na etapa 1, comparando CPU e artefatos. O padrão inicial é a qualidade padrão do sistema.
 
 ## Formato e taxa de amostragem
@@ -151,5 +153,7 @@ Invariantes: nunca definir uma fonte física como padrão, exceto na restauraç�
 | Permissão negada | `AVCaptureDevice.authorizationStatus(for: .audio)` antes do start e ao reativar o app | `error(.microphonePermissionDenied)` |
 | Overload de IO | `kAudioDeviceProcessorOverload` | incrementar contador, sem mudar estado |
 | Serviço de áudio reiniciado (`coreaudiod`) | todos os objetos inválidos / `Devices` muda por completo | descartar IDs em cache, reenumerar por UID e reconstruir |
+
+Uma fonte que entrega apenas zeros mantém o motor em `running`; não há detecção automática de fonte silenciosa na v1.
 
 Silêncio seguro: sempre que o processador não tiver entrada válida ou detectar não-finitos, a saída para o BlackHole é zero. Antes de qualquer stop voluntário, rampa de saída.

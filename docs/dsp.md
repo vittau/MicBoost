@@ -15,6 +15,8 @@ canais da fonte → [mapa de canais] → low shelf → peaking → high shelf �
 - Nenhum lookahead, nenhuma fila e nenhuma latência algorítmica.
 - Toda a memória é alocada em `mb_engine_create(max_frames, sample_rate, channels)`. `mb_engine_process` não aloca.
 
+A implementação da ponte mínima aplica somente mapa de canais, fade-out, guarda numérica e medidores. Os setters de ganho, mute e EQ armazenam os alvos atômicos; os efeitos são implementados nas etapas seguintes. O ganho efetivo desta etapa é 0 dB.
+
 ## API C (header `MicBoostDSP.h`)
 
 As funções de controle são seguras para chamar de qualquer thread fora da de IO e escrevem apenas atômicos:
@@ -36,7 +38,7 @@ void       mb_engine_process(mb_engine *, const float *const *in, float *const *
 OSStatus   mb_ioproc(...);  // ver audio-engine.md
 ```
 
-`mb_engine_process` recebe canais não intercalados já mapeados e é o ponto de entrada dos testes offline. O IOProc só faz mapeamento (intercalação/desintercalação) e delega a ele.
+`mb_engine_process` recebe todos os canais da fonte não intercalados e aplica a seleção de canais e é o ponto de entrada dos testes offline. O IOProc extrai os canais físicos, delega o processamento e escreve os dois canais de saída. `mb_routing` comporta até 64 canais de fonte; canais C são indexados a partir de zero, enquanto settings/UI usam canais a partir de um. `mb_meters.fade_done` permite consultar a conclusão do fade sem zerar a flag.
 
 ## Equalizador
 
@@ -96,7 +98,7 @@ Todos são pico desde a última leitura.
 
 ## Segurança numérica
 
-Se alguma amostra de saída do bloco não for finita: zerar o estado de todos os filtros, escrever zeros no bloco inteiro e incrementar `nonfinite_resets`. As entradas não finitas são tratadas como 0 antes do processamento.
+Se alguma amostra de saída do bloco não for finita: zerar o estado de todos os filtros, escrever zeros no bloco inteiro e incrementar `nonfinite_resets`. As entradas não finitas são tratadas como 0 antes do processamento e incrementam `nonfinite_resets` uma vez por ciclo afetado.
 
 ## Custo esperado
 

@@ -34,6 +34,8 @@ O projeto é um único pacote SwiftPM (sem `.xcodeproj`). O `.app` é montado po
 | `MicBoostDSPTests` | Swift Testing | Testes offline do processador via API C. |
 | `MicBoostCoreTests` | Swift Testing | Política de entrada padrão, máquina de estados, settings e mapa de canais, com HAL falsa. |
 
+`EngineHardware` estende `AudioHardware` com criação/destruição de agregado, mapa de buffers/streams, taxa do destino, tamanho de buffer, registro/uso de IOProc e latências. A fake implementa ambas as interfaces.
+
 `AudioHardware` expõe `devices()`, leitura/escrita da entrada padrão e registro/remoção de listeners por `HardwareProperty` em uma `DispatchQueue`. Não há operação de escrita da saída padrão no protocolo. `CoreAudioHardware` converte todos os status em `EngineError.halFailure`. `FakeAudioHardware` fica em `Tests/MicBoostCoreTests`; seu ponto de escrita de propriedades padrão registra uma falha de Swift Testing ao receber a saída padrão.
 
 Estrutura de diretórios:
@@ -85,7 +87,7 @@ stopped ──start──▶ starting ──ok──▶ running
 - `start` verifica, nesta ordem: permissão de microfone → BlackHole presente → fonte presente → constrói o agregado → configura formato/buffer → cria o IOProc → `AudioDeviceStart` → aplica a política de entrada padrão.
 - Em `recovering`, o controller observa a lista de dispositivos e tenta de novo quando a condição muda. Não há polling. Exceção: depois do wake, uma única tentativa com atraso de 1 s.
 - `error(.blackHoleMissing)` e `error(.sourceUnavailable)` saem sozinhos quando o dispositivo aparece. `microphonePermissionDenied` é reavaliado quando o app volta a ficar ativo.
-- `stop` faz uma rampa de saída para zero (≤ 10 ms, via flag atômica de fade-out e espera de 2 ciclos de IO, com limite de 50 ms), `AudioDeviceStop`, destrói o IOProc, destrói o agregado e restaura a entrada padrão conforme a política.
+- `stop` faz uma rampa de saída para zero (τ = 3 ms, atingindo −90 dB em aproximadamente 31 ms; espera de 40 ms com limite de 50 ms), `AudioDeviceStop`, destrói o IOProc, destrói o agregado e restaura a entrada padrão conforme a política.
 - Ganho, mute, EQ, bypass e modo de canais **nunca** reiniciam o motor. Mudar a fonte ou o tamanho de buffer reconstrói o motor (stop → start), com rampa.
 
 ## Modelo de domínio (MicBoostCore)

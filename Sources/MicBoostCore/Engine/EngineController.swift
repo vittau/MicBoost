@@ -7,7 +7,7 @@ import MicBoostDSP
 public enum EngineState: Sendable, Equatable {
     case stopped, starting, running
     case recovering(String)
-    case error(String)
+    case error(EngineError)
 }
 public struct EngineStatus: Sendable {
     public var state: EngineState
@@ -25,6 +25,9 @@ public struct EngineStatus: Sendable {
 public actor EngineController {
     private let queue = DispatchSerialQueue(label: "io.github.vittau.MicBoost.engine")
     nonisolated public var unownedExecutor: UnownedSerialExecutor { queue.asUnownedSerialExecutor() }
+    private let settings: SettingsStore
+    private var channelSelection: ChannelSelection = .auto
+    private var forceRebuild = false
     private let hardware: any EngineHardware
     private var state: EngineState = .stopped
     private var selected: String?
@@ -34,13 +37,25 @@ public actor EngineController {
     private var aggregate: AudioObjectID?
     private var proc: AudioDeviceIOProcID?
     private var engine: OpaquePointer?
+    private var reportedFrames: UInt32 = 0
     private var buffer: UInt32 = 0
     private var overloads: UInt64 = 0
     private var tokens: [UUID] = []
     private var pending: Task<Void, Never>?
-    public init() { hardware = CoreAudioHardware() }
-    public init(hardware: sending any EngineHardware) { self.hardware = hardware }
-    public func start(inputUID: String, bufferFrames: UInt32 = 256) throws {
+    public init(settings: SettingsStore = SettingsStore(storage: UserDefaultsStorage())) {
+        hardware = CoreAudioHardware()
+        self.settings = settings
+    }
+    public init(
+        hardware: sending any EngineHardware, settings: SettingsStore = SettingsStore(storage: UserDefaultsStorage())
+    ) {
+        self.hardware = hardware
+        self.settings = settings
+    }
+    public func start(inputUID: String, bufferFrames: UInt32? = nil) async throws {
+        let stored = await settings.current
+        let bufferFrames = bufferFrames ?? UInt32(stored.bufferFrames)
+        channelSelection = stored.channelSelectionByUID[inputUID] ?? .auto
         guard bufferFrames > 0 else { throw EngineError.invalidArgument("Buffer must be positive") }
         try tearDown()
         selected = inputUID
@@ -60,11 +75,11 @@ public actor EngineController {
             guard AVCaptureDevice.authorizationStatus(for: .audio) != .denied,
                 AVCaptureDevice.authorizationStatus(for: .audio) != .restricted
             else {
-                throw EngineError.invalidArgument("Microphone permission denied")
+                throw EngineError.microphonePermissionDenied
             }
             let devices = try hardware.devices()
             guard let blackHole = devices.first(where: { $0.isBlackHole2ch && $0.alive }) else {
-                state = .error("blackHoleMissing")
+                state = .error(.blackHoleMissing)
                 return
             }
             destination = blackHole
@@ -98,23 +113,37 @@ public actor EngineController {
             let sourceLayout = try hardware.layout(source.id)
             let destinationLayout = try hardware.layout(blackHole.id)
             var routing = try AggregateBuilder.routing(source: sourceLayout, destination: destinationLayout)
-            guard let context = mb_engine_create(buffer, source.sampleRate) else { throw EngineError.formatUnsupported }
+            guard let context = mb_engine_create(try hardware.maximumFrames(id, buffer: buffer), source.sampleRate)
+            else { throw EngineError.formatUnsupported }
             engine = context
             guard mb_engine_configure(context, &routing) == 0 else { throw EngineError.formatUnsupported }
+            setChannelSelection(channelSelection)
             let io = try hardware.createIO(id, context: context)
             proc = io
             try hardware.streamUsage(
                 id, proc: io, input: true,
-                enabled: sourceLayout.inputs.map { _ in true } + destinationLayout.inputs.map { _ in false })
+                enabled: Array(repeating: true, count: sourceLayout.inputStreams)
+                    + Array(repeating: false, count: destinationLayout.inputStreams))
             try hardware.streamUsage(
                 id, proc: io, input: false,
-                enabled: sourceLayout.outputs.map { _ in false } + destinationLayout.outputs.map { _ in true })
+                enabled: Array(repeating: false, count: sourceLayout.outputStreams)
+                    + Array(repeating: true, count: destinationLayout.outputStreams))
             try hardware.startIO(id, proc: io)
             for device in [source, blackHole] {
                 for selector in [kAudioDevicePropertyDeviceIsAlive, kAudioDevicePropertyNominalSampleRate] {
                     tokens.append(
                         try hardware.addListener(.init(device.id, selector), queue: queue) { [weak self] in
-                            Task { await self?.changed() }
+                            Task { await self?.changed(force: true) }
+                        })
+                }
+            }
+            for device in [source, blackHole] {
+                for scope in [kAudioObjectPropertyScopeInput, kAudioObjectPropertyScopeOutput] {
+                    tokens.append(
+                        try hardware.addListener(
+                            .init(device.id, kAudioDevicePropertyStreamConfiguration, scope), queue: queue
+                        ) { [weak self] in
+                            Task { await self?.changed(force: true) }
                         })
                 }
             }
@@ -122,15 +151,30 @@ public actor EngineController {
                 try hardware.addListener(.init(id, kAudioDeviceProcessorOverload), queue: queue) { [weak self] in
                     Task { await self?.overloaded() }
                 })
+            reportedFrames =
+                try hardware.latencyFrames(source.id, scope: kAudioObjectPropertyScopeInput)
+                + hardware.latencyFrames(blackHole.id, scope: kAudioObjectPropertyScopeOutput)
+                + hardware.latencyFrames(id, scope: kAudioObjectPropertyScopeInput) + buffer
             state = .running
         } catch {
             try tearDown()
-            state = .error(String(describing: error))
+            state = .error((error as? EngineError) ?? .invalidArgument(String(describing: error)))
             throw error
         }
     }
     private func overloaded() { overloads += 1 }
-    private func changed() {
+    public func setChannelSelection(_ selection: ChannelSelection) {
+        channelSelection = selection
+        guard let engine else { return }
+        switch selection {
+        case .auto: mb_engine_set_channel_mode(engine, MB_AUTO, 0)
+        case .monoMix: mb_engine_set_channel_mode(engine, MB_MONO_MIX, 0)
+        case .mono(let channel): mb_engine_set_channel_mode(engine, MB_MONO, UInt32(clamping: channel - 1))
+        case .stereo(let first): mb_engine_set_channel_mode(engine, MB_STEREO, UInt32(clamping: first - 1))
+        }
+    }
+    private func changed(force: Bool = false) {
+        forceRebuild = forceRebuild || force
         pending?.cancel()
         pending = Task { [weak self] in
             do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
@@ -139,7 +183,9 @@ public actor EngineController {
     }
     private func recover() {
         guard selected != nil else { return }
-        if state == .running, let devices = try? hardware.devices(),
+        let forced = forceRebuild
+        forceRebuild = false
+        if !forced, state == .running, let devices = try? hardware.devices(),
             let currentSource = devices.first(where: { $0.uid == selected }),
             let currentDestination = devices.first(where: { $0.isBlackHole2ch }),
             currentSource == source, currentDestination == destination
@@ -150,7 +196,7 @@ public actor EngineController {
         do {
             try tearDown()
             try build()
-        } catch { state = .error(String(describing: error)) }
+        } catch { state = .error((error as? EngineError) ?? .invalidArgument(String(describing: error))) }
     }
     private func tearDown() throws {
         if let id = aggregate, let proc {
@@ -171,6 +217,17 @@ public actor EngineController {
         for token in tokens.dropFirst() { try hardware.removeListener(token) }
         if tokens.count > 1 { tokens.removeSubrange(1...) }
     }
+    public func willSleep() throws {
+        try tearDown()
+        state = .recovering("sleep")
+    }
+    public func didWake() {
+        pending?.cancel()
+        pending = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(1)) } catch { return }
+            await self?.recover()
+        }
+    }
     public func stop() throws {
         selected = nil
         pending?.cancel()
@@ -183,9 +240,7 @@ public actor EngineController {
         var counters = mb_counters()
         if let engine { mb_engine_read_counters(engine, &counters) }
         let rate = source?.sampleRate ?? 0
-        let latency = Double(
-            (source?.inputLatency ?? 0) + (source?.inputSafetyOffset ?? 0)
-                + buffer + (destination?.outputLatency ?? 0) + (destination?.outputSafetyOffset ?? 0))
+        let latency = Double(reportedFrames)
         return EngineStatus(
             state: state, source: source, blackHole: destination, sampleRate: rate,
             bufferFrames: buffer, reportedLatencyMs: rate > 0 ? latency * 1000 / rate : 0,

@@ -90,8 +90,8 @@ void mb_engine_read_counters(const mb_engine *e, mb_counters *out) {
     out->frames_over_max = atomic_load(&e->oversized);
     out->io_delta_host = atomic_load(&e->delta);
 }
-void mb_engine_process(mb_engine *e, const float *const *in, float *const *out,
-                       uint32_t frames) {
+static unsigned process(mb_engine *e, const float *const *in, float *const *out,
+                        uint32_t frames) {
     unsigned selection = atomic_load(&e->selection);
     unsigned mode = selection & 3;
     unsigned first = selection >> 2;
@@ -99,9 +99,7 @@ void mb_engine_process(mb_engine *e, const float *const *in, float *const *out,
     bool fading = atomic_load(&e->fading);
     bool invalid = false;
     bool missing = false;
-    if (frames > e->maximum) {
-        atomic_fetch_add(&e->oversized, 1);
-    }
+
     if (first >= count || (mode == MB_STEREO && first + 1 >= count)) {
         first = 0;
     }
@@ -156,13 +154,23 @@ void mb_engine_process(mb_engine *e, const float *const *in, float *const *out,
         }
         base += size;
     }
-    if (invalid) {
+    return (invalid ? 1u : 0u) | (missing ? 2u : 0u);
+}
+static void count_cycle(mb_engine *e, unsigned flags, uint32_t frames) {
+    if (flags & 1u) {
         atomic_fetch_add(&e->nonfinite, 1);
     }
-    if (missing) {
+    if (flags & 2u) {
         atomic_fetch_add(&e->missing, 1);
     }
+    if (frames > e->maximum) {
+        atomic_fetch_add(&e->oversized, 1);
+    }
     atomic_fetch_add(&e->cycles, 1);
+}
+void mb_engine_process(mb_engine *e, const float *const *in, float *const *out,
+                       uint32_t frames) {
+    count_cycle(e, process(e, in, out, frames), frames);
 }
 
 OSStatus mb_ioproc(AudioObjectID device, const AudioTimeStamp *now,
@@ -193,6 +201,7 @@ OSStatus mb_ioproc(AudioObjectID device, const AudioTimeStamp *now,
             }
         }
     }
+    unsigned flags = frames == 0 ? 2u : 0u;
     for (uint32_t base = 0; base < frames;) {
         uint32_t n = frames - base;
         if (n > e->maximum) {
@@ -218,7 +227,7 @@ OSStatus mb_ioproc(AudioObjectID device, const AudioTimeStamp *now,
                 }
             }
         }
-        mb_engine_process(e, inputs, outputs, n);
+        flags |= process(e, inputs, outputs, n);
         for (unsigned c = 0; c < 2; c++) {
             mb_channel map = e->routing.outputs[c];
             if (map.buffer >= out->mNumberBuffers) {
@@ -237,5 +246,6 @@ OSStatus mb_ioproc(AudioObjectID device, const AudioTimeStamp *now,
         }
         base += n;
     }
+    count_cycle(e, flags, frames);
     return noErr;
 }

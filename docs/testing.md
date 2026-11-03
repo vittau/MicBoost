@@ -56,8 +56,8 @@ A CLI usa parsing manual, sem dependências externas. `devices` exibe transporte
 Método (`micboost-diag latency`):
 1. O motor roda no próprio processo da ferramenta (fonte → BlackHole, ganho 0 dB, EQ desligado).
 2. Dois IOProcs auxiliares de captura, um direto na fonte e outro na entrada do BlackHole, gravam com o `mHostTime` do início de cada buffer em buffers pré-alocados.
-3. Um clique (impulso de 1 ms) é tocado na saída padrão (`afplay` ou um IOProc de saída). Em alternativa, o usuário estala os dedos perto do microfone.
-4. A ferramenta alinha as duas gravações pelo host time, calcula a correlação cruzada e obtém o atraso. Repete N vezes (padrão 10) e reporta mediana, mínimo e máximo, em ms e em frames.
+3. A implementação usa o sinal da sala, sem emitir sons. Um clique (impulso de 1 ms) é tocado na saída padrão (`afplay` ou um IOProc de saída). Em alternativa, o usuário estala os dedos perto do microfone.
+4. A ferramenta captura dois segundos por tentativa, usa o host time do primeiro buffer para alinhamento, busca correlação normalizada em ±100 ms e exige correlação ≥ 0,5; sem sinal suficiente, falha explicitamente. A ferramenta alinha as duas gravações pelo host time, calcula a correlação cruzada e obtém o atraso. Repete N vezes (padrão 10) e reporta mediana, mínimo e máximo, em ms e em frames.
 5. Também imprime a latência reportada pela HAL e `io_delta_host`, para comparar.
 
 **Meta:** mediana < 20 ms na máquina de referência com buffer de 256 (e o valor com 128). É uma meta de engenharia, não uma garantia. Desvios são documentados abaixo.
@@ -98,7 +98,7 @@ Máquina de referência: MacBook Neo (Apple A18 Pro), macOS 27.2.
 |---|---|---|
 | Latência adicional (mediana) | microfone interno, 48 kHz, buffer 256 | — |
 | Latência adicional (mediana) | microfone interno, 48 kHz, buffer 128 | — |
-| Latência adicional (mediana) | USB/interface | — |
+| Latência adicional USB | C920, 16 kHz, buffer 256; 3 tentativas; correlação com som da sala | mediana/mín./máx. 38,875 ms; correlação 0,9994–0,99997; HAL parcial 19,25 ms; io_delta_host ≈ 834000 ticks |
 | Latência adicional (mediana) | Bluetooth | — |
 | CPU do processo | running, EQ ligado | — |
 | Memória residente | running | — |
@@ -106,5 +106,11 @@ Máquina de referência: MacBook Neo (Apple A18 Pro), macOS 27.2.
 | Captura bruta interna | 2026-11-03; pedido de 3 s, 48 kHz, 1 canal | 144000 frames; pico 0,102121599; RMS 0,005412710; sinal não zero |
 | Captura bruta Continuity | 2026-11-03; pedido de 3 s, 48 kHz, 1 canal | 126976 frames; pico 0,003942308; RMS 0,001024310; sinal não zero |
 | Latência de entrada reportada pela HAL | 2026-11-03; Continuity, 48 kHz | 6000 frames (125 ms) |
+
+Microfone interno: a tampa fechada silencia a captura por hardware, embora a autorização seja concedida e os callbacks continuem. Captura de 2 s: 96000 frames, pico/RMS 0; medição de latência recusada por correlação 0. A latência interna em 128/256 permanece pendente com a tampa aberta. A fifine estava desconectada; a webcam USB substitui a segunda fonte por autorização do coordenador.
+
+Captura bruta C920 (16 kHz, 2 s): 32000 frames; canal 1 pico 0,106262207 e RMS 0,015375519; canal 2 pico 0,092010498 e RMS 0,012545472. Captura simultânea de fonte/BlackHole durante a correlação: picos 0,15270996/0,15269819, 0,21069336/0,2104089 e 0,19293213/0,19246516; diferenças incluem o resampler de drift.
+
+A recuperação física por desconexão USB, escuta humana e teste real de reinício de coreaudiod permanecem manuais. O ensaio de 60 min e as decisões de buffer/drift permanecem em validação.
 
 (— = ainda não medido. Substituir pelo valor e pela data da medição.)

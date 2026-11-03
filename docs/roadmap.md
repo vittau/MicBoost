@@ -5,7 +5,7 @@ Status: `não iniciado` · `em andamento` · `concluído`. Uma etapa só é conc
 | # | Etapa | Status |
 |---|---|---|
 | 0 | Estrutura e diagnóstico | concluído |
-| 1 | Ponte mínima | não iniciado |
+| 1 | Ponte mínima | em andamento |
 | 2 | Ganho e proteção de pico | não iniciado |
 | 3 | Equalizador | não iniciado |
 | 4 | Interface | não iniciado |
@@ -39,6 +39,8 @@ Condições de conclusão:
 - ensaio de 60 min aprovado (sem crescimento de atraso);
 - decisão confirmada: agregado (ou troca para a ponte alternativa, com a especificação reescrita);
 - buffer padrão definido.
+
+A ponte e os diagnósticos estão implementados; a aprovação depende do ensaio de estabilidade, das medições em diferentes buffers e da recuperação física manual. O microfone interno não permite medição com a tampa fechada.
 
 ## 2 — Ganho e proteção de pico
 
