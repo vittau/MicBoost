@@ -14,7 +14,7 @@
   - `mic.slash.fill`: mudo;
   - `mic`: processamento desligado;
   - `exclamationmark.triangle.fill`: erro ou divergência da entrada padrão.
-- Clique (esquerdo ou direito) abre e fecha o painel. O rótulo de acessibilidade descreve o estado (por exemplo, "MicBoost, ativo, +12 dB").
+- Clique (esquerdo ou direito) abre e fecha o painel. ⌥-clique liga ou desliga o processamento direto, sem abrir o painel. O rótulo de acessibilidade descreve o estado (por exemplo, "MicBoost, ativo, +12 dB").
 
 ## Painel
 
@@ -29,7 +29,10 @@ Fecha com clique fora (monitor global de mouse), `Esc` ou novo clique no ícone.
 
 Conteúdo, de cima para baixo (SwiftUI, `PanelView`):
 
-1. **Cabeçalho:** "MicBoost" + `Toggle` estilo switch para o processamento (`processingEnabled`).
+1. **Cabeçalho:** "MicBoost" + `Toggle` estilo switch para o processamento (`processingEnabled`), sempre visível no topo e alcançável com um clique ao abrir o painel. É o jeito principal de parar o MicBoost e **soltar o microfone**:
+   - **Desligar:** para o motor por completo (rampa, `AudioDeviceStop`, IOProc e agregado destruídos), de modo que o microfone deixa de ser capturado e o indicador de microfone do macOS apaga. A entrada padrão é restaurada conforme a [política](audio-engine.md#política-de-entrada-padrão-defaultinputmanager), e o ícone vira `mic`.
+   - **Ligar:** reconstrói o motor com a fonte e os ajustes persistidos e reaplica a política de entrada padrão.
+   - O estado persiste (`processingEnabled`), e a troca nunca fecha o painel.
 2. **Ganho:** botão de mute com o ícone `mic.fill`/`mic.slash.fill`, `Slider` de ganho de −12 a +24 dB e rótulo `+12,0 dB · 398%`. O valor é editável: clicar no rótulo abre um campo numérico em dB. O selo "Limitando" (pílula discreta) aparece durante a proteção de pico.
 3. **Medidores:** duas barras finas horizontais, "Entrada" e "Saída", em dBFS de −60 a 0, que só mudam de cor perto de 0. Aviso "Entrada saturada" quando `input_clipped`.
 4. **Roteamento:** linha "Microfone → BlackHole 2ch" e estado da entrada padrão:
