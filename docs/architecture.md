@@ -62,6 +62,7 @@ Frameworks linkados: CoreAudio, AudioToolbox, AVFoundation (só para `AVCaptureD
 | Thread de IO do Core Audio | `mb_ioproc` (C) | Ler parâmetros atômicos, processar, escrever medidores atômicos | Alocar, liberar, travar locks, acessar disco, logar, chamar Swift/Objective-C, chamar a HAL |
 
 - Os listeners HAL usam `AudioObjectAddPropertyListenerBlock` com a fila `engine`, de modo que todas as mudanças de dispositivo ficam serializadas fora dos callbacks de áudio.
+- `SettingsStore` é um actor: o controller lê e grava com `await`, e o debounce roda como `Task` isolada nele. `DefaultInputManager` não é `Sendable` e seus métodos assíncronos são `nonisolated(nonsending)`: herdam o executor de quem chama, então rodam e retomam na fila `engine` mesmo depois de cada `await` ao `SettingsStore`; um método `nonisolated async` comum rodaria no pool cooperativo e tocaria a HAL fora da fila. O controller serializa as chamadas.
 - O IOProc é uma função C registrada com `AudioDeviceCreateIOProcID`. O contexto é um `mb_engine *` alocado pelo Swift na fila `engine`, antes do start, e liberado só depois de `AudioDeviceStop` + `AudioDeviceDestroyIOProcID`.
 - Parâmetros (Swift → C): o lado de controle escreve alvos em `_Atomic float`/`_Atomic int` com ordem relaxed; o IOProc lê uma vez por bloco. Combinações momentaneamente inconsistentes entre parâmetros são aceitáveis, porque todos passam por suavização.
 - Medidores (C → Swift): o IOProc mantém picos máximos em atômicos, e o lado de controle lê e zera com `atomic_exchange` (pico desde a última leitura). Contadores (`uint64`) são monotônicos.
@@ -91,22 +92,25 @@ stopped ──start──▶ starting ──ok──▶ running
 
 - `AudioDevice`: `id: AudioObjectID`, `uid: String`, `name: String`, `manufacturer`, `transport` (builtIn, usb, bluetooth, bluetoothLE, aggregate, virtual, continuity/unknown…), `inputChannels`, `outputChannels`, `nominalSampleRate`, `availableSampleRates`, `bufferFrameSizeRange`, `isAlive`.
 - `DeviceService` publica `[AudioDevice]` de entrada elegíveis (ver exclusões em [audio-engine.md](audio-engine.md#enumeração-e-elegibilidade)), o BlackHole detectado (se houver) e o UID da entrada padrão atual.
+- `Settings`: preferências persistidas, com `EQSettings` (`low`, `mid`, `high`) e `ChannelSelection` (`auto`, `mono(canal)`, `monoMix`, `stereo(primeiroCanal)`, canais baseados em 1). `SettingsStore` é o actor que as lê e grava ([Persistência](#persistência)).
+- `DefaultInputManager`: aplica a [política de entrada padrão](audio-engine.md#política-de-entrada-padrão-defaultinputmanager) sobre `AudioHardware` e `SettingsStore`, e publica `DefaultInputStatus`.
 - `EngineStatus` (snapshot enviado à UI): `state`, `source: AudioDevice?`, `blackHole: AudioDevice?`, `defaultInput: DefaultInputStatus` (`isBlackHole`, `divergedByUser`, `unknown`), `sampleRate`, `bufferFrames`, `reportedLatencyMs`, contadores (overloads, eventos NaN).
 
 ## Persistência
 
-`SettingsStore` grava um struct `Settings: Codable` versionado (`schemaVersion`) em `UserDefaults` (suite padrão do bundle), com debounce de 300 ms para não gravar a cada movimento do slider.
+`SettingsStore` é um actor que mantém `Settings: Codable, Sendable, Equatable` versionado por `schemaVersion` (atual: 1) e o grava como JSON na chave `io.github.vittau.MicBoost.settings`. O armazenamento fica atrás do protocolo `SettingsStorage` (`data(forKey:)` / `setData(_:forKey:)`): `UserDefaultsStorage` na suíte padrão do bundle e um armazenamento em memória nos testes. `update` cobre os campos comuns e grava com debounce de 300 ms; `updateDefaultInput` cobre os campos de entrada padrão e grava imediatamente; `flush` antecipa uma gravação pendente. Atualizações que não mudam nada não gravam.
 
 | Campo | Padrão | Notas |
 |---|---|---|
+| `schemaVersion` | `1` | Versão diferente da atual → padrões |
 | `processingEnabled` | `true` | Liga/desliga o motor ao abrir o app |
 | `selectedInputUID` | `nil` | Primeira execução: entrada padrão atual, se elegível; senão, a primeira elegível |
 | `gainDB` | `0` | Faixa em [dsp.md](dsp.md#ganho) |
 | `muted` | `false` | |
-| `eq` | ver [dsp.md](dsp.md#equalizador) | `enabled`, `low{freq, gainDB}`, `mid{freq, gainDB, q}`, `high{freq, gainDB}` |
-| `channelSelectionByUID` | `[:]` | Modo de canais por dispositivo ([audio-engine.md](audio-engine.md#canais)) |
+| `eq` | ver [dsp.md](dsp.md#equalizador) | `enabled` (padrão `true`), `low{frequency, gainDB}`, `mid{frequency, gainDB, q}`, `high{frequency, gainDB}` |
+| `channelSelectionByUID` | `[:]` | Modo de canais por dispositivo ([audio-engine.md](audio-engine.md#canais)), codificado como `{mode, channel}` com canal baseado em 1 |
 | `bufferFrames` | `256` | Opções 128/256/512/1024, limitadas pela faixa do dispositivo |
 | `previousDefaultInputUID` | `nil` | Entrada anterior ao MicBoost assumir a padrão |
 | `defaultInputManaged` | `false` | `true` enquanto a entrada padrão atual foi definida pelo MicBoost |
 
-Esquemas desconhecidos ou corrompidos caem nos padrões, sem crash. Os campos de entrada padrão são gravados imediatamente, sem debounce, porque servem de recuperação após crash.
+Cada campo é decodificado isoladamente (`decodeIfPresent`), então um campo ausente mantém o padrão. Esquemas desconhecidos ou dados corrompidos caem nos padrões, sem crash. Valores fora das faixas documentadas (ganho, buffer, frequência/ganho/Q do EQ) são limitados, e seleções de canal inválidas são descartadas na leitura. Os campos de entrada padrão são gravados imediatamente, sem debounce, porque servem de recuperação após crash.

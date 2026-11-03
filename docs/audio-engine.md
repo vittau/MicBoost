@@ -119,17 +119,26 @@ O valor oficial é o medido ([testing.md](testing.md#medição-de-latência)); o
 
 ## Política de entrada padrão (`DefaultInputManager`)
 
+`DefaultInputManager` aplica a política sobre `AudioHardware` e `SettingsStore`, a partir de quatro chamadas feitas pelo `EngineController` na fila `engine` (ele não registra listeners):
+
+- `engineDidStart(blackHole:)` ao entrar em `running`;
+- `defaultInputDidChange()` quando `kAudioHardwarePropertyDefaultInputDevice` muda, devolvendo o `DefaultInputStatus` publicado;
+- `useBlackHole()` para a ação "Usar BlackHole" da UI;
+- `engineWillStop(reason:)` ao sair de `running`, com `reason` `user` (sair do app, desligar o processamento) ou `engineError`.
+
 Ao entrar em `running`:
-- Se a entrada padrão atual não for o BlackHole: salvar `previousDefaultInputUID` = UID atual, definir BlackHole com `kAudioHardwarePropertyDefaultInputDevice` e marcar `defaultInputManaged = true`.
+- Se a entrada padrão atual não for o BlackHole: gravar `previousDefaultInputUID` = UID atual e `defaultInputManaged = true` (gravação imediata) e então definir o BlackHole com `kAudioHardwarePropertyDefaultInputDevice`. A gravação vem antes da escrita na HAL, para que um crash no meio ainda restaure; se a escrita falhar, `defaultInputManaged` volta a `false`.
 - Se já for o BlackHole: não alterar nada nem sobrescrever `previousDefaultInputUID`. Manter `defaultInputManaged` como estiver persistido, o que cobre a recuperação após crash.
 
-Mudança externa da entrada padrão com o motor rodando: se a nova entrada não for o BlackHole, marcar `defaultInputManaged = false` e publicar `divergedByUser`. **Não** reverter. A ação "Usar BlackHole" da UI repete o passo de entrada (salva o UID atual como anterior e define o BlackHole).
+Mudança externa da entrada padrão com o motor rodando: se a nova entrada não for o BlackHole, marcar `defaultInputManaged = false` e publicar `divergedByUser`. **Não** reverter. A ação "Usar BlackHole" repete o passo de entrada (salva o UID atual como anterior e define o BlackHole).
 
-Ao parar (sair do app, desligar o processamento): restaurar `previousDefaultInputUID` somente se `defaultInputManaged == true`, a entrada atual for o BlackHole e o dispositivo anterior existir. Em seguida, limpar `defaultInputManaged`.
+Ao parar (sair do app, desligar o processamento): restaurar `previousDefaultInputUID` somente se `defaultInputManaged == true`, a entrada atual for o BlackHole e o dispositivo anterior existir (e estiver vivo). Em seguida, limpar `defaultInputManaged`. Se o usuário trocou a entrada ou o dispositivo anterior sumiu, apenas limpar `defaultInputManaged`.
 
-Erros do motor (`recovering`/`error`) **não** restauram a entrada padrão. O BlackHole fica em silêncio, e os apps consumidores não trocam de microfone de repente.
+Erros do motor (`recovering`/`error`) **não** restauram a entrada padrão: `engineWillStop(reason: .engineError)` não escreve nada e mantém `defaultInputManaged`, para que o stop voluntário seguinte ainda restaure. O BlackHole fica em silêncio, e os apps consumidores não trocam de microfone de repente.
 
-Invariantes: nunca definir uma fonte física como padrão; nunca tocar em `kAudioHardwarePropertyDefaultOutputDevice` nem em `kAudioHardwarePropertyDefaultSystemOutputDevice`.
+`DefaultInputStatus` tem três sinais: `isBlackHole` (a entrada padrão é o BlackHole 2ch), `divergedByUser` (o motor roda e a entrada não é o BlackHole) e `unknown` (o `DefaultInputManager` ainda não conhece o BlackHole, por exemplo antes do start, ou não conseguiu resolver a entrada atual).
+
+Invariantes: nunca definir uma fonte física como padrão, exceto na restauração descrita acima; nunca tocar em `kAudioHardwarePropertyDefaultOutputDevice` nem em `kAudioHardwarePropertyDefaultSystemOutputDevice`.
 
 ## Recuperação
 
