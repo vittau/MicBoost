@@ -127,7 +127,7 @@ Estrutura, nesta ordem:
 6. **How it works:** diagrama da cadeia (fonte → EQ → ganho → proteção de pico → BlackHole → apps) e um parágrafo sobre o dispositivo agregado sem fila e o porquê da baixa latência.
 7. **Features**, **Requirements**, **Install** (só os canais validados; antes disso, só "Build from source"), **First launch** (fluxo "Abrir Mesmo Assim" de [Primeira abertura](#primeira-abertura-sem-notarização), sem `xattr` nem remoção de quarentena), **Usage** (passos numerados, incluindo selecionar "BlackHole 2ch" ou "padrão do sistema" no app de chamada), **Latency** (números medidos de [testing.md](testing.md#resultados-registrados) e o método), **Known limitations** (Bluetooth, Continuity, microfone interno com a tampa fechada, ganho digital), **Troubleshooting**, **Uninstall**, **Building from source**, **Support** (GitHub Sponsors e Buy Me a Coffee, com botões/badges para `github.com/sponsors/vittau` e `buymeacoffee.com/vittau`), **License**, **Credits** (BlackHole e as referências de inspiração, deixando claro que é uma implementação independente).
 
-Manutenção: toda mudança visível ao usuário (recurso, instalação, limitação, medição) atualiza o README na mesma mudança. As capturas são regeneradas quando a UI muda.
+Manutenção: toda mudança visível ao usuário (recurso, instalação, limitação, medição) atualiza o README na mesma mudança. As capturas são regeneradas quando a UI muda. O cabeçalho é regenerado por `scripts/render-readme-header.sh`, que executa `design/readme/RenderHeader.swift` sobre as prévias do ícone e regrava `docs/design/readme/header-{light,dark}.png`.
 
 ## Licenciamento
 
