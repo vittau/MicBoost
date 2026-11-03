@@ -1,5 +1,7 @@
+import AppKit
 import Foundation
 import MicBoostCore
+import SwiftUI
 import Testing
 
 @testable import MicBoostUI
@@ -35,4 +37,15 @@ import Testing
     #expect((await store.current).processingEnabled)
     #expect(model.error == .noSourceSelected)
     try await model.shutdown()
+}
+
+@MainActor @Test func limiterBadgeKeepsPanelSize() {
+    let quiet = AppModel()
+    quiet.limitingUntil = .distantPast
+    let limiting = AppModel()
+    limiting.limitingUntil = .distantFuture
+    let quietSize = NSHostingView(rootView: PanelView(model: quiet)).fittingSize
+    let limitingSize = NSHostingView(rootView: PanelView(model: limiting)).fittingSize
+    #expect(quietSize.width == 320 && quietSize.height > 0)
+    #expect(limitingSize == quietSize)
 }

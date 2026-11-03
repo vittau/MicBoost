@@ -18,6 +18,7 @@ import SwiftUI
         let scheme: ColorScheme = dark ? .dark : .light
         for kind in ["panel", "eq", "settings", "error"] {
             model.expanded = kind == "eq"
+            model.limitingUntil = kind == "panel" ? .distantFuture : .distantPast
             model.error = kind == "error" ? .blackHoleMissing : nil
             let view = kind == "settings" ? AnyView(SettingsView(model: model)) : AnyView(PanelView(model: model))
             let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)

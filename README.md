@@ -54,7 +54,8 @@ keeps the output below −1 dBFS; human voice calibration and listening checks r
 
 Available today:
 
-- **Gain from −12 to +24 dB**, mute and peak protection; toggling mute keeps the gain slider in place.
+- **Gain from −12 to +24 dB**, mute and peak protection; mute and the limiting indicator keep
+  the panel layout stable.
 - **3-band EQ** with adjustable bass, parametric mids and treble, bypass and reset. Click its
   title or disclosure arrow to expand or collapse it; each band has a clear section heading.
 

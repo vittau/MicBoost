@@ -59,19 +59,26 @@ import SwiftUI
                     return .handled
                 }
             }
-            if editing {
-                TextField(
-                    localized("Gain"), value: Binding(get: { model.controls.gainDB }, set: model.gain), format: .number
-                )
-                .onSubmit { editing = false }
-            } else {
-                Button(AppModel.gainLabel(model.controls.gainDB)) { editing = true }.buttonStyle(.plain)
-                    .monospacedDigit()
-            }
-            if model.limitingUntil > Date() {
-                Text(localized("Limiting")).font(.caption).padding(.horizontal, 8).background(
-                    .quaternary, in: Capsule())
-            }
+            HStack {
+                if editing {
+                    TextField(
+                        localized("Gain"), value: Binding(get: { model.controls.gainDB }, set: model.gain),
+                        format: .number
+                    )
+                    .onSubmit { editing = false }
+                } else {
+                    Button(AppModel.gainLabel(model.controls.gainDB)) { editing = true }.buttonStyle(.plain)
+                        .monospacedDigit()
+                }
+                Spacer(minLength: 8)
+                Text(localized("Limiting"))
+                    .font(.caption)
+                    .padding(.horizontal, 8)
+                    .background(.quaternary, in: Capsule())
+                    .fixedSize()
+                    .opacity(model.limitingUntil > Date() ? 1 : 0)
+                    .accessibilityHidden(model.limitingUntil <= Date())
+            }.frame(minHeight: 24)
             meter("Input", model.inputDB)
             meter("Output", model.outputDB)
             if model.clipped { Text(localized("Input clipped")).font(.caption).foregroundStyle(.red) }
