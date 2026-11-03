@@ -22,10 +22,18 @@ public struct EngineStatus: Sendable {
     public var nonfiniteResets: UInt64
     public var ioDeltaHost: UInt64
 }
+public enum EQBand: Sendable { case low, mid, high }
+public struct MetersSnapshot: Sendable {
+    public var inputPeak: Float
+    public var outputPeak: Float
+    public var gainReductionDB: Float
+    public var inputClipped: Bool
+}
 public actor EngineController {
     private let queue = DispatchSerialQueue(label: "io.github.vittau.MicBoost.engine")
     nonisolated public var unownedExecutor: UnownedSerialExecutor { queue.asUnownedSerialExecutor() }
     private let settings: SettingsStore
+    private var controls = Settings()
     private var channelSelection: ChannelSelection = .auto
     private var forceRebuild = false
     private let hardware: any EngineHardware
@@ -56,6 +64,7 @@ public actor EngineController {
     }
     public func start(inputUID: String, bufferFrames: UInt32? = nil) async throws {
         let stored = await settings.current
+        controls = stored
         let bufferFrames = bufferFrames ?? UInt32(stored.bufferFrames)
         channelSelection = stored.channelSelectionByUID[inputUID] ?? .auto
         guard bufferFrames > 0 else { throw EngineError.invalidArgument("Buffer must be positive") }
@@ -119,6 +128,7 @@ public actor EngineController {
             engine = context
             guard mb_engine_configure(context, &routing) == 0 else { throw EngineError.formatUnsupported }
             setChannelSelection(channelSelection)
+            applyControls()
             let io = try hardware.createIO(id, context: context)
             proc = io
             try hardware.streamUsage(
@@ -174,6 +184,61 @@ public actor EngineController {
         case .mono(let channel): mb_engine_set_channel_mode(engine, MB_MONO, UInt32(clamping: channel - 1))
         case .stereo(let first): mb_engine_set_channel_mode(engine, MB_STEREO, UInt32(clamping: first - 1))
         }
+    }
+    private func applyControls() {
+        guard let engine else { return }
+        mb_engine_set_gain_db(engine, Float(controls.gainDB))
+        mb_engine_set_muted(engine, controls.muted)
+        mb_engine_set_eq_enabled(engine, controls.eq.enabled)
+        mb_engine_set_band(engine, MB_LOW, Float(controls.eq.low.frequency), Float(controls.eq.low.gainDB), 0.9)
+        mb_engine_set_band(
+            engine, MB_MID, Float(controls.eq.mid.frequency), Float(controls.eq.mid.gainDB), Float(controls.eq.mid.q))
+        mb_engine_set_band(engine, MB_HIGH, Float(controls.eq.high.frequency), Float(controls.eq.high.gainDB), 0.9)
+    }
+    private func updateControls(_ change: @Sendable (inout Settings) -> Void) async {
+        controls = await settings.update { value in
+            change(&value)
+            value = value.sanitized()
+        }
+        applyControls()
+    }
+    public func setGain(db: Double) async {
+        await updateControls { $0.gainDB = db.isFinite ? db : 0 }
+    }
+    public func setMuted(_ muted: Bool) async {
+        await updateControls { $0.muted = muted }
+    }
+    public func setEQEnabled(_ enabled: Bool) async {
+        await updateControls { $0.eq.enabled = enabled }
+    }
+    public func setBand(_ band: EQBand, frequency: Double, gainDB: Double, q: Double = 0.9) async {
+        guard frequency.isFinite, gainDB.isFinite, q.isFinite else { return }
+        await updateControls {
+            switch band {
+            case .low: $0.eq.low = EQShelfBand(frequency: frequency, gainDB: gainDB)
+            case .mid: $0.eq.mid = EQPeakingBand(frequency: frequency, gainDB: gainDB, q: q)
+            case .high: $0.eq.high = EQShelfBand(frequency: frequency, gainDB: gainDB)
+            }
+        }
+    }
+    public func resetEQ() async {
+        await updateControls {
+            let enabled = $0.eq.enabled
+            $0.eq = EQSettings()
+            $0.eq.enabled = enabled
+        }
+    }
+    public func setChannelSelection(_ selection: ChannelSelection, forUID uid: String) async {
+        guard selection.isValid else { return }
+        await settings.update { $0.channelSelectionByUID[uid] = selection }
+        if selected == uid { setChannelSelection(selection) }
+    }
+    public func meters() -> MetersSnapshot {
+        var value = mb_meters()
+        if let engine { mb_engine_read_meters(engine, &value) }
+        return MetersSnapshot(
+            inputPeak: value.input_peak, outputPeak: value.output_peak,
+            gainReductionDB: value.gr_max_db, inputClipped: value.input_clipped)
     }
     private func changed(force: Bool = false) {
         forceRebuild = forceRebuild || force

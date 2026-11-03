@@ -6,8 +6,8 @@ Status: `não iniciado` · `em andamento` · `concluído`. Uma etapa só é conc
 |---|---|---|
 | 0 | Estrutura e diagnóstico | concluído |
 | 1 | Ponte mínima | concluído |
-| 2 | Ganho e proteção de pico | não iniciado |
-| 3 | Equalizador | não iniciado |
+| 2 | Ganho e proteção de pico | em andamento |
+| 3 | Equalizador | concluído |
 | 4 | Interface | não iniciado |
 | 5 | Recuperação | não iniciado |
 | 6 | Distribuição | não iniciado |
@@ -43,7 +43,7 @@ Condições de conclusão:
 
 ## 2 — Ganho e proteção de pico
 
-Entregas: ganho suavizado, mute, limitador, medidores e contadores; testes DSP correspondentes.
+Entregas: ganho suavizado, mute, limitador, medidores e contadores; testes DSP correspondentes. Implementação e medição com som ambiente verificadas; calibração e gravação de voz humana pendentes.
 
 Condições de conclusão:
 - níveis conferidos com sinal conhecido (testes) e com gravação de voz;
@@ -94,4 +94,4 @@ Condições de conclusão:
 |---|---|---|
 | Licença do MicBoost | GPL-3.0, que alinha com o BlackHole e simplifica uma eventual redistribuição conjunta | antes da etapa 6 |
 | Queda lenta de latência no ensaio longo | ensaio de várias horas para confirmar que se estabiliza | antes da etapa 6 |
-| Faixa máxima do ganho | +24 dB provisório | etapa 2 |
+| Calibração do ganho com voz humana | manter +24 dB; teto aprovado nos testes numéricos, calibração manual pendente | antes de concluir etapa 2 |

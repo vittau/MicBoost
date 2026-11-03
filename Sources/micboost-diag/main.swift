@@ -4,11 +4,33 @@ import Foundation
 import MicBoostCore
 
 let usage =
-    "Usage: micboost-diag devices [--json] | permission | capture --device UID --seconds N --out file.wav | run --input UID [--buffer N] [--seconds N] | latency --input UID [--trials N] [--buffer N] | soak --input UID [--minutes N] [--buffer N]"
+    "Usage: micboost-diag devices [--json] | permission | capture --device UID --seconds N --out file.wav | run --input UID [--buffer N] [--seconds N] | latency --input UID [--trials N] [--buffer N] | soak --input UID [--minutes N] [--buffer N]; effects: --gain-db N --mute --eq-low F:G --eq-mid F:G:Q --eq-high F:G --eq-off"
 do {
-    let args = Array(CommandLine.arguments.dropFirst())
+    let rawArgs = Array(CommandLine.arguments.dropFirst())
+    var args: [String] = []
+    var effects: [String: String] = [:]
+    var index = 0
+    while index < rawArgs.count {
+        let key = rawArgs[index]
+        if ["--gain-db", "--eq-low", "--eq-mid", "--eq-high", "--mute", "--eq-off"].contains(key) {
+            guard effects[key] == nil else { throw EngineError.invalidArgument(usage) }
+            if key == "--mute" || key == "--eq-off" {
+                effects[key] = "true"
+            } else {
+                index += 1
+                guard index < rawArgs.count else { throw EngineError.invalidArgument(usage) }
+                effects[key] = rawArgs[index]
+            }
+        } else {
+            args.append(key)
+        }
+        index += 1
+    }
     let hardware = CoreAudioHardware()
     guard let command = args.first else { throw EngineError.invalidArgument(usage) }
+    guard effects.isEmpty || ["run", "latency", "soak"].contains(command) else {
+        throw EngineError.invalidArgument(usage)
+    }
     switch command {
     case "permission":
         print("microphoneAuthorization=\(AVCaptureDevice.authorizationStatus(for: .audio).rawValue)")
@@ -60,7 +82,7 @@ do {
         else {
             throw EngineError.invalidArgument(usage)
         }
-        let controller = EngineController()
+        let controller = try await diagnosticController(effects: effects)
         do {
             try await controller.start(inputUID: uid, bufferFrames: buffer)
             try await Task.sleep(for: .seconds(1))
@@ -110,12 +132,16 @@ do {
         else {
             throw EngineError.invalidArgument(usage)
         }
-        let controller = EngineController()
+        let controller = try await diagnosticController(effects: effects)
         do {
             try await controller.start(inputUID: uid, bufferFrames: buffer)
             let deadline = Date().addingTimeInterval(seconds)
             repeat {
                 let status = await controller.status()
+                let meters = await controller.meters()
+                report(
+                    "input_peak=\(meters.inputPeak) output_peak=\(meters.outputPeak) gr_db=\(meters.gainReductionDB) cpu_seconds=\(try processUsage().cpuSeconds)"
+                )
                 report(
                     "state=\(status.state) rate=\(status.sampleRate) buffer=\(status.bufferFrames) HAL_ms=\(status.reportedLatencyMs) cycles=\(status.cycles) overloads=\(status.overloads) input_missing=\(status.inputMissing) nonfinite_resets=\(status.nonfiniteResets) io_delta_host=\(status.ioDeltaHost) io_delta_ms=\(hostMilliseconds(status.ioDeltaHost))"
                 )
@@ -205,4 +231,34 @@ func hostMilliseconds(_ ticks: UInt64) -> Double {
     var timebase = mach_timebase_info_data_t()
     mach_timebase_info(&timebase)
     return Double(ticks) * Double(timebase.numer) / Double(timebase.denom) / 1e6
+}
+
+func diagnosticController(effects: [String: String]) async throws -> EngineController {
+    guard let defaults = UserDefaults(suiteName: "io.github.vittau.MicBoost.diag") else {
+        throw EngineError.invalidArgument("Diagnostic settings unavailable")
+    }
+    let store = SettingsStore(storage: UserDefaultsStorage(defaults: defaults))
+    let controller = EngineController(settings: store)
+    await controller.setGain(db: 0)
+    await controller.setMuted(effects["--mute"] != nil)
+    await controller.resetEQ()
+    await controller.setEQEnabled(effects["--eq-off"] == nil)
+    if let value = effects["--gain-db"] {
+        guard let db = Double(value), db.isFinite else { throw EngineError.invalidArgument(usage) }
+        await controller.setGain(db: db)
+    }
+    for (key, band) in [("--eq-low", EQBand.low), ("--eq-mid", .mid), ("--eq-high", .high)] {
+        if let value = effects[key] {
+            let fields = value.split(separator: ":", omittingEmptySubsequences: false)
+            let values = fields.compactMap { Double($0) }
+            guard values.count == fields.count, values.count == (key == "--eq-mid" ? 3 : 2),
+                values.allSatisfy({ $0.isFinite })
+            else {
+                throw EngineError.invalidArgument(usage)
+            }
+            await controller.setBand(
+                band, frequency: values[0], gainDB: values[1], q: values.count == 3 ? values[2] : 0.9)
+        }
+    }
+    return controller
 }

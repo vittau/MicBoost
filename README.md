@@ -20,14 +20,15 @@ calls, recorders, anything — hears the processed voice.
 > **Pre-release: the app is a menu bar icon with a Quit item, and there is no download or
 > Homebrew tap yet.**
 >
-> **Working today (stage 1):** a device-agnostic capture → BlackHole 2ch bridge, driven by the
+> **Working today:** a device-agnostic capture → BlackHole 2ch bridge, driven by the
 > `micboost-diag` command-line tool. It captures any Core Audio input by UID through a private
 > aggregate device, with no queue between callbacks. Measured on a USB microphone at 48 kHz:
 > median **15.3 ms** of added latency at the default buffer, a 20-minute stability run with no
 > overloads, automatic recovery after unplugging the microphone, and safe silence when the
-> source delivers no signal.
+> source delivers no signal. Gain up to +24 dB, mute, peak protection and a 3-band EQ
+> with bypass are available through the diagnostic tool.
 >
-> **Still planned:** gain and peak protection (stage 2), the 3-band EQ (stage 3), the menu bar
+> **Still planned:** the menu bar
 > panel and settings window (stage 4), full recovery coverage — sleep/wake, format changes (stage 5), and the Homebrew tap with a `.zip`
 > release (stage 6). Progress lives in [the roadmap](docs/roadmap.md).
 
@@ -44,12 +45,15 @@ The added latency is bounded by the buffer and the device safety offsets, and th
 the two clocks is handled by Core Audio's drift resampler instead of a ring buffer that grows.
 The aggregate is private: other apps never see it, and it disappears with the process.
 
-The EQ, gain and peak protection in that chain are still being built; today the bridge passes
-audio through unchanged.
+Gain, mute and the 3-band EQ can be adjusted with the diagnostic tool. Peak protection
+keeps the output below −1 dBFS; human voice calibration and listening checks remain pending.
 
 ## Features
 
 Available today:
+
+- **Gain from −12 to +24 dB**, mute and peak protection.
+- **3-band EQ** with adjustable bass, parametric mids and treble, bypass and reset.
 
 - **Any Core Audio input**, captured explicitly by UID — the source does not have to be the
   system default input.
@@ -62,10 +66,6 @@ Available today:
 
 Planned for v1:
 
-- **Gain above +6 dB (200%)** with mute and peak protection, without a ceiling inherited from
-  another product (stage 2).
-- **3-band EQ** — low shelf, one parametric mid band and high shelf — with bypass and a reset
-  action (stage 3).
 - **Menu bar panel** with gain, meters, routing status, source list and the EQ section, plus a
   settings window for buffer, channels and diagnostics (stage 4).
 - **Recovery** from a disconnected source, sleep/wake, format changes and a missing BlackHole
