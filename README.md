@@ -31,20 +31,6 @@ calls, recorders, anything — hears the processed voice.
 > panel and settings window (stage 4), recovery (stage 5), and the Homebrew tap with a `.zip`
 > release (stage 6). Progress lives in [the roadmap](docs/roadmap.md).
 
-## The app icon
-
-| Light | Dark |
-| --- | --- |
-| <img src="docs/design/readme/icon-light-256.png" width="128" alt="MicBoost app icon, light appearance"> | <img src="docs/design/readme/icon-dark-256.png" width="128" alt="MicBoost app icon, dark appearance"> |
-| **Clear** | **Tinted** |
-| <img src="docs/design/readme/icon-clear-light-256.png" width="128" alt="MicBoost app icon, clear appearance"> | <img src="docs/design/readme/icon-tinted-light-256.png" width="128" alt="MicBoost app icon, tinted appearance"> |
-
-*The icon is a layered Liquid Glass document (`Resources/AppIcon.icon`) rendered by Icon Composer
-in six appearances: light, dark, tinted light/dark and clear light/dark. These 256 px previews come
-from `design/icon/previews/` and are refreshed by `scripts/render-readme-header.sh`. Panel
-screenshots will be real SwiftUI renders of the app with sample state, added together with the UI
-stage.*
-
 ## How it works
 
 ```text
