@@ -21,15 +21,17 @@
 
 ## Painel
 
-`MenuBarPanel`: subclasse de `NSPanel` com:
-- estilo `.nonactivatingPanel` + `.borderless`;
-- `canBecomeKey = true`, para foco de teclado;
-- conteúdo transparente de SwiftUI em `PanelSurface`: `NSGlassEffectView` `.regular` no macOS 26 ou posterior, com `contentView` e cantos de 12 pt definidos pela API nativa; no macOS 14–15, `NSVisualEffectView` `.menu`, `.behindWindow`, `.active`, com o mesmo raio e recorte de subviews;
-- sem cor de fundo, opacidade ou borda sobrepostas ao material do sistema; o host recorta seu conteúdo para impedir vazamento nos cantos;
-- largura fixa de 320 pt e altura que segue o conteúdo;
-- ancorado abaixo do item de status, alinhado à borda direita do botão e mantido dentro da tela visível.
+`NSPopover` padrão do AppKit, com conteúdo em `NSHostingController<PanelView>`:
+- comportamento `.transient`: o sistema fecha ao clicar fora;
+- moldura, material, transparência, sombra, cantos e seta do próprio popover, sem camadas de fundo nem desenho adicional;
+- conteúdo de 320 pt de largura e altura acompanhando o tamanho preferido do hosting controller;
+- ancorado no `NSStatusBarButton`; posicionamento e limites da tela gerenciados pelo AppKit;
+- foco de teclado na janela do popover para edição de valores e atalhos;
+- animações nativas desabilitadas quando "Reduzir movimento" está ativo.
 
-Fecha com clique fora (monitor global de mouse), `Esc` ou novo clique no ícone. **Fechar o painel nunca afeta o motor.** O material acompanha a aparência e as preferências de transparência/acessibilidade do sistema; não aplicar um alpha fixo nem simular o vidro com cores.
+Fecha com clique fora, `Esc` ou novo clique no ícone. **Fechar o painel nunca afeta o motor.**
+O delegate inicia os medidores ao mostrar e os cancela ao fechar. Aparência e preferências
+de acessibilidade são herdadas do sistema; não alterar o fundo ou a opacidade da janela.
 
 Conteúdo, de cima para baixo (SwiftUI, `PanelView`):
 
@@ -113,6 +115,6 @@ O app consulta snapshots de estado a 1 Hz; os medidores têm tarefa separada de 
 cancelada ao fechar o painel. A expansão do EQ fica em `UserDefaults.eqExpanded`.
 A validação manual de VoiceOver, contraste e preferências de acessibilidade está pendente.
 
-As capturas fora da tela documentam o conteúdo SwiftUI, não a composição do material
-com o desktop. Cantos, borda e transparência de `PanelSurface` exigem conferir a janela
-real composta pelo WindowServer.
+As capturas fora da tela documentam o conteúdo SwiftUI, não a composição do popover
+com o desktop. Moldura, seta e transparência exigem conferir a janela real composta
+pelo WindowServer.

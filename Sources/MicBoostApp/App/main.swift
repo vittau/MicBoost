@@ -2,19 +2,11 @@ import AppKit
 import MicBoostUI
 import SwiftUI
 
-@MainActor final class MenuBarPanel: NSPanel {
-    override var canBecomeKey: Bool { true }
-    var closeAction: () -> Void = {}
-    override func cancelOperation(_ sender: Any?) { closeAction() }
-}
-
-@MainActor final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+@MainActor final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPopoverDelegate {
     private let model = AppModel()
     private var status: NSStatusItem?
-    private var panel: MenuBarPanel?
+    private let popover = NSPopover()
     private var settings: NSWindow?
-    private var outside: Any?
-    private var local: Any?
     private var quitting = false
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureMenu()
@@ -23,6 +15,14 @@ import SwiftUI
         item.button?.action = #selector(toggle)
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         status = item
+        popover.behavior = .transient
+        popover.delegate = self
+        let host = NSHostingController(
+            rootView: PanelView(model: model).onExitCommand { [weak self] in
+                self?.closePanel()
+            })
+        host.sizingOptions = .preferredContentSize
+        popover.contentViewController = host
         model.onSettings = { [weak self] in self?.showSettings() }
         model.onQuit = { NSApplication.shared.terminate(nil) }
         model.onUpdate = { [weak self] in self?.update() }
@@ -61,14 +61,6 @@ import SwiftUI
         NSApplication.shared.mainMenu = main
     }
     private func update() {
-        if let panel, panel.isVisible, let surface = panel.contentView as? PanelSurface {
-            let size = surface.contentSize
-            if abs(size.height - panel.frame.height) > 1 {
-                let top = panel.frame.maxY
-                panel.setContentSize(size)
-                panel.setFrameOrigin(NSPoint(x: panel.frame.minX, y: top - size.height))
-            }
-        }
         status?.button?.image = NSImage(systemSymbolName: model.icon, accessibilityDescription: nil)
         status?.button?.image?.isTemplate = true
         status?.button?.setAccessibilityLabel(
@@ -80,52 +72,25 @@ import SwiftUI
             model.processing(!model.controls.processingEnabled)
             return
         }
-        if panel?.isVisible == true { closePanel() } else { showPanel() }
+        if popover.isShown { closePanel() } else { showPanel() }
     }
     private func showPanel() {
-        let surface = PanelSurface(model: model)
-        let size = surface.contentSize
-        let panel = MenuBarPanel(
-            contentRect: NSRect(origin: .zero, size: size), styleMask: [.nonactivatingPanel, .borderless],
-            backing: .buffered, defer: false)
-        panel.contentView = surface
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = true
-        panel.level = .popUpMenu
-        panel.closeAction = { [weak self] in self?.closePanel() }
-        if let button = status?.button, let window = button.window {
-            let anchor = window.convertToScreen(button.convert(button.bounds, to: nil))
-            let visible = window.screen?.visibleFrame ?? anchor
-            panel.setFrameOrigin(
-                NSPoint(
-                    x: min(max(anchor.maxX - 320, visible.minX), visible.maxX - 320),
-                    y: max(visible.minY, anchor.minY - size.height - 5)))
-        }
-        self.panel = panel
-        panel.makeKeyAndOrderFront(nil)
-        model.setPanelVisible(true)
-        outside = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            Task { @MainActor in self?.closePanel() }
-        }
-        local = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            MainActor.assumeIsolated {
-                if event.window !== self?.panel && event.window !== self?.status?.button?.window { self?.closePanel() }
-            }
-            return event
-        }
+        guard let button = status?.button else { return }
+        popover.animates = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        popover.contentViewController?.view.window?.makeKey()
     }
     private func closePanel() {
-        panel?.orderOut(nil)
+        popover.performClose(nil)
+    }
+    func popoverDidShow(_ notification: Notification) {
+        status?.button?.highlight(true)
+        model.setPanelVisible(true)
+    }
+    func popoverWillClose(_ notification: Notification) {
         model.setPanelVisible(false)
-        if let outside {
-            NSEvent.removeMonitor(outside)
-            self.outside = nil
-        }
-        if let local {
-            NSEvent.removeMonitor(local)
-            self.local = nil
-        }
+        status?.button?.highlight(false)
     }
     @objc private func showSettings() {
         closePanel()

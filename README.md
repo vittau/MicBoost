@@ -66,7 +66,7 @@ Available today:
 - **Safe silence on zero input**: a source that delivers zeros — the built-in microphone with the
   lid closed, for example — produces silence in BlackHole, not noise.
 
-- **Native panel materials**, using Liquid Glass on macOS 26+ and the system menu material on earlier versions.
+- **Standard macOS popover**, with system-managed appearance, positioning and dismissal.
 - **Menu bar panel** with gain, meters, routing status, microphones and EQ, plus settings for
   buffer, channels, automatic system input switching and diagnostics, using native grouped
   sections and switches.

@@ -167,9 +167,8 @@ execução somada de 1,72 s; a suíte Core inclui o caso negativo
 `swift build`, `swift test`, lint recursivo de formatação, montagem debug e
 `codesign --verify --strict` passam na máquina de referência.
 
-O contêiner `PanelSurface` foi conferido em captura da janela real no macOS 27:
-vidro nativo `.regular`, fundo transparente da janela e cantos sem vazamento de
-subviews. A captura do WindowServer fica como evidência local de desenvolvimento;
-as imagens públicas fora da tela documentam apenas o conteúdo SwiftUI. O fallback
-de material `.menu` foi compilado com alvo macOS 14, mas requer verificação visual
-nessa versão do sistema.
+O painel usa a moldura de `NSPopover` sem sobreposição de material ou bordas.
+Na janela real do macOS 27 foram conferidos a moldura com seta de ancoragem,
+redimensionamento ao expandir o EQ, fechamento por Escape e reabertura pelo item.
+A edição de valores e o fechamento externo continuam no roteiro manual completo. A compatibilidade com macOS 14
+é verificada na compilação; aparência nessa versão requer teste no próprio sistema.
