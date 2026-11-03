@@ -49,3 +49,13 @@ import Testing
     #expect(quietSize.width == 320 && quietSize.height > 0)
     #expect(limitingSize == quietSize)
 }
+
+@MainActor @Test func meterScaleReachesItsEndpoints() {
+    #expect(AppModel.meterFraction(-60) == 0)
+    #expect(AppModel.meterFraction(-30) == 0.5)
+    #expect(AppModel.meterFraction(0) == 1)
+    #expect(AppModel.meterFraction(6) == 1)
+    #expect(AppModel.meterFraction(-90) == 0)
+    #expect(abs(AppModel.meterFraction(-1) - 59.0 / 60.0) < 1e-12)
+    #expect(AppModel.meterFraction(.nan) == 0)
+}

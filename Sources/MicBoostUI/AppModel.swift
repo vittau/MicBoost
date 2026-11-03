@@ -15,7 +15,6 @@ public func localized(_ key: String) -> String {
     public var error: EngineError?
     public var inputDB = -60.0
     public var outputDB = -60.0
-    public var clipped = false
     public var limitingUntil = Date.distantPast
     public var panelVisible = false
     public var settingsVisible = false
@@ -40,6 +39,10 @@ public func localized(_ key: String) -> String {
         return "\(db >= 0 ? "+" : "")\(number) dB · \(Int((100 * pow(10, db / 20)).rounded()))%"
     }
     public static func gainStep(option: Bool) -> Double { option ? 1 : 0.5 }
+    public static func meterFraction(_ db: Double) -> Double {
+        guard db.isFinite else { return 0 }
+        return min(1, max(0, (db + 60) / 60))
+    }
     public var icon: String {
         if error != nil || status?.defaultInput.divergedByUser == true { return "exclamationmark.triangle.fill" }
         if !controls.processingEnabled { return "mic" }
@@ -184,7 +187,6 @@ public func localized(_ key: String) -> String {
                 let output = max(-60, 20 * log10(max(Double(meter.outputPeak), 0.001)))
                 inputDB = direct ? input : max(input, inputDB - decay)
                 outputDB = direct ? output : max(output, outputDB - decay)
-                clipped = meter.inputClipped
                 if meter.gainReductionDB > 1 { limitingUntil = now.addingTimeInterval(0.3) }
                 try? await Task.sleep(for: .milliseconds(50))
             }

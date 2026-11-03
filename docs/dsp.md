@@ -79,7 +79,7 @@ Limitador de pico sem lookahead, com ataque instantâneo:
 - Ganho do limitador `g`: se `target < g`, então `g = target` (ataque instantâneo, garante |y| ≤ teto). Caso contrário, `g` volta para 1 com liberação exponencial τ = 150 ms.
 - Ligado entre canais (mesmo `g` em L e R).
 - Clamp final a ±1,0 só como guarda numérica. Com o limitador correto, ele nunca deve atuar.
-- Indicação: redução de ganho (GR) em dB publicada nos medidores. A UI mostra "Limitando" quando o GR passa de 1 dB nos últimos 300 ms.
+- Indicação: redução de ganho (GR) em dB publicada nos medidores. A UI mostra "Limitador ativo" quando o GR passa de 1 dB nos últimos 300 ms.
 
 A distorção de transientes, consequência de não haver lookahead, é aceita na v1.
 

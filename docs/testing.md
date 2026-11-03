@@ -161,8 +161,8 @@ Capturas claras/escuras verificadas visualmente; sliders sem marcas de passo.
 VoiceOver, todos os atalhos, reduzir movimento/transparência e contraste aumentado
 permanecem sem validação manual completa. A etapa 4 permanece em andamento.
 
-Verificação automatizada da interface: 54 testes (3 UI, 11 DSP, 40 Core),
-execução somada de 1,72 s; a suíte Core inclui o caso negativo
+Verificação automatizada da interface: 56 testes (5 UI, 11 DSP, 40 Core),
+execução somada de aproximadamente 2 s; a suíte Core inclui o caso negativo
 `fakeRejectsOutputWrite`, que registra uma issue conhecida intencionalmente.
 `swift build`, `swift test`, lint recursivo de formatação, montagem debug e
 `codesign --verify --strict` passam na máquina de referência.
@@ -193,3 +193,10 @@ Cadência dos medidores com o menu aberto: em 20 intervalos consecutivos, median
 Medição com relógio monotônico na chegada dos snapshots à UI; não representa
 a latência entre falar e o pixel mudar. O decaimento visual é separado: 20 dB/s,
 ou 1,5 s para cair 30 dB, sem atraso de ataque adicionado pelo modelo.
+
+Ensaio visual de degrau 0 → 100% no macOS 27.2, com a mesma atualização SwiftUI
+para os dois controles: numa captura solicitada 100 ms depois do degrau,
+`ProgressView` ainda ocupava aproximadamente um terço da faixa; `NSLevelIndicator`
+já preenchia toda a faixa. O painel usa o indicador de nível nativo para não
+interpolar a apresentação dos picos. A escala foi conferida em 0 dBFS (100%) e
+−1 dBFS (98,33%), com clamp somente fora de −60…0 dBFS.

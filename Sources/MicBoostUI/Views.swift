@@ -71,7 +71,7 @@ import SwiftUI
                         .monospacedDigit()
                 }
                 Spacer(minLength: 8)
-                Text(localized("Limiting"))
+                Text(localized("Limiter active"))
                     .font(.caption)
                     .padding(.horizontal, 8)
                     .background(.quaternary, in: Capsule())
@@ -81,7 +81,6 @@ import SwiftUI
             }.frame(minHeight: 24)
             meter("Input", model.inputDB)
             meter("Output", model.outputDB)
-            if model.clipped { Text(localized("Input clipped")).font(.caption).foregroundStyle(.red) }
             Divider()
             if model.status?.defaultInput.isBlackHole == true {
                 Label(localized("System input: MicBoost"), systemImage: "checkmark.circle.fill").font(.caption)
@@ -168,7 +167,7 @@ import SwiftUI
     private func meter(_ title: String, _ db: Double) -> some View {
         HStack {
             Text(localized(title)).font(.caption).frame(width: 42, alignment: .leading)
-            ProgressView(value: (db + 60) / 60).tint(db > -1 ? .red : .accentColor)
+            LevelMeterView(fraction: AppModel.meterFraction(db)).frame(maxWidth: .infinity)
                 .accessibilityLabel(localized(title)).accessibilityValue("\(Int(db)) dBFS")
         }
     }

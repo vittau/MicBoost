@@ -38,8 +38,8 @@ Conteúdo, de cima para baixo (SwiftUI, `PanelView`):
    - **Desligar:** para o motor por completo (rampa, `AudioDeviceStop`, IOProc e agregado destruídos), de modo que o microfone deixa de ser capturado e o indicador de microfone do macOS apaga. A entrada padrão é restaurada conforme a [política](audio-engine.md#política-de-entrada-padrão-defaultinputmanager), e o ícone vira `mic`.
    - **Ligar:** reconstrói o motor com a fonte e os ajustes persistidos e reaplica a política de entrada padrão.
    - O estado persiste (`processingEnabled`), e a troca nunca fecha o painel.
-2. **Ganho:** botão de mute com o ícone `mic.fill`/`mic.slash.fill` centralizado em uma área fixa de 20 × 20 pt para não deslocar o slider ao alternar, `Slider` de ganho de −12 a +24 dB e rótulo `+12,0 dB · 398%`. O valor é editável: clicar no rótulo abre um campo numérico em dB. O selo "Limitando" (pílula discreta) aparece ao lado do valor de ganho durante a proteção de pico; sua área permanece reservada e o selo fica oculto para acessibilidade quando inativo, sem alterar a altura do painel ou deslocar controles.
-3. **Medidores:** duas barras finas horizontais, "Entrada" e "Saída", em dBFS de −60 a 0, que só mudam de cor perto de 0. Aviso "Entrada saturada" quando `input_clipped`.
+2. **Ganho:** botão de mute com o ícone `mic.fill`/`mic.slash.fill` centralizado em uma área fixa de 20 × 20 pt para não deslocar o slider ao alternar, `Slider` de ganho de −12 a +24 dB e rótulo `+12,0 dB · 398%`. O valor é editável: clicar no rótulo abre um campo numérico em dB. O selo "Limitador ativo" (pílula discreta) aparece ao lado do valor de ganho durante a proteção de pico; sua área permanece reservada e o selo fica oculto para acessibilidade quando inativo, sem alterar a altura do painel ou deslocar controles.
+3. **Medidores:** duas barras finas horizontais, "Entrada" e "Saída", em dBFS de −60 a 0, sempre na cor de destaque do sistema, sem flash vermelho nem aviso textual de saturação.
 4. **Entrada do sistema:** apenas o estado da entrada padrão; a fonte selecionada é indicada pela marcação na lista de microfones, sem uma linha adicional de caminho do áudio:
    - ok: "Entrada do sistema: MicBoost" com marcação;
    - divergência: "Entrada do sistema: <nome>" + botão "Usar MicBoost".
@@ -74,7 +74,9 @@ Uma faixa no topo do conteúdo, abaixo do cabeçalho, mostra uma mensagem por ve
 
 ### Medidores na UI
 
-`MeterPoller` (main actor) lê `mb_engine_read_meters` por meio do controller a 20 Hz, só enquanto o painel está visível, e aplica decaimento visual de 20 dB/s calculado a cada leitura. Subidas usam o pico da leitura seguinte; apenas a queda é gradual (30 dB levam 1,5 s). Essa duração visual é independente da latência do áudio. Com "Reduzir movimento", não há interpolação: cada leitura é exibida diretamente.
+`NSLevelIndicator` contínuo apresenta os valores sem interpolação de progresso. As
+cores normal, de aviso e crítica usam `NSColor.controlAccentColor`, mantendo a mesma
+cor em toda a faixa. `MeterPoller` (main actor) lê `mb_engine_read_meters` por meio do controller a 20 Hz, só enquanto o painel está visível, e aplica decaimento visual de 20 dB/s calculado a cada leitura. Subidas usam o pico da leitura seguinte; apenas a queda é gradual (30 dB levam 1,5 s). Essa duração visual é independente da latência do áudio. Com "Reduzir movimento", não há interpolação: cada leitura é exibida diretamente.
 
 ## Janela de ajustes
 
@@ -95,9 +97,9 @@ junto ao rótulo e linhas de diagnóstico/sobre com rótulo à esquerda e valor 
 - Atalhos com o painel focado: `M` alterna o mute, `Esc` fecha, ⌘, abre os ajustes.
 - VoiceOver:
   - sliders com `accessibilityLabel` ("Ganho", "Graves, ganho"…) e `accessibilityValue` em dB e percentual;
-  - estados ("Limitando", "Entrada saturada", divergência) anunciados como valor ou dica, não só como cor;
+  - estados ("Limitador ativo", divergência) anunciados como valor ou dica, não só como cor;
   - lista de microfones com estado "selecionado".
-- Contraste e cores: só cores semânticas do sistema (`.primary`, `.secondary`, `.tint`, `.red` para clipping).
+- Contraste e cores: só cores semânticas do sistema (`.primary`, `.secondary`, `.tint`).
 - Aparência clara e escura e "Aumentar contraste" seguem o sistema automaticamente.
 
 ## Primeira execução
@@ -128,3 +130,8 @@ transformações de escala nem desenhar uma versão própria desse controle.
 O menu ativa o app ao abrir para que os controles AppKit sejam apresentados ativos.
 Os toggles usam `.toggleStyle(.switch)`, sem tamanho, escala, tint ou estado visual
 forçados: o AppKit escolhe as métricas e a cor de destaque a partir do sistema.
+
+Os medidores usam escala fixa de −60 a 0 dBFS: 0 dBFS preenche 100% da barra.
+O teto do limitador permanece em −1 dBFS, correspondente a 98,33% nessa escala;
+não alterar a escala nem o teto do áudio para preencher artificialmente a saída.
+Valores fora da faixa são limitados a 0…100% apenas para desenhar a barra.

@@ -16,9 +16,8 @@
 "How to install" = "How to install";
 "In calling and recording apps, select BlackHole 2ch or the system default input." = "In calling and recording apps, select BlackHole 2ch or the system default input.";
 "Input" = "Input";
-"Input clipped" = "Input clipped";
 "License: to be defined" = "License: to be defined";
-"Limiting" = "Limiting";
+"Limiter active" = "Limiter active";
 "Microphone" = "Microphone";
 "Microphone access denied." = "Microphone access denied.";
 "Microphone disconnected. Audio resumes when reconnected." = "Microphone disconnected. Audio resumes when reconnected.";
