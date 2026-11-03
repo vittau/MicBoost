@@ -54,7 +54,7 @@ keeps the output below −1 dBFS; human voice calibration and listening checks r
 
 Available today:
 
-- **Gain from −12 to +24 dB**, mute and peak protection.
+- **Gain from −12 to +24 dB**, mute and peak protection; toggling mute keeps the gain slider in place.
 - **3-band EQ** with adjustable bass, parametric mids and treble, bypass and reset.
 
 - **Any Core Audio input**, captured explicitly by UID — the source does not have to be the

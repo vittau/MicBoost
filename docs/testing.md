@@ -183,3 +183,7 @@ redundante do caminho de áudio e atualização dos medidores com o menu aberto.
 O ajuste do SDK foi validado também em um executável de teste universal
 (arm64 + x86_64), com mínimo 14, SDK 27.2 e assinatura ad hoc válida em ambas
 as arquiteturas.
+
+Ao alternar mute e restaurar o estado original, a acessibilidade reportou o slider
+de ganho com a mesma origem nas três leituras e tamanho constante de 260 × 16 pt.
+Os dois símbolos de mute ficam centralizados na mesma área de 20 × 20 pt.

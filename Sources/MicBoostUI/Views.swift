@@ -38,12 +38,15 @@ import SwiftUI
                 }.font(.caption).padding(8).background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
             }
             HStack {
-                Button(action: model.mute) { Image(systemName: model.controls.muted ? "mic.slash.fill" : "mic.fill") }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel(localized("Mute"))
-                    .accessibilityValue(localized(model.controls.muted ? "On" : "Off"))
-                    .help(localized("Mute"))
-                    .keyboardShortcut("m", modifiers: [])
+                Button(action: model.mute) {
+                    Image(systemName: model.controls.muted ? "mic.slash.fill" : "mic.fill")
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(localized("Mute"))
+                .accessibilityValue(localized(model.controls.muted ? "On" : "Off"))
+                .help(localized("Mute"))
+                .keyboardShortcut("m", modifiers: [])
                 Slider(
                     value: Binding(get: { model.controls.gainDB }, set: model.gain), in: Settings.gainRange
                 )
