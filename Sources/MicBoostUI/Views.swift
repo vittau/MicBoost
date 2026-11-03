@@ -119,16 +119,11 @@ import SwiftUI
                     band(
                         "Bass", gain: $model.controls.eq.low.gainDB, frequency: $model.controls.eq.low.frequency,
                         range: EQSettings.lowFrequencyRange)
+                    Divider()
                     band(
                         "Mid", gain: $model.controls.eq.mid.gainDB, frequency: $model.controls.eq.mid.frequency,
-                        range: EQSettings.midFrequencyRange)
-                    LabeledContent(localized("Width"), value: String(format: "Q %.1f", model.controls.eq.mid.q))
-                        .font(.caption)
-                    Slider(value: $model.controls.eq.mid.q, in: EQSettings.midQRange)
-                        .accessibilityLabel(localized("Width"))
-                        .accessibilityValue(String(format: "Q %.1f", model.controls.eq.mid.q)).onChange(
-                            of: model.controls.eq.mid.q
-                        ) { model.eq() }
+                        range: EQSettings.midFrequencyRange, q: $model.controls.eq.mid.q)
+                    Divider()
                     band(
                         "Treble", gain: $model.controls.eq.high.gainDB, frequency: $model.controls.eq.high.frequency,
                         range: EQSettings.highFrequencyRange)
@@ -170,16 +165,19 @@ import SwiftUI
                 .accessibilityLabel(localized(title)).accessibilityValue("\(Int(db)) dBFS")
         }
     }
-    private func band(_ title: String, gain: Binding<Double>, frequency: Binding<Double>, range: ClosedRange<Double>)
-        -> some View
-    {
-        VStack(alignment: .leading) {
-            LabeledContent(localized(title)) {
+    private func band(
+        _ title: String, gain: Binding<Double>, frequency: Binding<Double>, range: ClosedRange<Double>,
+        q: Binding<Double>? = nil
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(localized(title)).font(.headline).accessibilityAddTraits(.isHeader)
+                Spacer()
                 Text(
                     gain.wrappedValue.formatted(.number.precision(.fractionLength(1)).sign(strategy: .always())) + " dB"
                 )
-                .monospacedDigit()
-            }.font(.caption)
+                .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            }
             Slider(
                 value: Binding(get: { gain.wrappedValue }, set: { gain.wrappedValue = ($0 * 2).rounded() / 2 }),
                 in: EQSettings.gainRange
@@ -222,7 +220,18 @@ import SwiftUI
                     }
                 Text("Hz")
             }.font(.caption)
-        }
+            if let q {
+                HStack {
+                    Text(localized("Width"))
+                    Spacer()
+                    Text(String(format: "Q %.1f", q.wrappedValue)).foregroundStyle(.secondary)
+                }.font(.caption)
+                Slider(value: q, in: EQSettings.midQRange)
+                    .accessibilityLabel(localized("Width"))
+                    .accessibilityValue(String(format: "Q %.1f", q.wrappedValue))
+                    .onChange(of: q.wrappedValue) { model.eq() }
+            }
+        }.padding(.vertical, 6)
     }
 }
 

@@ -56,7 +56,7 @@ Available today:
 
 - **Gain from −12 to +24 dB**, mute and peak protection; toggling mute keeps the gain slider in place.
 - **3-band EQ** with adjustable bass, parametric mids and treble, bypass and reset. Click its
-  title or disclosure arrow to expand or collapse it.
+  title or disclosure arrow to expand or collapse it; each band has a clear section heading.
 
 - **Any Core Audio input**, captured explicitly by UID — the source does not have to be the
   system default input.

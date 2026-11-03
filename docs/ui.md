@@ -52,7 +52,9 @@ Conteúdo, de cima para baixo (SwiftUI, `PanelView`):
    - Agudos: slider de ganho + campo de frequência;
    - ações sem borda "Padrão de voz" e "Zerar EQ" na mesma linha.
 
-   O ganho de cada banda aparece numericamente junto ao título; campos de frequência têm largura compacta e alinhamento numérico à direita.
+   Cada banda é um bloco separado por espaçamento e divisor, com título em `.headline`
+   negrito (como "Microfone") e marcação de cabeçalho para acessibilidade. O controle
+   de largura fica dentro do bloco de Médios. O ganho de cada banda aparece numericamente junto ao título; campos de frequência têm largura compacta e alinhamento numérico à direita.
 
    Valores editáveis, validados e limitados às faixas de [dsp.md](dsp.md#equalizador). Sem gráfico de resposta.
 7. **Rodapé:** opções de menu em texto puro, uma por linha e alinhadas à esquerda, "Ajustes…" (abre a janela de ajustes) e "Sair do MicBoost". Sem moldura de botão; a linha inteira é clicável e ganha destaque semântico ao passar o ponteiro ou pressionar, como as ações nos painéis de Som do macOS.
