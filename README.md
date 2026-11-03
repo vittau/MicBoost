@@ -68,6 +68,8 @@ Available today:
   lid closed, for example — produces silence in BlackHole, not noise.
 
 - **Standard macOS menu surface**, with system-managed appearance and dismissal, without a popover arrow.
+- **Level meters** refresh about 20 times per second, with gradual peak decay; this visual
+  decay does not delay the audio.
 - **Menu bar panel** with gain, meters, routing status, microphones and EQ, plus settings for
   buffer, channels, automatic system input switching and diagnostics, using native grouped
   sections and switches.

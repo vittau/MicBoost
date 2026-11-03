@@ -74,7 +74,7 @@ Uma faixa no topo do conteúdo, abaixo do cabeçalho, mostra uma mensagem por ve
 
 ### Medidores na UI
 
-`MeterPoller` (main actor) lê `mb_engine_read_meters` por meio do controller a 20 Hz, só enquanto o painel está visível, e aplica decaimento visual de 20 dB/s calculado a cada leitura. Com "Reduzir movimento", não há interpolação: cada leitura é exibida diretamente.
+`MeterPoller` (main actor) lê `mb_engine_read_meters` por meio do controller a 20 Hz, só enquanto o painel está visível, e aplica decaimento visual de 20 dB/s calculado a cada leitura. Subidas usam o pico da leitura seguinte; apenas a queda é gradual (30 dB levam 1,5 s). Essa duração visual é independente da latência do áudio. Com "Reduzir movimento", não há interpolação: cada leitura é exibida diretamente.
 
 ## Janela de ajustes
 

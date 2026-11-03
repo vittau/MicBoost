@@ -187,3 +187,9 @@ as arquiteturas.
 Ao alternar mute e restaurar o estado original, a acessibilidade reportou o slider
 de ganho com a mesma origem nas três leituras e tamanho constante de 260 × 16 pt.
 Os dois símbolos de mute ficam centralizados na mesma área de 20 × 20 pt.
+
+Cadência dos medidores com o menu aberto: em 20 intervalos consecutivos, mediana
+53,5 ms e máximo 76,8 ms; espera máxima pela leitura no controller 22,6 ms.
+Medição com relógio monotônico na chegada dos snapshots à UI; não representa
+a latência entre falar e o pixel mudar. O decaimento visual é separado: 20 dB/s,
+ou 1,5 s para cair 30 dB, sem atraso de ataque adicionado pelo modelo.
