@@ -1,3 +1,4 @@
+import CoreAudio
 import MicBoostDSP
 import Testing
 
@@ -74,4 +75,50 @@ private func process(_ engine: OpaquePointer, _ channels: [[Float]]) -> [[Float]
     var counters = mb_counters()
     mb_engine_read_counters(engine, &counters)
     #expect(counters.nonfinite_resets == 1)
+}
+
+@Test func ioProcZerosPhysicalOutputsAndHandlesMissingInput() throws {
+    let engine = try #require(mb_engine_create(2, 48000))
+    defer { mb_engine_destroy(engine) }
+    var routing = mb_routing()
+    routing.input_count = 1
+    routing.outputs.0 = mb_channel(buffer: 1, channel: 0)
+    routing.outputs.1 = mb_channel(buffer: 1, channel: 1)
+    #expect(mb_engine_configure(engine, &routing) == 0)
+    let raw = UnsafeMutableRawPointer.allocate(
+        byteCount: MemoryLayout<AudioBufferList>.size + MemoryLayout<AudioBuffer>.stride,
+        alignment: MemoryLayout<AudioBufferList>.alignment)
+    defer { raw.deallocate() }
+    raw.initializeMemory(
+        as: UInt8.self, repeating: 0,
+        count: MemoryLayout<AudioBufferList>.size + MemoryLayout<AudioBuffer>.stride)
+    let list = raw.assumingMemoryBound(to: AudioBufferList.self)
+    list.pointee.mNumberBuffers = 2
+    let buffers = UnsafeMutableAudioBufferListPointer(list)
+    var physical: [Float] = Array(repeating: 1, count: 8)
+    var blackHole: [Float] = Array(repeating: 1, count: 8)
+    physical.withUnsafeMutableBytes { physicalBytes in
+        blackHole.withUnsafeMutableBytes { destinationBytes in
+            buffers[0] = AudioBuffer(
+                mNumberChannels: 2, mDataByteSize: UInt32(physicalBytes.count), mData: physicalBytes.baseAddress)
+            buffers[1] = AudioBuffer(
+                mNumberChannels: 2, mDataByteSize: UInt32(destinationBytes.count), mData: destinationBytes.baseAddress)
+            var input = AudioBufferList(
+                mNumberBuffers: 1, mBuffers: AudioBuffer(mNumberChannels: 1, mDataByteSize: 16, mData: nil))
+            var now = AudioTimeStamp()
+            var before = AudioTimeStamp()
+            var after = AudioTimeStamp()
+            before.mHostTime = 100
+            after.mHostTime = 150
+            #expect(mb_ioproc(1, &now, &input, &before, list, &after, UnsafeMutableRawPointer(engine)) == 0)
+        }
+    }
+    #expect(physical == Array(repeating: 0, count: 8))
+    #expect(blackHole == Array(repeating: 0, count: 8))
+    var counters = mb_counters()
+    mb_engine_read_counters(engine, &counters)
+    #expect(counters.input_missing == 1)
+    #expect(counters.cycles == 1)
+    #expect(counters.frames_over_max == 1)
+    #expect(counters.io_delta_host == 50)
 }

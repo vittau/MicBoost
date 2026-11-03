@@ -1,4 +1,3 @@
-import AVFoundation
 import CoreAudio
 import Dispatch
 import Foundation
@@ -13,6 +12,7 @@ public struct EngineStatus: Sendable {
     public var state: EngineState
     public var source: AudioDevice?
     public var blackHole: AudioDevice?
+    public var defaultInput: DefaultInputStatus
     public var sampleRate: Double
     public var bufferFrames: UInt32
     public var reportedLatencyMs: Double
@@ -30,6 +30,7 @@ public actor EngineController {
     private var forceRebuild = false
     private let hardware: any EngineHardware
     private var state: EngineState = .stopped
+    private var hasRun = false
     private var selected: String?
     private var requested: UInt32 = 256
     private var source: AudioDevice?
@@ -59,6 +60,7 @@ public actor EngineController {
         channelSelection = stored.channelSelectionByUID[inputUID] ?? .auto
         guard bufferFrames > 0 else { throw EngineError.invalidArgument("Buffer must be positive") }
         try tearDown()
+        hasRun = false
         selected = inputUID
         requested = bufferFrames
         if tokens.isEmpty {
@@ -73,9 +75,7 @@ public actor EngineController {
     private func build() throws {
         state = .starting
         do {
-            guard AVCaptureDevice.authorizationStatus(for: .audio) != .denied,
-                AVCaptureDevice.authorizationStatus(for: .audio) != .restricted
-            else {
+            guard hardware.microphoneAuthorized else {
                 throw EngineError.microphonePermissionDenied
             }
             let devices = try hardware.devices()
@@ -86,7 +86,7 @@ public actor EngineController {
             destination = blackHole
             guard let source = devices.first(where: { $0.uid == selected && $0.alive && $0.isEligible(in: devices) })
             else {
-                state = .recovering("sourceLost")
+                state = hasRun ? .recovering("sourceLost") : .error(.sourceUnavailable(selected ?? ""))
                 return
             }
             self.source = source
@@ -156,6 +156,7 @@ public actor EngineController {
                 try hardware.latencyFrames(source.id, scope: kAudioObjectPropertyScopeInput)
                 + hardware.latencyFrames(blackHole.id, scope: kAudioObjectPropertyScopeOutput)
                 + hardware.latencyFrames(id, scope: kAudioObjectPropertyScopeInput) + buffer
+            hasRun = true
             state = .running
         } catch {
             state = .error((error as? EngineError) ?? .invalidArgument(String(describing: error)))
@@ -262,8 +263,14 @@ public actor EngineController {
         counters.frames_over_max += completedCounters.frames_over_max
         let rate = source?.sampleRate ?? 0
         let latency = Double(reportedFrames)
+        let defaultStatus: DefaultInputStatus
+        if let current = try? hardware.defaultInput() {
+            defaultStatus = DefaultInputStatus(isBlackHole: current == destination?.id)
+        } else {
+            defaultStatus = .unresolved
+        }
         return EngineStatus(
-            state: state, source: source, blackHole: destination, sampleRate: rate,
+            state: state, source: source, blackHole: destination, defaultInput: defaultStatus, sampleRate: rate,
             bufferFrames: buffer, reportedLatencyMs: rate > 0 ? latency * 1000 / rate : 0,
             overloads: overloads, cycles: counters.cycles, inputMissing: counters.input_missing,
             nonfiniteResets: counters.nonfinite_resets, ioDeltaHost: counters.io_delta_host)

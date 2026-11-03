@@ -221,7 +221,8 @@ OSStatus mb_ioproc(AudioObjectID device, const AudioTimeStamp *now,
             memset(dest, 0, n * sizeof(float));
             if (map.buffer < in->mNumberBuffers) {
                 AudioBuffer buffer = in->mBuffers[map.buffer];
-                if (buffer.mData && buffer.mDataByteSize > 0 && map.channel < buffer.mNumberChannels) {
+                if (buffer.mData && buffer.mDataByteSize > 0
+                    && map.channel < buffer.mNumberChannels) {
                     inputs[c] = dest;
                     for (uint32_t i = 0; i < n; i++) {
                         size_t index = (size_t)(base + i) * buffer.mNumberChannels + map.channel;

@@ -1,3 +1,4 @@
+import AVFoundation
 import CoreAudio
 import Foundation
 import MicBoostDSP
@@ -15,6 +16,7 @@ public struct StreamLayout: Sendable, Equatable {
     }
 }
 public protocol EngineHardware: AudioHardware {
+    var microphoneAuthorized: Bool { get }
     func layout(_ device: AudioObjectID) throws -> StreamLayout
     func maximumFrames(_ device: AudioObjectID, buffer: UInt32) throws -> UInt32
     func latencyFrames(_ device: AudioObjectID, scope: AudioObjectPropertyScope) throws -> UInt32
@@ -61,6 +63,10 @@ public struct AggregateBuilder {
     }
 }
 extension CoreAudioHardware: EngineHardware {
+    public var microphoneAuthorized: Bool {
+        let status = AVCaptureDevice.authorizationStatus(for: .audio)
+        return status != .denied && status != .restricted
+    }
     func write<T>(_ property: HardwareProperty, value: T) throws {
         var address = property.address
         var value = value
@@ -136,13 +142,34 @@ extension CoreAudioHardware: EngineHardware {
     public func createIO(_ device: AudioObjectID, context: OpaquePointer) throws -> AudioDeviceIOProcID {
         for scope in [kAudioObjectPropertyScopeInput, kAudioObjectPropertyScopeOutput] {
             for stream in try values(.init(device, kAudioDevicePropertyStreams, scope), as: AudioStreamID.self) {
-                let format = try scalar(
+                var format = try scalar(
                     .init(stream, kAudioStreamPropertyVirtualFormat), as: AudioStreamBasicDescription.self)
-                guard format.mFormatID == kAudioFormatLinearPCM, format.mBitsPerChannel == 32,
-                    format.mFormatFlags & kAudioFormatFlagIsFloat != 0,
-                    format.mFormatFlags & kAudioFormatFlagIsBigEndian == 0
-                else {
-                    throw EngineError.formatUnsupported
+                func supported(_ f: AudioStreamBasicDescription) -> Bool {
+                    f.mFormatID == kAudioFormatLinearPCM && f.mBitsPerChannel == 32
+                        && f.mFormatFlags & kAudioFormatFlagIsFloat != 0
+                        && f.mFormatFlags & kAudioFormatFlagIsPacked != 0
+                        && f.mFormatFlags & kAudioFormatFlagIsBigEndian == 0
+                        && f.mBytesPerFrame == 4
+                            * (f.mFormatFlags & kAudioFormatFlagIsNonInterleaved != 0 ? 1 : f.mChannelsPerFrame)
+                }
+                if !supported(format) {
+                    format.mFormatID = kAudioFormatLinearPCM
+                    format.mFormatFlags =
+                        (format.mFormatFlags & kAudioFormatFlagIsNonInterleaved)
+                        | kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked
+                    format.mBitsPerChannel = 32
+                    format.mFramesPerPacket = 1
+                    format.mBytesPerFrame =
+                        4 * (format.mFormatFlags & kAudioFormatFlagIsNonInterleaved != 0 ? 1 : format.mChannelsPerFrame)
+                    format.mBytesPerPacket = format.mBytesPerFrame
+                    do { try write(.init(stream, kAudioStreamPropertyVirtualFormat), value: format) } catch {
+                        throw EngineError.formatUnsupported
+                    }
+                    let actual = try scalar(
+                        .init(stream, kAudioStreamPropertyVirtualFormat), as: AudioStreamBasicDescription.self)
+                    guard supported(actual), actual.mSampleRate == format.mSampleRate else {
+                        throw EngineError.formatUnsupported
+                    }
                 }
             }
         }

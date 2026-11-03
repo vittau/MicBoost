@@ -1,4 +1,5 @@
 import CoreAudio
+import Foundation
 import MicBoostDSP
 import Testing
 
@@ -25,6 +26,7 @@ import Testing
 }
 
 extension FakeAudioHardware: EngineHardware {
+    var microphoneAuthorized: Bool { true }
     func maximumFrames(_ device: AudioObjectID, buffer: UInt32) throws -> UInt32 { buffer }
     func latencyFrames(_ device: AudioObjectID, scope: AudioObjectPropertyScope) throws -> UInt32 { 0 }
     func layout(_ device: AudioObjectID) throws -> StreamLayout {
@@ -66,6 +68,59 @@ extension FakeAudioHardware: EngineHardware {
     fake.deviceList = [destination]
     let controller = EngineController(hardware: fake)
     try await controller.start(inputUID: "missing")
-    #expect(await controller.status().state == .recovering("sourceLost"))
+    #expect(await controller.status().state == .error(.sourceUnavailable("missing")))
     try await controller.stop()
+}
+
+// Only this event mailbox crosses queues; NSLock protects every stored value.
+final class FakeEngineEvents: @unchecked Sendable {
+    private let lock = NSLock()
+    private var missing: Set<String> = []
+    private var listener: (DispatchQueue, @Sendable () -> Void)?
+    func devices(_ values: [AudioDevice]) -> [AudioDevice] {
+        lock.lock()
+        defer { lock.unlock() }
+        return values.filter { !missing.contains($0.uid) }
+    }
+    func register(queue: DispatchQueue, handler: @escaping @Sendable () -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        listener = (queue, handler)
+    }
+    func remove(_ uid: String, missing value: Bool) {
+        lock.lock()
+        if value { missing.insert(uid) } else { missing.remove(uid) }
+        let callback = listener
+        lock.unlock()
+        if let (queue, handler) = callback { queue.async(execute: handler) }
+    }
+}
+
+@Test func runningEngineRecoversSameSourceAndBlackHole() async throws {
+    let events = FakeEngineEvents()
+    let fake = FakeAudioHardware()
+    fake.engineEvents = events
+    var source = AudioDevice(id: 1, uid: "test.source", name: "Source")
+    source.inputChannels = 1
+    var destination = AudioDevice(id: 2, uid: "BlackHole2ch_UID", name: "BlackHole")
+    destination.inputChannels = 2
+    destination.outputChannels = 2
+    fake.deviceList = [source, destination]
+    let controller = EngineController(hardware: fake)
+    try await controller.start(inputUID: source.uid)
+    #expect(await controller.status().state == .running)
+    events.remove(source.uid, missing: true)
+    try await Task.sleep(for: .milliseconds(350))
+    #expect(await controller.status().state == .recovering("sourceLost"))
+    events.remove(source.uid, missing: false)
+    try await Task.sleep(for: .milliseconds(350))
+    #expect(await controller.status().state == .running)
+    events.remove(destination.uid, missing: true)
+    try await Task.sleep(for: .milliseconds(350))
+    #expect(await controller.status().state == .error(.blackHoleMissing))
+    events.remove(destination.uid, missing: false)
+    try await Task.sleep(for: .milliseconds(350))
+    #expect(await controller.status().state == .running)
+    try await controller.stop()
+    #expect(await controller.status().state == .stopped)
 }

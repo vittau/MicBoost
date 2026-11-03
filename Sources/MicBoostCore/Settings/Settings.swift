@@ -8,7 +8,7 @@ import Foundation
 public struct Settings: Codable, Equatable, Sendable {
     /// Bumped whenever the stored shape changes; unknown versions load defaults.
     public static let currentSchemaVersion = 1
-    public static let allowedBufferFrames = [128, 256, 512, 1024]
+    public static let allowedBufferFrames = [64, 128, 256, 512, 1024]
     public static let gainRange = -12.0...24.0
 
     public var schemaVersion: Int
