@@ -104,7 +104,7 @@ import SwiftUI
                 Text("\(uid) (\(localized("Disconnected")))").font(.caption)
             }
             Divider()
-            DisclosureGroup(localized("Equalizer"), isExpanded: $model.expanded) {
+            DisclosureGroup(isExpanded: $model.expanded) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text(localized("Enable EQ"))
@@ -138,6 +138,11 @@ import SwiftUI
                         Button(localized("Reset EQ"), action: model.reset)
                     }.buttonStyle(.borderless)
                 }.padding(.top, 8)
+            } label: {
+                Text(localized("Equalizer"))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture { model.expanded.toggle() }
             }
             Divider()
             VStack(spacing: 0) {
