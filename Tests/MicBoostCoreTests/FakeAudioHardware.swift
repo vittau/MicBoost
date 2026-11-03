@@ -5,11 +5,12 @@ import Testing
 @testable import MicBoostCore
 
 final class FakeAudioHardware: AudioHardware {
+    var engineEvents: FakeEngineEvents?
     var deviceList: [AudioDevice] = []
     var input: AudioObjectID = 0
     var writes: [AudioObjectPropertySelector] = []
     var listeners: [UUID: (HardwareProperty, DispatchQueue, @Sendable () -> Void)] = [:]
-    func devices() throws -> [AudioDevice] { deviceList }
+    func devices() throws -> [AudioDevice] { engineEvents?.devices(deviceList) ?? deviceList }
     func defaultInput() throws -> AudioObjectID { input }
     func setDefaultInput(_ device: AudioObjectID) throws {
         try writeDefault(kAudioHardwarePropertyDefaultInputDevice, device)
@@ -26,6 +27,7 @@ final class FakeAudioHardware: AudioHardware {
         -> UUID
     {
         let id = UUID()
+        if property.selector == kAudioHardwarePropertyDevices { engineEvents?.register(queue: queue, handler: handler) }
         listeners[id] = (property, queue, handler)
         return id
     }

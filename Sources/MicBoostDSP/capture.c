@@ -6,6 +6,7 @@ struct mb_capture {
     size_t capacity;
     unsigned channels;
     _Atomic size_t written;
+    _Atomic uint64_t first_host;
 };
 
 mb_capture *mb_capture_create(size_t frames, unsigned channels) {
@@ -25,6 +26,10 @@ mb_capture *mb_capture_create(size_t frames, unsigned channels) {
     c->channels = channels;
     atomic_init(&c->written, 0);
     return c;
+}
+
+uint64_t mb_capture_host_time(const mb_capture *c) {
+    return atomic_load(&c->first_host);
 }
 
 void mb_capture_destroy(mb_capture *c) {
@@ -68,6 +73,9 @@ OSStatus mb_capture_ioproc(
     size_t start = atomic_load_explicit(&c->written, memory_order_relaxed);
     if (frames > c->capacity - start) {
         frames = c->capacity - start;
+    }
+    if (start == 0 && frames > 0) {
+        atomic_store(&c->first_host, inputTime->mHostTime);
     }
     unsigned channel = 0;
     for (unsigned b = 0; b < input->mNumberBuffers; ++b) {

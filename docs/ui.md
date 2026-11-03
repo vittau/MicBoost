@@ -67,7 +67,7 @@ Uma faixa no topo do conteúdo, abaixo do cabeçalho, mostra uma mensagem por ve
 
 `NSWindow` com SwiftUI `SettingsView` (`Form` com estilo `.grouped`), aberta por "Ajustes…" ou ⌘, com o painel focado. Seções:
 
-- **Áudio:** tamanho de buffer (128/256/512/1024, só os valores suportados) e modo de canais da fonte atual ([audio-engine.md](audio-engine.md#canais)).
+- **Áudio:** tamanho de buffer (64/128/256/512/1024, só os valores suportados) e modo de canais da fonte atual ([audio-engine.md](audio-engine.md#canais)).
 - **Diagnóstico** (somente leitura, atualização a 1 Hz com a janela visível): taxa de amostragem, buffer, latência reportada, overloads, `input_missing`, `nonfinite_resets`. Botão "Copiar relatório" (texto para a área de transferência).
 - **Sobre:** versão, link do projeto, aviso de que o app não é notarizado e informação de licença.
 

@@ -35,12 +35,14 @@ Em 16, 44,1, 48 e 96 kHz:
 
 ## Ferramenta de diagnóstico (`micboost-diag`)
 
-CLI para verificar o hardware. É o meio pelo qual agentes sem acesso a áudio verificam o comportamento real. Pela regra de TCC, quem precisa de permissão de microfone é o app de terminal que a executa (Terminal, Orca etc.).
+CLI para verificar o hardware. `run`, `latency` e `soak` não alteram as entradas ou saídas padrão; a política de entrada padrão ainda não está integrada a esses comandos. `latency` aceita `--buffer`; `soak` aceita `--buffer` e usa 20 minutos quando `--minutes` não é informado. A opção `permission` imprime o estado de autorização do microfone sem solicitar acesso.
+
+É o meio pelo qual agentes sem acesso a áudio verificam o comportamento real. Pela regra de TCC, quem precisa de permissão de microfone é o app de terminal que a executa (Terminal, Orca etc.).
 
 | Comando | Função |
 |---|---|
 | `micboost-diag devices [--json]` | Lista dispositivos com UID, transporte, canais, taxas, faixa de buffer, latências, safety offsets e elegibilidade; mostra o BlackHole detectado e a entrada padrão |
-| `micboost-diag run --input <uid> [--gain-db N] [--buffer N] [--seconds N]` | Roda o motor sem UI (mesmo `EngineController` do app), imprimindo estado e contadores a cada segundo. Não altera a entrada padrão, a menos que `--manage-default-input` seja passado |
+| `micboost-diag run --input <uid> [--buffer N] [--seconds N]` | Roda o motor sem UI (mesmo `EngineController` do app), imprimindo estado e contadores a cada segundo. Não altera a entrada ou saída padrão; integração com a política de entrada padrão fica para o app |
 | `micboost-diag capture --device <uid> --seconds N --out file.wav` | Grava a entrada bruta de um dispositivo |
 | `micboost-diag latency --input <uid> [--trials N]` | Mede a latência adicional (método abaixo) |
 | `micboost-diag soak --input <uid> [--minutes N]` (padrão 20) | Ensaio de estabilidade (abaixo) |
@@ -56,8 +58,8 @@ A CLI usa parsing manual, sem dependências externas. `devices` exibe transporte
 Método (`micboost-diag latency`):
 1. O motor roda no próprio processo da ferramenta (fonte → BlackHole, ganho 0 dB, EQ desligado).
 2. Dois IOProcs auxiliares de captura, um direto na fonte e outro na entrada do BlackHole, gravam com o `mHostTime` do início de cada buffer em buffers pré-alocados.
-3. Um clique (impulso de 1 ms) é tocado na saída padrão (`afplay` ou um IOProc de saída). Em alternativa, o usuário estala os dedos perto do microfone.
-4. A ferramenta alinha as duas gravações pelo host time, calcula a correlação cruzada e obtém o atraso. Repete N vezes (padrão 10) e reporta mediana, mínimo e máximo, em ms e em frames.
+3. A implementação usa o sinal da sala, sem emitir sons. Um clique (impulso de 1 ms) é tocado na saída padrão (`afplay` ou um IOProc de saída). Em alternativa, o usuário estala os dedos perto do microfone.
+4. A ferramenta captura dois segundos por tentativa, usa o host time do primeiro buffer para alinhamento, busca correlação normalizada em ±100 ms e exige correlação ≥ 0,5; sem sinal suficiente, falha explicitamente. A ferramenta alinha as duas gravações pelo host time, calcula a correlação cruzada e obtém o atraso. Repete N vezes (padrão 10) e reporta mediana, mínimo e máximo, em ms e em frames.
 5. Também imprime a latência reportada pela HAL e `io_delta_host`, para comparar.
 
 **Aceitação (v1, fonte → BlackHole):** mediana ≤ 100 ms em toda fonte suportada, exceto fontes cuja própria latência de entrada reportada já exceda esse valor (por exemplo, Continuity), que ficam documentadas como limitação.
@@ -94,19 +96,29 @@ Complementar com uma escuta humana de uma gravação de voz de 20 min via BlackH
 
 ## Resultados registrados
 
-Máquina de referência: MacBook Neo (Apple A18 Pro), macOS 27.2.
+Máquina de referência: MacBook Neo (Apple A18 Pro), macOS 27.2. Latências medidas por correlação com o som da sala, 3 tentativas cada (mediana/mín./máx.).
 
 | Medida | Condição | Resultado |
 |---|---|---|
-| Latência adicional (mediana) | microfone interno, 48 kHz, buffer 256 | — |
-| Latência adicional (mediana) | microfone interno, 48 kHz, buffer 128 | — |
-| Latência adicional (mediana) | USB/interface | — |
-| Latência adicional (mediana) | Bluetooth | — |
+| Latência adicional | microfone interno, 48 kHz, buffer 256 | — |
+| Latência adicional | microfone interno, 48 kHz, buffer 128 | — |
+| Latência adicional | USB 48 kHz, buffer 256 | — |
+| Latência adicional | USB (C920), 16 kHz, buffer 64 | 14,94 / 14,88 / 14,94 ms; HAL 10,5 ms (2026-11-03) |
+| Latência adicional | USB (C920), 16 kHz, buffer 128 | 22,88 / 22,88 / 22,88 ms; HAL 14,5 ms (2026-11-03) |
+| Latência adicional | USB (C920), 16 kHz, buffer 256 | 38,94 / 38,88 / 38,94 ms; HAL 22,5 ms (2026-11-03) |
+| Latência adicional | Bluetooth | — |
+| Passagem fonte → BlackHole | C920, 16 kHz, `run` + capturas simultâneas | fonte pico/RMS 0,0654 / 0,0056; BlackHole L = R 0,0630 / 0,0057 (2026-11-03) |
+| Silêncio seguro | fonte que entrega zeros (microfone interno com a tampa fechada) | BlackHole pico/RMS 0 nos dois canais (2026-11-03) |
+| Ensaio de estabilidade | C920, 16 kHz, buffer 256, 18 min | deriva −0,06 ms (38,88 → 38,81 ms); 0 overloads, `input_missing` e `nonfinite_resets`; CPU ≈ 0,4% de um núcleo; memória só como pico (maxRSS constante 15,6 MB) (2026-11-03) |
+| Ensaio de estabilidade | 20 min com RSS instantânea | — |
 | CPU do processo | running, EQ ligado | — |
-| Memória residente | running | — |
-| Ensaio de 20 min | fonte USB ou interna | — |
-| Captura bruta interna | 2026-11-03; pedido de 3 s, 48 kHz, 1 canal | 144000 frames; pico 0,102121599; RMS 0,005412710; sinal não zero |
-| Captura bruta Continuity | 2026-11-03; pedido de 3 s, 48 kHz, 1 canal | 126976 frames; pico 0,003942308; RMS 0,001024310; sinal não zero |
-| Latência de entrada reportada pela HAL | 2026-11-03; Continuity, 48 kHz | 6000 frames (125 ms) |
+| Captura bruta | microfone interno, 48 kHz, 3 s | pico 0,102; RMS 0,0054 (2026-11-03) |
+| Captura bruta | Continuity, 48 kHz, 3 s | pico 0,0039; RMS 0,0010 (2026-11-03) |
+| Latência de entrada reportada pela HAL | Continuity, 48 kHz | 6000 frames (125 ms) |
 
 (— = ainda não medido. Substituir pelo valor e pela data da medição.)
+
+Observações de hardware:
+- Com a tampa fechada, o macOS silencia o microfone interno por hardware: a permissão continua concedida e os callbacks entregam zeros. A medição de latência recusa esse sinal (correlação 0).
+- As pequenas diferenças de nível entre fonte e BlackHole vêm do resampler de drift e de capturas que começam em instantes distintos.
+- Recuperação física (desconectar o USB), reinício real do `coreaudiod` e escuta humana são verificações manuais. A HAL falsa cobre perda e retorno da fonte e do BlackHole.

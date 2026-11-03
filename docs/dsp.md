@@ -13,7 +13,9 @@ canais da fonte → [mapa de canais] → low shelf → peaking → high shelf �
 - Formato interno: Float32 nos buffers; estado e coeficientes dos biquads em `double`.
 - 1 canal de processamento (modos mono) ou 2 (estéreo). Estado dos filtros por canal.
 - Nenhum lookahead, nenhuma fila e nenhuma latência algorítmica.
-- Toda a memória é alocada em `mb_engine_create(max_frames, sample_rate, channels)`. `mb_engine_process` não aloca.
+- Toda a memória é alocada em `mb_engine_create(max_frames, sample_rate)`. `mb_engine_process` não aloca.
+
+A implementação da ponte mínima aplica somente mapa de canais, fade-out, guarda numérica e medidores. Os setters de ganho, mute e EQ armazenam os alvos atômicos; os efeitos são implementados nas etapas seguintes. O ganho efetivo desta etapa é 0 dB.
 
 ## API C (header `MicBoostDSP.h`)
 
@@ -36,7 +38,7 @@ void       mb_engine_process(mb_engine *, const float *const *in, float *const *
 OSStatus   mb_ioproc(...);  // ver audio-engine.md
 ```
 
-`mb_engine_process` recebe canais não intercalados já mapeados e é o ponto de entrada dos testes offline. O IOProc só faz mapeamento (intercalação/desintercalação) e delega a ele.
+`mb_engine_process` recebe todos os canais da fonte não intercalados e aplica a seleção de canais e é o ponto de entrada dos testes offline. O IOProc extrai os canais físicos, delega o processamento e escreve os dois canais de saída. `mb_routing` comporta até 64 canais de fonte; canais C são indexados a partir de zero, enquanto settings/UI usam canais a partir de um. `mb_meters.fade_done` permite consultar a conclusão do fade sem zerar a flag.
 
 ## Equalizador
 
@@ -57,7 +59,7 @@ Filtros biquad do Audio EQ Cookbook (RBJ) em Transposed Direct Form II. Shelves 
 
 ## Ganho
 
-- Faixa do controle: **−12 dB a +24 dB** (6,3% a 1.585%), passo de 0,5 dB, padrão 0 dB. O máximo é recalibrado na etapa 3 com voz real e documentado aqui.
+- Faixa do controle: **−12 dB a +24 dB** (6,3% a 1.585%), passo de 0,5 dB, padrão 0 dB. O máximo é recalibrado na etapa 2 com voz real e documentado aqui.
 - Exibição: `+12,0 dB · 398%`, com percentual = 100 · 10^(dB/20) arredondado ao inteiro. 0 dB = 100%, +6,02 dB ≈ 200%.
 - O percentual é de amplitude, não de volume percebido, e a proteção de pico pode reduzir o ganho efetivo.
 - Aplicação: ganho linear por amostra, suavizado por filtro de um polo com τ = 20 ms rumo a `10^(dB/20)`, ou a 0 com mute.
@@ -96,7 +98,7 @@ Todos são pico desde a última leitura.
 
 ## Segurança numérica
 
-Se alguma amostra de saída do bloco não for finita: zerar o estado de todos os filtros, escrever zeros no bloco inteiro e incrementar `nonfinite_resets`. As entradas não finitas são tratadas como 0 antes do processamento.
+Se alguma amostra de saída do bloco não for finita: zerar o estado de todos os filtros, escrever zeros no bloco inteiro e incrementar `nonfinite_resets`. As entradas não finitas são tratadas como 0 antes do processamento e incrementam `nonfinite_resets` uma vez por ciclo afetado.
 
 ## Custo esperado
 
