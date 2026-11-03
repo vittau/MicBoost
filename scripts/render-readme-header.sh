@@ -16,3 +16,10 @@ fi
 
 mkdir -p "$output"
 swift "$root/design/readme/RenderHeader.swift" "$icon" "$output"
+
+# Icon variants shown in the README grid, scaled down from the 1024 px previews.
+for variant in light dark clear-light tinted-light; do
+    sips --resampleHeightWidth 256 256 \
+        "$root/design/icon/previews/$variant-1024.png" \
+        --out "$output/icon-$variant-256.png" >/dev/null
+done
