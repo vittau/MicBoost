@@ -2,6 +2,8 @@
 
 ## Princípios
 
+- Terminologia: a UI chama a entrada processada de "MicBoost". O nome "BlackHole 2ch" só aparece onde o usuário precisa reconhecê-lo: ao escolher o microfone dentro de um app que não segue a entrada do sistema, e quando o driver está ausente.
+
 - Parecer parte do sistema: materiais, tipografia (fonte do sistema, tamanhos de controle `.regular`/`.small`), espaçamento e cantos dos módulos de Som/Bluetooth da Central de Controle; ícones SF Symbols; sliders, toggles e listas nativos.
 - Sem aparência de mixer de estúdio e sem animações contínuas. Os medidores são o único elemento atualizado periodicamente, e só com o painel visível.
 - Toda a UI vem do `AppModel` (`@Observable`, `@MainActor`), que reflete o `EngineStatus` e encaminha comandos ao `EngineController`. A UI nunca chama a HAL.
@@ -35,10 +37,10 @@ Conteúdo, de cima para baixo (SwiftUI, `PanelView`):
    - O estado persiste (`processingEnabled`), e a troca nunca fecha o painel.
 2. **Ganho:** botão de mute com o ícone `mic.fill`/`mic.slash.fill`, `Slider` de ganho de −12 a +24 dB e rótulo `+12,0 dB · 398%`. O valor é editável: clicar no rótulo abre um campo numérico em dB. O selo "Limitando" (pílula discreta) aparece durante a proteção de pico.
 3. **Medidores:** duas barras finas horizontais, "Entrada" e "Saída", em dBFS de −60 a 0, que só mudam de cor perto de 0. Aviso "Entrada saturada" quando `input_clipped`.
-4. **Roteamento:** linha "Microfone → BlackHole 2ch" e estado da entrada padrão:
-   - ok: "Entrada do sistema: BlackHole 2ch" com marcação;
-   - divergência: "Entrada do sistema: <nome>" + botão "Usar BlackHole".
-   - com `manageDefaultInput` desligado, a linha só informa a entrada atual, sem tratá-la como divergência; o botão "Usar BlackHole" aparece se a entrada não for o BlackHole.
+4. **Roteamento:** estado da entrada do sistema:
+   - ok: "Entrada do sistema: MicBoost" com marcação;
+   - divergência: "Entrada do sistema: <nome>" + botão "Usar MicBoost".
+   - com `manageDefaultInput` desligado, a linha só informa a entrada atual, sem tratá-la como divergência; o botão "Usar MicBoost" aparece se a entrada não for o BlackHole.
 5. **Microfone:** lista de fontes elegíveis no estilo das listas de dispositivos da Central de Controle (ícone por transporte, nome, marca de seleção). Selecionar troca a fonte (reconstrução do motor com rampa). Uma fonte persistida que não está conectada aparece como "<nome> (desconectado)".
 6. **Equalizador:** seção expansível (`DisclosureGroup`, recolhida por padrão; o estado de expansão persiste), com:
    - `Toggle` "Ativar EQ";
@@ -61,7 +63,7 @@ Uma faixa no topo do conteúdo, abaixo do cabeçalho, mostra uma mensagem por ve
 | `sourceUnavailable` / `recovering(.sourceLost)` | "<nome> desconectado. O áudio volta quando ele for reconectado." | escolher outro microfone na lista |
 | `formatUnsupported` | "Formato do <nome> não suportado." | escolher outro microfone |
 | `halFailure` | "Falha no áudio do sistema." | "Tentar novamente" |
-| divergência da entrada padrão | (na linha de roteamento) | "Usar BlackHole" |
+| divergência da entrada padrão | (na linha de roteamento) | "Usar MicBoost" |
 
 ### Medidores na UI
 
@@ -71,7 +73,7 @@ Uma faixa no topo do conteúdo, abaixo do cabeçalho, mostra uma mensagem por ve
 
 `NSWindow` com SwiftUI `SettingsView` (`Form` com estilo `.grouped`), aberta por "Ajustes…" ou ⌘, com o painel focado. Seções:
 
-- **Áudio:** chave "Usar BlackHole como entrada do sistema automaticamente" (`manageDefaultInput`, ligada por padrão), com uma frase explicando que, desligada, os apps precisam selecionar "BlackHole 2ch" por conta própria; tamanho de buffer (64/128/256/512/1024, só os valores suportados) e modo de canais da fonte atual ([audio-engine.md](audio-engine.md#canais)).
+- **Áudio:** chave "Usar MicBoost como entrada do sistema automaticamente" (`manageDefaultInput`, ligada por padrão), com uma frase explicando que, desligada, cada app precisa selecionar o microfone "BlackHole 2ch" por conta própria; tamanho de buffer (64/128/256/512/1024, só os valores suportados) e modo de canais da fonte atual ([audio-engine.md](audio-engine.md#canais)).
 - **Diagnóstico** (somente leitura, atualização a 1 Hz com a janela visível): taxa de amostragem, buffer, latência reportada, overloads, `input_missing`, `nonfinite_resets`. Botão "Copiar relatório" (texto para a área de transferência).
 - **Sobre:** versão, link do projeto, aviso de que o app não é notarizado e informação de licença.
 
@@ -88,6 +90,6 @@ Uma faixa no topo do conteúdo, abaixo do cabeçalho, mostra uma mensagem por ve
 
 ## Primeira execução
 
-1. Pedir a permissão de microfone (`AVCaptureDevice.requestAccess(for: .audio)`), com texto de `NSMicrophoneUsageDescription`: "O MicBoost captura o microfone escolhido para amplificá-lo e enviá-lo ao BlackHole."
+1. Pedir a permissão de microfone (`AVCaptureDevice.requestAccess(for: .audio)`), com texto de `NSMicrophoneUsageDescription`: "O MicBoost captura o microfone escolhido para amplificá-lo e entregá-lo aos seus apps."
 2. Se faltar o BlackHole, mostrar a mensagem correspondente.
 3. Abrir o painel automaticamente uma vez, para o usuário ver onde o app fica.
