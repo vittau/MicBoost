@@ -66,7 +66,8 @@ Available today:
   lid closed, for example — produces silence in BlackHole, not noise.
 
 - **Menu bar panel** with gain, meters, routing status, microphones and EQ, plus settings for
-  buffer, channels, automatic system input switching and diagnostics.
+  buffer, channels, automatic system input switching and diagnostics, using native grouped
+  sections and switches.
 - **Voice preset** for rumble reduction and gentle presence, plus a flat EQ reset.
 - **Processing switch** releases the microphone; quitting restores the previous system input
   when MicBoost still manages it.

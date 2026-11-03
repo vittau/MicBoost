@@ -112,7 +112,7 @@ import SwiftUI
     private func showSettings() {
         if settings == nil {
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 480, height: 600), styleMask: [.titled, .closable],
+                contentRect: NSRect(x: 0, y: 0, width: 540, height: 680), styleMask: [.titled, .closable],
                 backing: .buffered, defer: false)
             window.title = localized("Settings…")
             window.contentView = NSHostingView(rootView: SettingsView(model: model))

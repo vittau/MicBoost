@@ -181,16 +181,22 @@ import SwiftUI
     public var body: some View {
         Form {
             Section(localized("Audio")) {
-                Toggle(
-                    localized("Use MicBoost as the system input automatically"),
-                    isOn: $model.controls.manageDefaultInput
-                )
+                Toggle(isOn: $model.controls.manageDefaultInput) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(localized("Use MicBoost as the system input automatically"))
+                        Text(
+                            localized(
+                                "In calling and recording apps, select BlackHole 2ch or the system default input.")
+                        )
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    }.fixedSize(horizontal: false, vertical: true)
+                }
+                .toggleStyle(.switch)
                 .onChange(of: model.controls.manageDefaultInput) {
                     let enabled = model.controls.manageDefaultInput
                     Task { await model.engine.setDefaultInputManagement(enabled) }
                 }
-                Text(localized("In calling and recording apps, select BlackHole 2ch or the system default input."))
-                    .font(.caption)
                 Picker(localized("Buffer"), selection: $model.controls.bufferFrames) {
                     ForEach(
                         Settings.allowedBufferFrames.filter { frames in
@@ -216,19 +222,40 @@ import SwiftUI
                 }
             }
             Section(localized("Diagnostics")) {
-                Text(model.report).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
-                Button(localized("Copy report")) {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(model.report, forType: .string)
+                LabeledContent(localized("Sample rate"), value: "\((model.status?.sampleRate ?? 0).formatted()) Hz")
+                LabeledContent(localized("Buffer"), value: "\(model.status?.bufferFrames ?? 0) \(localized("frames"))")
+                LabeledContent(
+                    localized("Reported latency"),
+                    value:
+                        "\((model.status?.reportedLatencyMs ?? 0).formatted(.number.precision(.fractionLength(1)))) ms")
+                LabeledContent(localized("Audio overloads"), value: "\(model.status?.overloads ?? 0)")
+                LabeledContent(localized("Missing input cycles"), value: "\(model.status?.inputMissing ?? 0)")
+                LabeledContent(localized("Numerical resets"), value: "\(model.status?.nonfiniteResets ?? 0)")
+                HStack {
+                    Spacer()
+                    Button(localized("Copy report")) {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(model.report, forType: .string)
+                    }
                 }
             }
-            Section(localized("About")) {
-                Text("MicBoost \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0")")
-                Link(localized("Project"), destination: URL(string: "https://github.com/vittau/MicBoost")!)
+            Section {
+                LabeledContent(
+                    localized("Version"),
+                    value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0")
+                LabeledContent(localized("Project")) {
+                    Link("GitHub", destination: URL(string: "https://github.com/vittau/MicBoost")!)
+                }
+                Text(localized("License: to be defined")).foregroundStyle(.secondary)
+            } header: {
+                Text(localized("About"))
+            } footer: {
                 Text(localized("This app is not notarized."))
-                Text(localized("License: to be defined"))
             }
-        }.formStyle(.grouped).frame(width: 480)
+        }
+        .formStyle(.grouped)
+        .controlSize(.regular)
+        .frame(width: 540)
     }
     private var channel: Int {
         switch model.controls.channelSelectionByUID[model.controls.selectedInputUID ?? ""] ?? .auto {

@@ -47,3 +47,10 @@
 "Voice preset" = "Padrão de voz";
 "System input" = "Entrada do sistema";
 "Unknown" = "Desconhecida";
+"Sample rate" = "Taxa de amostragem";
+"frames" = "quadros";
+"Reported latency" = "Latência reportada";
+"Audio overloads" = "Sobrecargas de áudio";
+"Missing input cycles" = "Ciclos sem entrada";
+"Numerical resets" = "Reinicializações numéricas";
+"Version" = "Versão";

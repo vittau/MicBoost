@@ -47,3 +47,10 @@
 "Voice preset" = "Voice preset";
 "System input" = "System input";
 "Unknown" = "Unknown";
+"Sample rate" = "Sample rate";
+"frames" = "frames";
+"Reported latency" = "Reported latency";
+"Audio overloads" = "Audio overloads";
+"Missing input cycles" = "Missing input cycles";
+"Numerical resets" = "Numerical resets";
+"Version" = "Version";

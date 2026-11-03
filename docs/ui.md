@@ -71,7 +71,11 @@ Uma faixa no topo do conteúdo, abaixo do cabeçalho, mostra uma mensagem por ve
 
 ## Janela de ajustes
 
-`NSWindow` com SwiftUI `SettingsView` (`Form` com estilo `.grouped`), aberta por "Ajustes…" ou ⌘, com o painel focado. Seções:
+`NSWindow` de 540 pt de largura com SwiftUI `SettingsView` (`Form` com estilo `.grouped`), aberta por "Ajustes…" ou ⌘, com o painel focado. Seções:
+
+As seções seguem o estilo dos Ajustes do Sistema: cartões agrupados nativos,
+controles de tamanho regular, switch nativo à direita com explicação secundária
+junto ao rótulo e linhas de diagnóstico/sobre com rótulo à esquerda e valor à direita.
 
 - **Áudio:** chave "Usar MicBoost como entrada do sistema automaticamente" (`manageDefaultInput`, ligada por padrão), com uma frase explicando que, desligada, cada app precisa selecionar o microfone "BlackHole 2ch" por conta própria; tamanho de buffer (64/128/256/512/1024, só os valores suportados) e modo de canais da fonte atual ([audio-engine.md](audio-engine.md#canais)).
 - **Diagnóstico** (somente leitura, atualização a 1 Hz com a janela visível): taxa de amostragem, buffer, latência reportada, overloads, `input_missing`, `nonfinite_resets`. Botão "Copiar relatório" (texto para a área de transferência).
