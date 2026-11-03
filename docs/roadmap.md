@@ -1,0 +1,99 @@
+# Roadmap
+
+Status: `não iniciado` · `em andamento` · `concluído`. Uma etapa só é concluída quando as condições de conclusão foram verificadas, e os resultados medidos foram registrados em [testing.md](testing.md#resultados-registrados).
+
+| # | Etapa | Status |
+|---|---|---|
+| 0 | Estrutura e diagnóstico | não iniciado |
+| 1 | Ponte mínima | não iniciado |
+| 2 | Ganho e proteção de pico | não iniciado |
+| 3 | Equalizador | não iniciado |
+| 4 | Interface | não iniciado |
+| 5 | Recuperação | não iniciado |
+| 6 | Distribuição | não iniciado |
+| 7 | Entrega | não iniciado |
+
+## 0 — Estrutura e diagnóstico
+
+Entregas:
+- `Package.swift` com todos os targets de [architecture.md](architecture.md#pacote-swift) (stubs onde for o caso);
+- `scripts/build-app.sh` gerando um `.app` que abre como item de barra de menus vazio;
+- camada HAL (`AudioHardware` + implementação real + `FakeAudioHardware`);
+- `DeviceService`;
+- `micboost-diag devices` e `capture`.
+
+Condições de conclusão:
+- `swift build` e `swift test` passam;
+- `micboost-diag devices` lista corretamente os dispositivos da máquina de referência, com o BlackHole instalado;
+- o UID real do BlackHole foi confirmado e [audio-engine.md](audio-engine.md#identificação-do-blackhole) atualizado;
+- houve captura bruta do microfone interno e de um segundo tipo de entrada (USB/Continuity).
+
+## 1 — Ponte mínima
+
+Entregas: `MicBoostDSP` com passagem direta (sem efeitos, já com fade e guarda numérica), `AggregateBuilder`, `EngineController` (start/stop/estados), `micboost-diag run`, `latency` e `soak`.
+
+Condições de conclusão:
+- voz da fonte chega ao BlackHole (gravador em BlackHole);
+- silêncio seguro nas falhas (desconectar a fonte durante `run`);
+- latência medida com buffers de 128 e 256;
+- ensaio de 60 min aprovado (sem crescimento de atraso);
+- decisão confirmada: agregado (ou troca para a ponte alternativa, com a especificação reescrita);
+- buffer padrão definido.
+
+## 2 — Ganho e proteção de pico
+
+Entregas: ganho suavizado, mute, limitador, medidores e contadores; testes DSP correspondentes.
+
+Condições de conclusão:
+- níveis conferidos com sinal conhecido (testes) e com gravação de voz;
+- faixa máxima do ganho definida e registrada em [dsp.md](dsp.md#ganho).
+
+## 3 — Equalizador
+
+Entregas: 3 bandas, bypass com crossfade, "Zerar EQ", suavização, limitação por taxa; persistência dos parâmetros no `SettingsStore`.
+
+Condições de conclusão:
+- testes de resposta em todas as taxas;
+- sem cliques em mudanças durante o áudio;
+- latência e CPU medidas com o EQ ativo.
+
+## 4 — Interface
+
+Entregas: item de status, painel, seção do EQ, mensagens de estado, janela de ajustes, localização pt-BR/en, política de entrada padrão integrada ao app.
+
+Condições de conclusão:
+- abrir e fechar o painel não interrompe o áudio;
+- persistência ao reabrir;
+- teclado, VoiceOver, aparência clara/escura e reduzir transparência/movimento verificados;
+- interface responsiva com o motor rodando.
+
+## 5 — Recuperação
+
+Condições de conclusão: cada linha da tabela de [audio-engine.md](audio-engine.md#recuperação) verificada manualmente (desconexão, suspensão e retomada, mudança de formato, permissão negada, BlackHole ausente, mudança manual da entrada padrão, reinício do `coreaudiod`).
+
+## 6 — Distribuição
+
+Entregas: `package-release.sh`, release `.zip` sem notarização, tap `vittau/homebrew-micboost` com o cask.
+
+Condições de conclusão:
+- os cenários de [distribution.md](distribution.md#homebrew-tap-próprio) e da primeira abertura foram validados em um Mac que não participou do desenvolvimento;
+- os resultados reais foram registrados em [distribution.md](distribution.md);
+- a variante com o instalador do BlackHole está decidida (publicada ou descartada) após a definição da licença.
+
+## 7 — Entrega
+
+Condições de conclusão:
+- README do repositório com instalação, primeira abertura, uso com apps de chamada, desinstalação, limitações (Bluetooth, ganho digital) e aviso de não notarização;
+- medições registradas;
+- artefatos publicados apenas dos canais validados.
+
+## Decisões em aberto
+
+| Decisão | Recomendação atual | Quando |
+|---|---|---|
+| Licença do MicBoost | GPL-3.0, que alinha com o BlackHole e simplifica uma eventual redistribuição conjunta | antes da etapa 6 |
+| Faixa máxima do ganho | +24 dB provisório | etapa 2 |
+| Buffer padrão | 256 provisório | etapa 1 |
+| Agregado vs. ponte com buffer circular | agregado | etapa 1 |
+| Qualidade do resampler de drift | padrão do sistema | etapa 1 |
+| UID do BlackHole | `BlackHole2ch_UID` | etapa 0 |

@@ -1,0 +1,9 @@
+.build/
+build/
+dist/
+.scratch/
+.swiftpm/
+*.xcodeproj/
+xcuserdata/
+.DS_Store
+*.wav
