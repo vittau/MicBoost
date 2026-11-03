@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+typedef struct {
+    double hz, db, q, b0, b1, b2, a1, a2, z[2][2];
+} biquad;
+
 struct mb_engine {
     uint32_t maximum;
     mb_routing routing;
@@ -11,7 +15,10 @@ struct mb_engine {
     _Atomic unsigned selection;
     _Atomic bool muted, eq, fading, fade_done, clipped;
     _Atomic uint64_t cycles, missing, nonfinite, oversized, delta;
-    float fade, decay;
+    double decay;
+    double rate, current_gain, gain_decay, release, limiter, wet;
+    biquad filters[3];
+    _Atomic float gr;
 };
 
 mb_engine *mb_engine_create(uint32_t maximum, double rate) {
@@ -35,8 +42,22 @@ mb_engine *mb_engine_create(uint32_t maximum, double rate) {
     e->maximum = maximum;
     e->routing.input_count = 1;
     e->routing.outputs[1].channel = 1;
-    e->fade = 1;
-    e->decay = (float)exp(-1 / (0.003 * rate));
+    e->rate = rate;
+    e->current_gain = 1;
+    e->limiter = 1;
+    e->wet = 1;
+    e->gain_decay = exp(-1 / (0.020 * rate));
+    e->release = exp(-1 / (0.150 * rate));
+    atomic_store(&e->eq, true);
+    const double frequencies[3] = {120, 1000, 6000};
+    for (unsigned b = 0; b < 3; b++) {
+        e->filters[b].hz = log(frequencies[b]);
+        e->filters[b].q = 0.9;
+        e->filters[b].b0 = 1;
+        atomic_store(&e->bands[b * 3], frequencies[b]);
+        atomic_store(&e->bands[b * 3 + 2], 0.9);
+    }
+    e->decay = exp(-1 / (0.003 * rate));
     return e;
 }
 
@@ -54,7 +75,7 @@ int mb_engine_configure(mb_engine *e, const mb_routing *r) {
 }
 
 void mb_engine_set_gain_db(mb_engine *e, float db) {
-    atomic_store(&e->gain, db);
+    atomic_store(&e->gain, isfinite(db) ? fmaxf(-12, fminf(24, db)) : 0);
 }
 void mb_engine_set_muted(mb_engine *e, bool value) {
     atomic_store(&e->muted, value);
@@ -66,9 +87,9 @@ void mb_engine_set_band(mb_engine *e, mb_band band, float hz, float db, float q)
     if (band < MB_LOW || band > MB_HIGH) {
         return;
     }
-    atomic_store(&e->bands[band * 3], hz);
-    atomic_store(&e->bands[band * 3 + 1], db);
-    atomic_store(&e->bands[band * 3 + 2], q);
+    atomic_store(&e->bands[band * 3], isfinite(hz) ? fmaxf(20, hz) : 1000);
+    atomic_store(&e->bands[band * 3 + 1], isfinite(db) ? fmaxf(-12, fminf(12, db)) : 0);
+    atomic_store(&e->bands[band * 3 + 2], isfinite(q) ? fmaxf(0.3, fminf(4, q)) : 0.9);
 }
 void mb_engine_set_channel_mode(mb_engine *e, mb_channel_mode mode, uint32_t first) {
     atomic_store(&e->selection, ((first & 63) << 2) | (mode & 3));
@@ -85,7 +106,7 @@ void mb_engine_read_meters(mb_engine *e, mb_meters *out) {
     out->input_peak = atomic_exchange(&e->input_peak, 0);
     out->output_peak = atomic_exchange(&e->output_peak, 0);
     out->input_clipped = atomic_exchange(&e->clipped, false);
-    out->gr_max_db = 0;
+    out->gr_max_db = atomic_exchange(&e->gr, 0);
     out->fade_done = atomic_load(&e->fade_done);
 }
 void mb_engine_read_counters(const mb_engine *e, mb_counters *out) {
@@ -94,6 +115,71 @@ void mb_engine_read_counters(const mb_engine *e, mb_counters *out) {
     out->nonfinite_resets = atomic_load(&e->nonfinite);
     out->frames_over_max = atomic_load(&e->oversized);
     out->io_delta_host = atomic_load(&e->delta);
+}
+static double smooth(double current, double target, double decay) {
+    return fabs(current - target) < 1e-7 ? target : target + decay * (current - target);
+}
+static void coefficients(biquad *f, unsigned band, double rate) {
+    if (f->db == 0) {
+        f->b0 = 1;
+        f->b1 = f->b2 = f->a1 = f->a2 = 0;
+        memset(f->z, 0, sizeof(f->z));
+        return;
+    }
+    double w = 2 * M_PI * fmax(20, fmin(0.45 * rate, exp(f->hz))) / rate;
+    double c = cos(w), a = pow(10, f->db / 40), alpha = sin(w) / (2 * f->q);
+    double b0, b1, b2, a0, a1, a2;
+    if (band == MB_MID) {
+        b0 = 1 + alpha * a;
+        b1 = -2 * c;
+        b2 = 1 - alpha * a;
+        a0 = 1 + alpha / a;
+        a1 = -2 * c;
+        a2 = 1 - alpha / a;
+    } else {
+        double t = sin(w) * sqrt(2 * a);
+        double sign = band == MB_LOW ? 1 : -1;
+        b0 = a * ((a + 1) - sign * (a - 1) * c + t);
+        b1 = 2 * sign * a * ((a - 1) - sign * (a + 1) * c);
+        b2 = a * ((a + 1) - sign * (a - 1) * c - t);
+        a0 = (a + 1) + sign * (a - 1) * c + t;
+        a1 = -2 * sign * ((a - 1) + sign * (a + 1) * c);
+        a2 = (a + 1) + sign * (a - 1) * c - t;
+    }
+    f->b0 = b0 / a0;
+    f->b1 = b1 / a0;
+    f->b2 = b2 / a0;
+    f->a1 = a1 / a0;
+    f->a2 = a2 / a0;
+}
+static void update_filters(mb_engine *e, uint32_t size) {
+    double decay = exp(-(double)size / (0.030 * e->rate));
+    for (unsigned b = 0; b < 3; b++) {
+        biquad *f = &e->filters[b];
+        double hz = log(fmax(20, fmin(0.45 * e->rate, atomic_load(&e->bands[b * 3]))));
+        double db = atomic_load(&e->bands[b * 3 + 1]);
+        double q = atomic_load(&e->bands[b * 3 + 2]);
+        if (hz != f->hz || db != f->db || q != f->q) {
+            f->hz = smooth(f->hz, hz, decay);
+            f->db = smooth(f->db, db, decay);
+            f->q = smooth(f->q, q, decay);
+            coefficients(f, b, e->rate);
+        }
+    }
+}
+static double filter(biquad *f, unsigned ch, double x) {
+    if (f->db == 0) {
+        return x;
+    }
+    double y = f->b0 * x + f->z[ch][0];
+    f->z[ch][0] = f->b1 * x - f->a1 * y + f->z[ch][1];
+    f->z[ch][1] = f->b2 * x - f->a2 * y;
+    return y;
+}
+static void reset_filters(mb_engine *e) {
+    for (unsigned b = 0; b < 3; b++) {
+        memset(e->filters[b].z, 0, sizeof(e->filters[b].z));
+    }
 }
 static unsigned process(mb_engine *e, const float *const *in, float *const *out,
                         uint32_t frames) {
@@ -113,6 +199,12 @@ static unsigned process(mb_engine *e, const float *const *in, float *const *out,
         if (size > e->maximum) {
             size = e->maximum;
         }
+        update_filters(e, size);
+        double target_gain = atomic_load(&e->muted) ? 0 : pow(10, atomic_load(&e->gain) / 20);
+        double wet_target = atomic_load(&e->eq) ? 1 : 0;
+        bool bad_output = false;
+        float input_peak = 0, output_peak = 0, gr = 0;
+        bool clipped = false;
         for (uint32_t i = base; i < base + size; i++) {
             float value[2] = {0, 0};
             for (unsigned ch = 0; ch < 2; ch++) {
@@ -137,25 +229,75 @@ static unsigned process(mb_engine *e, const float *const *in, float *const *out,
                         value[ch] = 0;
                     }
                 }
-                peak(&e->input_peak, fabsf(value[ch]));
+                input_peak = fmaxf(input_peak, fabsf(value[ch]));
                 if (fabsf(value[ch]) >= 0.999f) {
-                    atomic_store(&e->clipped, true);
+                    clipped = true;
                 }
             }
-            if (fading) {
-                e->fade *= e->decay;
-                if (e->fade < 0.000031622777f) {
-                    e->fade = 0;
-                    atomic_store(&e->fade_done, true);
-                }
+            e->wet += fmax(-1 / (0.020 * e->rate),
+                fmin(1 / (0.020 * e->rate), wet_target - e->wet));
+            e->current_gain = smooth(e->current_gain, fading ? 0 : target_gain,
+                fading ? e->decay : e->gain_decay);
+            if (fading && e->current_gain < 0.000031622777) {
+                e->current_gain = 0;
+                atomic_store(&e->fade_done, true);
             }
+            double signal[2];
+            unsigned channels = mode == MB_STEREO && count > 1 ? 2 : 1;
+            for (unsigned ch = 0; ch < channels; ch++) {
+                double y = value[ch];
+                for (unsigned b = 0; b < 3; b++) {
+                    y = filter(&e->filters[b], ch, y);
+                }
+                double mixed = y == value[ch] ? value[ch] : value[ch] + e->wet * (y - value[ch]);
+                signal[ch] = mixed * e->current_gain;
+            }
+            if (channels == 1) {
+                signal[1] = signal[0];
+            }
+            double magnitude = fmax(fabs(signal[0]), fabs(signal[1]));
+            double target = magnitude > 0.891 ? 0.891 / magnitude : 1;
+            e->limiter = fmin(target, 1 + e->release * (e->limiter - 1));
+            gr = fmaxf(gr, (float)(-20 * log10(e->limiter)));
             for (unsigned ch = 0; ch < 2; ch++) {
-                float y = fading ? value[ch] * e->fade : value[ch];
-                if (out[ch]) {
-                    out[ch][i] = y;
+                double y = signal[ch] * e->limiter;
+                if (!isfinite(y)) {
+                    bad_output = true;
+                    y = 0;
                 }
-                peak(&e->output_peak, fabsf(y));
+                float sample = (float)fmax(-1, fmin(1, y));
+                if (out[ch]) {
+                    out[ch][i] = sample;
+                }
+                output_peak = fmaxf(output_peak, fabsf(sample));
             }
+        }
+        if (bad_output) {
+            invalid = true;
+            output_peak = 0;
+            for (unsigned ch = 0; ch < 2; ch++) {
+                if (out[ch]) {
+                    memset(out[ch] + base, 0, size * sizeof(float));
+                }
+            }
+        }
+        if (invalid) {
+            reset_filters(e);
+        }
+        for (unsigned b = 0; b < 3; b++) {
+            for (unsigned ch = 0; ch < 2; ch++) {
+                for (unsigned z = 0; z < 2; z++) {
+                    if (fabs(e->filters[b].z[ch][z]) < 1e-25) {
+                        e->filters[b].z[ch][z] = 0;
+                    }
+                }
+            }
+        }
+        peak(&e->input_peak, input_peak);
+        peak(&e->output_peak, output_peak);
+        peak(&e->gr, gr);
+        if (clipped) {
+            atomic_store(&e->clipped, true);
         }
         base += size;
     }

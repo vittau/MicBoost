@@ -15,7 +15,7 @@ canais da fonte → [mapa de canais] → low shelf → peaking → high shelf �
 - Nenhum lookahead, nenhuma fila e nenhuma latência algorítmica.
 - Toda a memória é alocada em `mb_engine_create(max_frames, sample_rate)`. `mb_engine_process` não aloca.
 
-A implementação da ponte mínima aplica somente mapa de canais, fade-out, guarda numérica e medidores. Os setters de ganho, mute e EQ armazenam os alvos atômicos; os efeitos são implementados nas etapas seguintes. O ganho efetivo desta etapa é 0 dB.
+A cadeia completa é executada no IOProc e no ponto de entrada offline, com controles atômicos e sem reiniciar o motor.
 
 ## API C (header `MicBoostDSP.h`)
 
@@ -54,12 +54,12 @@ Filtros biquad do Audio EQ Cookbook (RBJ) em Transposed Direct Form II. Shelves 
 - Resposta plana: com ganho 0 dB, a banda é tratada como identidade exata (coeficientes b0 = 1, demais 0), sem depender de arredondamento.
 - Bypass (`eq.enabled = false`): os filtros continuam rodando, com estado aquecido, e a saída faz crossfade linear de 20 ms entre o sinal com EQ e o sem EQ.
 - "Zerar EQ": volta as três bandas aos valores padrão da tabela (ganho 0 dB) e mantém `eq.enabled`, ganho geral, mute e fonte.
-- Suavização de parâmetros: a cada bloco, os parâmetros correntes se aproximam dos alvos por um filtro de um polo com τ = 30 ms. A frequência é suavizada em escala logarítmica e o ganho em dB. Os coeficientes são recalculados por bloco somente enquanto algum parâmetro da banda está em transição (|alvo − atual| > ε).
+- Suavização de parâmetros: a cada bloco, os parâmetros correntes se aproximam dos alvos por um filtro de um polo com τ = 30 ms. A frequência é suavizada em escala logarítmica e o ganho em dB. Os coeficientes são recalculados por bloco somente enquanto algum parâmetro da banda está em transição (|alvo − atual| > ε). O valor é fixado no alvo quando a diferença fica abaixo de 1e−7 (log natural de Hz, dB ou Q); blocos maiores que `max_frames` são subdivididos antes dessa atualização.
 - Denormais: o estado do filtro com |s| < 1e−25 é zerado ao fim de cada bloco.
 
 ## Ganho
 
-- Faixa do controle: **−12 dB a +24 dB** (6,3% a 1.585%), passo de 0,5 dB, padrão 0 dB. O máximo é recalibrado na etapa 2 com voz real e documentado aqui.
+- Faixa do controle: **−12 dB a +24 dB** (6,3% a 1.585%), passo de 0,5 dB, padrão 0 dB. O máximo de +24 dB é mantido: os testes confirmam o teto do limitador nessa faixa. A calibração com voz humana permanece uma verificação manual pendente.
 - Exibição: `+12,0 dB · 398%`, com percentual = 100 · 10^(dB/20) arredondado ao inteiro. 0 dB = 100%, +6,02 dB ≈ 200%.
 - O percentual é de amplitude, não de volume percebido, e a proteção de pico pode reduzir o ganho efetivo.
 - Aplicação: ganho linear por amostra, suavizado por filtro de um polo com τ = 20 ms rumo a `10^(dB/20)`, ou a 0 com mute.

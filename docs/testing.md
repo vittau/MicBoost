@@ -35,7 +35,7 @@ Em 16, 44,1, 48 e 96 kHz:
 
 ## Ferramenta de diagnóstico (`micboost-diag`)
 
-CLI para verificar o hardware. `run`, `latency` e `soak` não alteram as entradas ou saídas padrão; a política de entrada padrão ainda não está integrada a esses comandos. `latency` aceita `--buffer`; `soak` aceita `--buffer` e usa 20 minutos quando `--minutes` não é informado. A opção `permission` imprime o estado de autorização do microfone sem solicitar acesso.
+CLI para verificar o hardware. `run` e `latency` aceitam `--gain-db N`, `--mute`, `--eq-low F:G`, `--eq-mid F:G:Q`, `--eq-high F:G` e `--eq-off`; os valores são validados e limitados às faixas de settings. Os controles de diagnóstico ficam em domínio de preferências separado do app. `run` publica pico de entrada, pico de saída, GR e CPU acumulada a cada segundo. `run`, `latency` e `soak` não alteram as entradas ou saídas padrão; a política de entrada padrão ainda não está integrada a esses comandos. `latency` aceita `--buffer`; `soak` aceita `--buffer` e usa 20 minutos quando `--minutes` não é informado. A opção `permission` imprime o estado de autorização do microfone sem solicitar acesso.
 
 É o meio pelo qual agentes sem acesso a áudio verificam o comportamento real. Pela regra de TCC, quem precisa de permissão de microfone é o app de terminal que a executa (Terminal, Orca etc.).
 
@@ -95,6 +95,24 @@ Complementar com uma escuta humana de uma gravação de voz de 20 min via BlackH
 10. Persistência: reabrir o app e conferir ganho, mute, EQ, fonte e canais.
 
 ## Resultados registrados
+
+
+Validação de ganho e EQ (2026-11-03): C920 USB, 16 kHz, buffer 256, canal automático (primeiro canal copiado para L/R). Capturas simultâneas da fonte e do BlackHole de 3 s após 2 s de assentamento, usando o sinal ambiente; picos variam com o alinhamento e com o resampler de drift.
+
+| Ganho | Fonte pico / RMS (canal 1) | BlackHole pico / RMS (L = R) | Razão RMS |
+|---|---|---|---|
+| 0 dB | 0,21924 / 0,012676 | 0,22361 / 0,012660 | 0,999 |
+| +6 dB | 0,23941 / 0,015418 | 0,54723 / 0,031360 | 2,034 |
+| +12 dB | 0,05301 / 0,006345 | 0,20991 / 0,025283 | 3,984 |
+| +24 dB | 0,01721 / 0,004814 | 0,27370 / 0,075962 | 15,779 |
+
+- Limitador em hardware: 60 s com +24 dB e médios +12 dB / 1 kHz / Q 0,9; pico máximo de saída 0,891; GR máximo 1,448 dB. Zero overloads, entradas ausentes e resets não finitos.
+- CPU nesse ensaio: 0,462 s em 59 s entre leituras (0,78% de um núcleo); CPU total até a última leitura 0,510 s. EQ habilitado, shelves em 0 dB.
+- Latência, 3 tentativas: EQ em bypass mediana/mín./máx. 38,875 / 38,875 / 38,9375 ms; médios ativos +6 dB / 1 kHz / Q 0,9: 38,875 / 38,8125 / 38,875 ms. Mediana 622 frames em ambos, diferença 0 frames; correlação ≥ 0,965 com EQ.
+- Finalização: BlackHole 48.000 Hz, entrada padrão `BuiltInMicrophoneDevice` preservada, nenhum processo `micboost-diag` restante. Nenhuma captura de Continuity ou Bluetooth.
+- A faixa permanece −12…+24 dB. Calibração com voz humana e escuta para estalos são verificações manuais pendentes; o ensaio usou som ambiente e os testes offline verificam transições numericamente.
+- Testes automatizados: 11 testes DSP em 0,135 s e 37 Core em 1,523 s (1,658 s somados, sem compilação) (48 funções, com os casos DSP parametrizados nas quatro taxas); o único problema conhecido é a escrita proibida proposital na HAL falsa, já esperado pelo teste. `swift build`, `swift test` e `swift format lint --recursive Sources Tests` aprovados.
+- Revisão de tempo real: processamento C sem alocação, locks, logs, HAL ou chamadas Swift/Objective-C; memória temporária pré-alocada, coeficientes apenas quando parâmetros se movem, estados denormais zerados ao fim dos sub-blocos.
 
 Máquina de referência: MacBook Neo (Apple A18 Pro), macOS 27.2. Latências medidas por correlação com o som da sala, 3 tentativas cada (mediana/mín./máx.).
 

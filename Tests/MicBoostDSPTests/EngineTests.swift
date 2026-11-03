@@ -2,7 +2,7 @@ import CoreAudio
 import MicBoostDSP
 import Testing
 
-private func process(_ engine: OpaquePointer, _ channels: [[Float]]) -> [[Float]] {
+func process(_ engine: OpaquePointer, _ channels: [[Float]]) -> [[Float]] {
     let count = channels.first?.count ?? 0
     let inputs = channels.map { values -> UnsafeMutablePointer<Float> in
         let pointer = UnsafeMutablePointer<Float>.allocate(capacity: count)
