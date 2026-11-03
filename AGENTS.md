@@ -74,6 +74,7 @@ Controles:
 ## Verificação
 
 - Toda mudança deve terminar com `swift build` e `swift test` verdes. Mudanças de DSP exigem testes em `MicBoostDSPTests` (resposta, ausência de cliques e limites, conforme `docs/testing.md`).
+- A suíte completa de `swift test` deve levar no máximo 1 minuto em média na máquina de referência (tempo de execução, sem a compilação). Testes longos, de hardware ou de estabilidade ficam no `micboost-diag`, não nos testes unitários. Quem aproximar a suíte desse limite deve otimizá-la na mesma mudança.
 - Comportamento com hardware real (latência, estabilidade, recuperação) é verificado com `micboost-diag`. Agentes não conseguem ouvir áudio: relate números medidos, não impressões.
 - A permissão de microfone pertence ao app de terminal que executa o `micboost-diag`. Se a captura vier zerada, verifique a permissão antes de depurar.
 - Não declare uma etapa concluída sem cumprir as condições de `docs/roadmap.md`. Diga explicitamente o que não foi possível verificar (por exemplo, "requer teste manual com USB").
