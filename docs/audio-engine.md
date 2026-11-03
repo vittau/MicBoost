@@ -39,7 +39,7 @@ Mudanças chegam em rajadas. O controller agrupa eventos com 100 ms de coalescê
 - Primária: UID `BlackHole2ch_UID` (UID padrão do build upstream de 2 canais).
 - Alternativa: fabricante contendo "Existential Audio" e nome contendo "BlackHole", com exatamente 2 canais de saída.
 - Qualquer dispositivo cujo UID ou nome comece com "BlackHole" é excluído como fonte, seja qual for a contagem de canais.
-- Na máquina de referência, a HAL ainda não expõe BlackHole (ver medição em testing.md). **A confirmar na etapa 0**, com o BlackHole instalado na máquina de referência. Se o UID real for diferente, atualizar esta seção.
+- **Pendente:** confirmar o UID real do BlackHole instalado na máquina de referência.
 
 ## Construção do agregado
 

@@ -58,6 +58,9 @@ Controles:
 
 ## Convenções de código
 
+- Swift formatado com `swift format`, usando `.swift-format` na raiz; executar antes de commitar.
+- C: indentação de 4 espaços, uma instrução por linha, chaves em todos os corpos de `if`/`for` e linhas de até 100 colunas.
+
 - Swift 6 com concorrência estrita e sem `@unchecked Sendable` sem justificativa em comentário.
   - UI em `@MainActor` com `@Observable`.
   - `EngineController` é um actor sobre uma `DispatchSerialQueue` própria. Listeners HAL vão para essa fila.

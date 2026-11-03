@@ -41,9 +41,13 @@ CLI para verificar o hardware. É o meio pelo qual agentes sem acesso a áudio v
 |---|---|
 | `micboost-diag devices [--json]` | Lista dispositivos com UID, transporte, canais, taxas, faixa de buffer, latências, safety offsets e elegibilidade; mostra o BlackHole detectado e a entrada padrão |
 | `micboost-diag run --input <uid> [--gain-db N] [--buffer N] [--seconds N]` | Roda o motor sem UI (mesmo `EngineController` do app), imprimindo estado e contadores a cada segundo. Não altera a entrada padrão, a menos que `--manage-default-input` seja passado |
-| `micboost-diag capture --device <uid> --seconds N --out file.wav` | Grava a entrada bruta de um dispositivo (validação da etapa 0) |
+| `micboost-diag capture --device <uid> --seconds N --out file.wav` | Grava a entrada bruta de um dispositivo |
 | `micboost-diag latency --input <uid> [--trials N]` | Mede a latência adicional (método abaixo) |
 | `micboost-diag soak --input <uid> --minutes 60` | Ensaio de estabilidade (abaixo) |
+
+A CLI usa parsing manual, sem dependências externas. `devices` exibe transporte por nome, taxas como lista simples em Hz (intervalos quando aplicável), latências e safety offsets em frames e milissegundos na taxa nominal. O JSON preserva os valores numéricos do `DeviceSnapshot` (`devices` e `defaultInputUID`); elegibilidade e BlackHole são derivados dos campos.
+
+`capture` aceita duração positiva de até 300 segundos e grava WAV IEEE Float32 intercalado na taxa nominal. Imprime frames efetivamente capturados, pico e RMS lineares por canal. A duração inclui a partida do dispositivo; Continuity pode entregar menos frames durante a conexão. A extensão de `CoreAudioHardware` valida os formatos virtuais Float32 nativos sem modificar formatos ou padrões, cria um IOProc C e pré-aloca o buffer em `mb_capture_create`. O callback apenas copia amostras; gravação WAV e cálculo de pico/RMS acontecem após stop e destruição do IOProc. Outros formatos são recusados sem alterar o hardware. Capturas locais ficam em `.scratch/` e não entram no git.
 
 ## Medição de latência
 
@@ -99,21 +103,8 @@ Máquina de referência: MacBook Neo (Apple A18 Pro), macOS 27.2.
 | CPU do processo | running, EQ ligado | — |
 | Memória residente | running | — |
 | Ensaio de 60 min | microfone interno | — |
+| Captura bruta interna | 2026-11-03; pedido de 3 s, 48 kHz, 1 canal | 144000 frames; pico 0,102121599; RMS 0,005412710; sinal não zero |
+| Captura bruta Continuity | 2026-11-03; pedido de 3 s, 48 kHz, 1 canal | 126976 frames; pico 0,003942308; RMS 0,001024310; sinal não zero |
+| Latência de entrada reportada pela HAL | 2026-11-03; Continuity, 48 kHz | 6000 frames (125 ms) |
 
 (— = ainda não medido. Substituir pelo valor e pela data da medição.)
-
-### Diagnóstico disponível na etapa 0
-
-Somente `devices [--json]` e `capture` estão implementados. A saída textual lista também elegibilidade e BlackHole; o JSON é o `DeviceSnapshot` com `devices` e `defaultInputUID` (os predicados de elegibilidade e BlackHole são derivados dos campos). `capture` aceita duração positiva de até 300 segundos, grava WAV IEEE Float32 intercalado na taxa nominal e imprime frames efetivamente capturados, pico e RMS lineares por canal. A duração inclui a partida do dispositivo; Continuity pode entregar menos frames durante a conexão. Formatos diferentes de Float32 nativo são recusados sem alterar o hardware.
-
-Verificação da etapa 0 na máquina de referência (2026-11-03):
-
-| Medida | Condição | Resultado |
-|---|---|---|
-| Captura bruta interna | pedido de 3 s, 48 kHz, 1 canal | 144000 frames; pico 0,102121599; RMS 0,005412710; sinal não zero |
-| Captura bruta Continuity | pedido de 3 s, 48 kHz, 1 canal | 126976 frames; pico 0,003942308; RMS 0,001024310; sinal não zero |
-| Enumeração BlackHole | driver instalado, ainda ausente na HAL | UID real pendente; não reiniciado coreaudiod |
-
-Nenhuma entrada ou saída padrão foi alterada. Capturas locais ficam em `.scratch/` e não entram no git. A ausência de BlackHole mantém a etapa 0 em andamento. Testes automatizados desta etapa cobrem enumeração/elegibilidade, detecção primária e alternativa, coalescência, remoção de listeners, guarda de saída padrão e cópia/limites do buffer de captura; os testes de motor e DSP descritos acima pertencem às próximas etapas.
-
-`swift build`, `swift test` (2 testes C/captura + 5 Core) e `scripts/build-app.sh debug` passam; o teste negativo da fake registra uma issue esperada com `withKnownIssue`. `codesign --verify --strict` passa. `open build/MicBoost.app` iniciou o processo, mas a presença visual do item de status não foi confirmada: o provedor de automação disponível não suporta a superfície da barra de menus.

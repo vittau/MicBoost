@@ -28,7 +28,7 @@ Condições de conclusão:
 - o UID real do BlackHole foi confirmado e [audio-engine.md](audio-engine.md#identificação-do-blackhole) atualizado;
 - houve captura bruta do microfone interno e de um segundo tipo de entrada (USB/Continuity).
 
-Build, testes, empacotamento ad hoc e capturas interna/Continuity verificados; falta o BlackHole aparecer na HAL para confirmar seu UID real.
+Pendente: confirmar o UID real do BlackHole na HAL.
 
 ## 1 — Ponte mínima
 

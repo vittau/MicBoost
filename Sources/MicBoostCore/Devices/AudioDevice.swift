@@ -1,8 +1,12 @@
 import CoreAudio
+
 public struct AudioRange: Codable, Equatable, Sendable {
     public var minimum: Double
     public var maximum: Double
-    public init(_ minimum: Double, _ maximum: Double) { self.minimum = minimum; self.maximum = maximum }
+    public init(_ minimum: Double, _ maximum: Double) {
+        self.minimum = minimum
+        self.maximum = maximum
+    }
 }
 public struct AudioDevice: Codable, Equatable, Sendable {
     public var id: AudioObjectID
@@ -21,9 +25,19 @@ public struct AudioDevice: Codable, Equatable, Sendable {
     public var inputSafetyOffset: UInt32 = 0
     public var outputSafetyOffset: UInt32 = 0
     public var subdeviceUIDs: [String] = []
-    public init(id: AudioObjectID, uid: String, name: String) { self.id = id; self.uid = uid; self.name = name }
-    public var isBlackHole: Bool { uid.hasPrefix("BlackHole") || name.hasPrefix("BlackHole") || (manufacturer.contains("Existential Audio") && name.contains("BlackHole")) }
-    public var isBlackHole2ch: Bool { uid == "BlackHole2ch_UID" || (manufacturer.contains("Existential Audio") && name.contains("BlackHole") && outputChannels == 2) }
+    public init(id: AudioObjectID, uid: String, name: String) {
+        self.id = id
+        self.uid = uid
+        self.name = name
+    }
+    public var isBlackHole: Bool {
+        uid.hasPrefix("BlackHole") || name.hasPrefix("BlackHole")
+            || (manufacturer.contains("Existential Audio") && name.contains("BlackHole"))
+    }
+    public var isBlackHole2ch: Bool {
+        uid == "BlackHole2ch_UID"
+            || (manufacturer.contains("Existential Audio") && name.contains("BlackHole") && outputChannels == 2)
+    }
     public func isEligible(in devices: [AudioDevice]) -> Bool {
         func containsBlackHole(_ device: AudioDevice, visited: Set<String>) -> Bool {
             if device.isBlackHole { return true }

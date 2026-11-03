@@ -34,6 +34,8 @@ O projeto é um único pacote SwiftPM (sem `.xcodeproj`). O `.app` é montado po
 | `MicBoostDSPTests` | Swift Testing | Testes offline do processador via API C. |
 | `MicBoostCoreTests` | Swift Testing | Política de entrada padrão, máquina de estados, settings e mapa de canais, com HAL falsa. |
 
+`AudioHardware` expõe `devices()`, leitura/escrita da entrada padrão e registro/remoção de listeners por `HardwareProperty` em uma `DispatchQueue`. Não há operação de escrita da saída padrão no protocolo. `CoreAudioHardware` converte todos os status em `EngineError.halFailure`. `FakeAudioHardware` fica em `Tests/MicBoostCoreTests`; seu ponto de escrita de propriedades padrão registra uma falha de Swift Testing ao receber a saída padrão.
+
 Estrutura de diretórios:
 
 ```text
@@ -64,6 +66,8 @@ Frameworks linkados: CoreAudio, AudioToolbox, AVFoundation (só para `AVCaptureD
 - Parâmetros (Swift → C): o lado de controle escreve alvos em `_Atomic float`/`_Atomic int` com ordem relaxed; o IOProc lê uma vez por bloco. Combinações momentaneamente inconsistentes entre parâmetros são aceitáveis, porque todos passam por suavização.
 - Medidores (C → Swift): o IOProc mantém picos máximos em atômicos, e o lado de controle lê e zera com `atomic_exchange` (pico desde a última leitura). Contadores (`uint64`) são monotônicos.
 - Logs: `os.Logger` (subsystem `io.github.vittau.MicBoost`) apenas fora da thread de IO. Eventos de IO (NaN, entrada ausente) viram contadores lidos depois.
+
+`DeviceService` recebe uma fila serial e um callback de `Result<DeviceSnapshot, Error>`. `start`, `stop` e `snapshot` são chamados nessa fila; `stop` remove listeners antes de liberar o serviço. A fila confina também o adaptador HAL. Observa sistema e propriedades dos dispositivos enumerados; reenumera após 100 ms sem novos eventos. O snapshot contém todos os dispositivos, fontes elegíveis, BlackHole detectado e UID da entrada padrão. O adaptador real deve ter um único dono nessa fila.
 
 ## Ciclo de vida do motor
 
@@ -106,11 +110,3 @@ stopped ──start──▶ starting ──ok──▶ running
 | `defaultInputManaged` | `false` | `true` enquanto a entrada padrão atual foi definida pelo MicBoost |
 
 Esquemas desconhecidos ou corrompidos caem nos padrões, sem crash. Os campos de entrada padrão são gravados imediatamente, sem debounce, porque servem de recuperação após crash.
-
-## Estrutura executável da etapa 0
-
-`AudioHardware` expõe `devices()`, leitura/escrita da entrada padrão e registro/remoção de listeners por `HardwareProperty` em uma `DispatchQueue`. Não há operação de escrita da saída padrão no protocolo. `CoreAudioHardware` converte todos os status em `EngineError.halFailure`. `FakeAudioHardware` fica em `Tests/MicBoostCoreTests`; seu ponto de escrita de propriedades padrão registra uma falha de Swift Testing ao receber a saída padrão.
-
-`DeviceService` recebe uma fila serial e um callback de `Result<DeviceSnapshot, Error>`. `start`, `stop` e `snapshot` são chamados nessa fila; `stop` remove listeners antes de liberar o serviço. A fila confina também o adaptador HAL. Observa sistema e propriedades dos dispositivos enumerados; reenumera após 100 ms sem novos eventos. O snapshot contém todos os dispositivos, fontes elegíveis, BlackHole detectado e UID da entrada padrão. O adaptador real deve ter um único dono nessa fila.
-
-A CLI usa parsing manual, sem dependências externas. A captura diagnóstica é uma extensão de `CoreAudioHardware`: valida os formatos virtuais Float32 nativos, sem modificar formatos ou padrões, cria um IOProc C e pré-aloca o buffer em `mb_capture_create`. O callback apenas copia amostras; gravação WAV e cálculo de pico/RMS acontecem após stop e destruição do IOProc. Não há motor nem processamento DSP nesta etapa. `MicBoostDSP` contém somente esse suporte de captura bruta; sua API de motor será implementada na etapa 1.
