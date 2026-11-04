@@ -34,7 +34,7 @@ Listeners (na fila `engine`):
 - fonte e BlackHole ativos: `kAudioDevicePropertyDeviceIsAlive`, `kAudioDevicePropertyNominalSampleRate`, `kAudioDevicePropertyStreamConfiguration`;
 - agregado: `kAudioDeviceProcessorOverload`, que incrementa o contador de overloads.
 
-Mudanças chegam em rajadas. O controller agrupa eventos com 100 ms de coalescência antes de reconfigurar. Eventos de formato (taxa e streams) nos 300 ms seguintes a um start são do próprio motor e são ignorados; notificações de taxa escritas pelo MicBoost também. A comparação que decide reconstruir usa UID, ID, estado vivo, taxa e canais: faixa de buffer, latências e safety offsets mudam quando o agregado entra em uso e não são mudança de formato.
+Mudanças chegam em rajadas. O controller agrupa eventos com 100 ms de coalescência antes de reconfigurar. Eventos de formato (taxa e streams) nos 300 ms seguintes a um start são do próprio motor e são ignorados; notificações de taxa escritas pelo MicBoost também. Com uma fonte Bluetooth, a janela é de 3 s, e os eventos de formato da fonte durante o stop do próprio motor também são ignorados ([troca de perfil](#fonte-bluetooth-e-troca-de-perfil)). A comparação que decide reconstruir usa UID, ID, estado vivo, taxa e canais: faixa de buffer, latências e safety offsets mudam quando o agregado entra em uso e não são mudança de formato.
 
 ## Identificação do BlackHole
 
@@ -42,6 +42,15 @@ Mudanças chegam em rajadas. O controller agrupa eventos com 100 ms de coalescê
 - Alternativa: fabricante contendo "Existential Audio" e nome contendo "BlackHole", com exatamente 2 canais de saída.
 - Qualquer dispositivo cujo UID ou nome comece com "BlackHole" é excluído como fonte, seja qual for a contagem de canais.
 - Propriedades observadas no BlackHole 2ch instalado: fabricante "Existential Audio Inc.", transporte `virtual`, 2 canais de entrada e 2 de saída, taxas nominais 8000, 16000, 24000, 44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600 e 768000 Hz (não anuncia 32000 Hz), latência e safety offset 0 nos dois escopos, buffer de 15 a 4096 frames.
+
+## Fonte Bluetooth e troca de perfil
+
+Quando um app abre o microfone de um fone Bluetooth, o macOS passa o fone do perfil de música (A2DP) para o de chamada (HFP). A taxa de entrada e de saída cai (tipicamente para 16 ou 24 kHz), as taxas disponíveis mudam e a configuração de streams é republicada, até alguns segundos depois do start. Ao soltar o microfone, o fone volta ao A2DP.
+
+- A escolha da taxa de trabalho usa as taxas que a fonte anuncia no momento do start. Se a troca de perfil mudar a taxa depois do start, o motor faz **uma** reconstrução na taxa nova (`recovering(.formatChanged)`, sem faixa).
+- Para não entrar em laço (start → HFP → reconstrução → stop → A2DP → start…), a janela de eventos do próprio motor é de 3 s para fontes Bluetooth (transporte `bluetooth` ou `bluetoothLE`), e eventos de formato da fonte que chegam durante o stop do próprio motor são ignorados. Uma mudança de formato fora dessas janelas segue a regra normal.
+- O mesmo fone como saída de monitor funciona: a AUHAL do monitor abre o lado de saída, já em HFP, na mesma taxa da fonte; a troca de perfil chega ao monitor como mudança de formato da saída e refaz só o monitor.
+- Em HFP, o som dos fones fica com qualidade de chamada enquanto o MicBoost captura o microfone deles. É uma limitação do Bluetooth, documentada ao usuário em [product.md](product.md#público-e-dispositivos).
 
 ## Construção do agregado
 

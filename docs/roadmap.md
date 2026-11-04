@@ -116,7 +116,7 @@ Condições de conclusão:
 - `swift build` e `swift test` verdes, com os testes de [testing.md](testing.md#micboostcoretests-com-fakeaudiohardware);
 - latência adicionada pelo MicBoost medida por `monitor-latency` ([testing.md](testing.md#medição-de-latência-do-monitor)): mediana < 20 ms no buffer 256 a 48 kHz, sem underruns nem overruns, numa saída na taxa do motor e numa em 44,1 kHz; registrar em [testing.md](testing.md#resultados-registrados);
 - `micboost-diag run --monitor --monitor-silent` por 60 s sem overload nem `input_missing`, com o pico no BlackHole ≤ −1 dBFS;
-- validação manual com o mantenedor: ouvir a própria voz nos fones sem eco perceptível (incluindo fone Bluetooth em taxa diferente da fonte), trocar a saída padrão com o monitor ligado e ligar e desligar o monitor sem interromper o áudio entregue aos apps.
+- validação manual com o mantenedor: ouvir a própria voz nos fones sem eco perceptível (incluindo fone Bluetooth em taxa diferente da fonte, e um fone Bluetooth usado como microfone e saída ao mesmo tempo, sem laço de reconstruções), trocar a saída padrão com o monitor ligado e ligar e desligar o monitor sem interromper o áudio entregue aos apps.
 
 ## Decisões em aberto
 
