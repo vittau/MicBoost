@@ -70,8 +70,6 @@ Condições de conclusão:
 
 ## 5 — Recuperação
 
-Status: em andamento.
-
 Entregas implementadas: motivos tipados de recuperação (`sourceLost`, `formatChanged`, `serviceRestarted`, `sleep`, `wakeFailed`); reconstrução por UID depois do `coreaudiod`; tentativa única 1 s após o wake; permissão reavaliada ao ativar o app; mensagens de estado por motivo; taxa de trabalho comum à fonte e ao BlackHole, com restauração no stop voluntário e na troca de fonte; `micboost-diag set-rate`; roteiro manual de recuperação em [testing.md](testing.md#recuperação-etapa-5).
 
 Condições de conclusão: cada linha da tabela de [audio-engine.md](audio-engine.md#recuperação) verificada manualmente (desconexão, suspensão e retomada, mudança de formato, permissão negada, BlackHole ausente, mudança manual da entrada padrão, reinício do `coreaudiod`). A HAL falsa cobre a lógica e as medições com hardware cobrem a mudança de taxa; os itens que precisam de interação humana estão pendentes no roteiro manual.
