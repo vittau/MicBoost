@@ -110,13 +110,13 @@ Status: implementação disponível; medições com monitor silencioso e valida�
 manual pendentes de sessão com o mantenedor. Ensaios destinados aos alto-falantes
 do Mac, mesmo silenciosos, exigem sua presença e pedido explícito.
 
-Entregas: [modo monitor](audio-engine.md#modo-monitor) com a saída padrão como terceiro subdispositivo do agregado, `MonitorStatus`, linha do monitor no painel e no diagnóstico ([ui.md](ui.md#painel)), testes com a HAL falsa e de UI, `micboost-diag monitor-latency` e README atualizado.
+Entregas: [modo monitor](audio-engine.md#modo-monitor) em caminho próprio (fila SPSC, resampler adaptativo e IOProc na saída padrão), `MonitorStatus`, linha do monitor no painel e no diagnóstico ([ui.md](ui.md#painel)), testes com a HAL falsa e de UI, `micboost-diag monitor-latency` e README atualizado.
 
 Condições de conclusão:
 - `swift build` e `swift test` verdes, com os testes de [testing.md](testing.md#micboostcoretests-com-fakeaudiohardware);
-- latência adicionada pelo MicBoost medida silenciosamente por `monitor-latency`: ponte fonte → BlackHole com o subdispositivo de monitor presente (mediana < 20 ms no buffer padrão de 256 frames a 48 kHz, fonte e saída internas), excluindo latências físicas de entrada/saída da HAL; registrar a medição e a estimativa física total como contexto em [testing.md](testing.md#resultados-registrados);
+- latência adicionada pelo MicBoost medida por `monitor-latency` ([testing.md](testing.md#medição-de-latência-do-monitor)): mediana < 20 ms no buffer 256 a 48 kHz, sem underruns nem overruns, numa saída na taxa do motor e numa em 44,1 kHz; registrar em [testing.md](testing.md#resultados-registrados);
 - `micboost-diag run --monitor --monitor-silent` por 60 s sem overload nem `input_missing`, com o pico no BlackHole ≤ −1 dBFS;
-- validação manual com o mantenedor: ouvir a própria voz nos fones sem eco perceptível, trocar a saída padrão com o monitor ligado e desligar o monitor sem alterar o áudio entregue aos apps além da rampa.
+- validação manual com o mantenedor: ouvir a própria voz nos fones sem eco perceptível (incluindo fone Bluetooth em taxa diferente da fonte), trocar a saída padrão com o monitor ligado e ligar e desligar o monitor sem interromper o áudio entregue aos apps.
 
 ## Decisões em aberto
 

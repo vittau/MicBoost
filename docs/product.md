@@ -31,7 +31,7 @@ Motivação: o VirtuMic tem interface pesada e atraso perceptível (o log dele m
 7. Persistência de ganho, mute, EQ, dispositivo selecionado e seleção de canais.
 8. Detecção e recuperação: BlackHole ausente, permissão de microfone negada, desconexão da fonte, suspensão/retomada, mudança de formato e mudança manual da entrada padrão.
 9. Tela secundária de ajustes avançados (buffer, canais, diagnóstico).
-10. Modo monitor: chave no painel que leva a voz processada também à saída padrão do sistema (fones), com latência adicionada pelo MicBoost medida < 20 ms em saídas internas, com fio e USB ([audio-engine.md](audio-engine.md#modo-monitor)).
+10. Modo monitor: chave no painel que leva a voz processada também à saída padrão do sistema (fones), em qualquer taxa de amostragem da saída, com latência adicionada pelo MicBoost medida < 20 ms ([audio-engine.md](audio-engine.md#modo-monitor)).
 11. Distribuição: tap Homebrew próprio com dependência do cask `blackhole-2ch` e download direto `.zip` ([distribution.md](distribution.md)).
 
 ## Fora de escopo da v1
@@ -83,8 +83,9 @@ Estabilidade e desempenho:
 - A interface permanece responsiva.
 
 Modo monitor:
-- Com o monitor ligado, a voz processada (a mesma entregue ao BlackHole) sai na saída padrão do sistema, com latência adicionada < 20 ms (mediana) no buffer padrão em saída interna, com fio ou USB. Essa latência é a ponte fonte → BlackHole medida com o subdispositivo de monitor presente no agregado, pois as duas saídas são escritas no mesmo ciclo; latência de dispositivo, safety offset e latência de stream de entrada e saída são contexto e não entram no critério ([testing.md](testing.md#medição-de-latência-do-monitor)).
-- Ligar e desligar o monitor não altera ganho, EQ, roteamento nem a entrada padrão; trocar a saída padrão com o monitor ligado leva o monitor à nova saída.
+- Com o monitor ligado, a voz processada (a mesma entregue ao BlackHole) sai na saída padrão do sistema, com latência adicionada < 20 ms (mediana) no buffer padrão, medida pelo motor da entrada da amostra até sua apresentação na saída; latências físicas da fonte e da saída são contexto e não entram no critério ([testing.md](testing.md#medição-de-latência-do-monitor)).
+- O monitor funciona com a saída em taxa diferente da fonte (por exemplo, fonte a 48 kHz e fone Bluetooth a 44,1 kHz), sem alterar a taxa da saída.
+- Ligar e desligar o monitor não interrompe o áudio entregue aos apps e não altera ganho, EQ, roteamento nem a entrada padrão; trocar a saída padrão com o monitor ligado leva o monitor à nova saída.
 - O monitor nunca usa um BlackHole (nem um agregado que o contenha) como saída.
 
 Recuperação:

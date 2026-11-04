@@ -24,11 +24,19 @@ Em 16, 44,1, 48 e 96 kHz:
 - **Blocos grandes:** `frames > max_frames` é processado em blocos sem estourar memória.
 - **Sem alocação:** `mb_engine_process` é verificado por revisão. Opcionalmente, com um `malloc` interposto no teste, contar chamadas durante o processo, que devem ser 0.
 
+### Fila e resampler do monitor (`MicBoostDSPTests`)
+
+- Conversão 48 → 44,1 kHz e 44,1 → 48 kHz (e 48 → 16 kHz) de senoide de 1 kHz: frequência correta e THD+N ≤ −60 dB; atraso de grupo ≤ 1 ms.
+- Drift simulado de ±200 ppm e ±0,3 % entre produtor e consumidor por 60 s de áudio simulado: ocupação converge ao alvo e fica limitada, sem underrun nem overrun após o assentamento.
+- Fila vazia → silêncio e `monitor_underruns`; produtor rápido demais → descarte e `monitor_overruns`; reinício ao se afastar do alvo.
+- Fade-in e fade-out de 10 ms sem saltos acima do limite; o modo silencioso zera a saída sem alterar ocupação nem timing.
+- Saída de 1, 2 e 8 canais, intercalada e não intercalada; a latência calculada a partir de host times sintéticos bate com o esperado.
+
 ### `MicBoostCoreTests` (com `FakeAudioHardware`)
 
 - Política de entrada padrão: todos os casos de [audio-engine.md](audio-engine.md#política-de-entrada-padrão-defaultinputmanager), incluindo crash simulado (`defaultInputManaged` persistido), divergência do usuário, dispositivo anterior ausente e BlackHole já padrão.
 - Nunca chama a escrita da saída padrão. A fake falha o teste se isso acontecer, inclusive com o monitor ligado e a saída padrão trocando.
-- Modo monitor ([audio-engine.md](audio-engine.md#modo-monitor)): agregado com a saída em terceiro e compensação de drift; saída igual à fonte sem duplicar subdispositivo; mapa de canais de monitor com saída de 1, 2 e 8 canais; saída BlackHole, agregado com BlackHole e sem saída → `unavailable` com o motor em `running`; taxa de trabalho entre os três e saída sem taxa comum → sem monitor; taxa da saída restaurada ao desligar; ligar/desligar reconstrói sem tocar a entrada padrão; troca da saída padrão e saída removida reconstroem sem `error`; falha de start com a saída → novo start sem ela; eventos `Devices` da criação do agregado não repetem builds quando o monitor está indisponível ou em fallback; toggle parado/em erro só guarda intenção; recovery/wake não restauram taxas; monitor desligado ou trocado restaura somente a saída que deixa o agregado, preservando fonte duplex e taxas alteradas externamente.
+- Modo monitor ([audio-engine.md](audio-engine.md#modo-monitor)): o agregado nunca inclui a saída de monitor; ligar e desligar não reconstrói o motor nem toca a entrada padrão; saída BlackHole, agregado com BlackHole e sem saída → `unavailable` com o motor em `running`; a taxa da saída nunca é escrita; saída igual à fonte (duplex) usa um IOProc próprio; troca da saída padrão e saída removida refazem só o monitor; falha de formato ou HAL no monitor → `unavailable(.startFailed)`/`formatUnsupported`, motor intacto; reconstrução do motor para e reinicia o monitor; toggle com o motor parado ou em erro só guarda a intenção.
 - Elegibilidade de fontes: exclui as variantes de BlackHole, o próprio agregado e agregados com BlackHole.
 - Máquina de estados: transições de [architecture.md](architecture.md#ciclo-de-vida-do-motor) para cada evento de recuperação.
 - Recuperação, uma por linha da tabela de [audio-engine.md](audio-engine.md#recuperação): fonte perdida e devolvida; BlackHole removido e devolvido; taxa da fonte e do BlackHole alterada de fora; permissão negada e concedida; suspensão e retomada com sucesso e com falha; `coreaudiod` reiniciado com IDs novos; overload só incrementando o contador; notificação da própria escrita de taxa e mudança de latência/faixa de buffer sem reconstrução. O caminho percorrido é verificado pelo observador de estado, não por polling do estado final.
@@ -85,40 +93,25 @@ Método (`micboost-diag latency`):
 
 **Aceitação (v1, fonte → BlackHole):** mediana ≤ 100 ms em toda fonte suportada, exceto fontes cuja própria latência de entrada reportada já exceda esse valor (por exemplo, Continuity), que ficam documentadas como limitação.
 
-**Objetivo de engenharia:** mediana fonte → BlackHole < 20 ms no buffer padrão de 256 frames para fontes USB e internas a 48 kHz, também adotada como critério de latência adicionada do [modo monitor](#medição-de-latência-do-monitor) quando o subdispositivo de monitor está presente no agregado; desvios são registrados abaixo com a causa.
+**Objetivo de engenharia:** mediana fonte → BlackHole < 20 ms no buffer padrão de 256 frames para fontes USB e internas a 48 kHz, para deixar margem ao [modo monitor](#medição-de-latência-do-monitor); desvios são registrados abaixo com a causa.
 
 ## Medição de latência do monitor
 
-`micboost-diag monitor-latency --input <uid> [--output <uid>] [--buffer N] [--trials N]`
-usa a saída indicada ou, sem `--output`, a saída padrão, sem alterá-la.
+`micboost-diag monitor-latency --input <uid> [--output <uid>] [--buffer N] [--seconds N]`
+usa a saída indicada ou, sem `--output`, a saída padrão, sem alterá-la. Sempre em modo de
+monitor silencioso: fila, resampler e timing idênticos, saída zerada. Não emite som e não
+precisa de sinal na sala.
 
-1. O motor mantém a saída de monitor no agregado, com os mesmos streams e timing do
-   monitor normal. Um atômico exclusivo do diagnóstico, definido antes do start e lido
-   uma vez por ciclo, faz o IOProc escrever zeros nos canais do monitor. O app não ativa
-   esse atômico. Ganho de 0 dB e EQ desligado.
-2. A correlação cruzada existente mede fonte → BlackHole usando apenas o som ambiente,
-   sem gerar sinal. Correlação inferior a 0,5 falha explicitamente e orienta estalar os
-   dedos perto do microfone antes de repetir.
-3. O resultado principal, `monitor_added_ms`, é a ponte fonte → BlackHole medida com o
-   subdispositivo de monitor presente: BlackHole e monitor são escritos no mesmo ciclo.
-   A estimativa física total, `monitor_physical_estimate_ms`, soma três parcelas: latência de entrada da fonte (dispositivo,
-   safety offset e maior latência dos streams de entrada, HAL no escopo de entrada),
-   medição fonte → BlackHole e latência da saída (dispositivo, safety offset e maior
-   latência dos streams de saída, HAL no escopo de saída). A medição da ponte cancela
-   a latência física de entrada, comum às duas capturas, por isso ela é acrescentada
-   explicitamente. A ferramenta imprime todos os termos em frames, os subtotais em ms,
-   a soma e a latência reportada completa do monitor. As parcelas físicas de entrada e
-   saída são **reportadas pela HAL**, não medidas fisicamente.
-4. Repete N tentativas (padrão 10), com mediana, mínimo e máximo da latência adicionada
-   em ms e frames; imprime separadamente o resumo da estimativa física total em ms.
+1. O motor roda com o monitor ligado (ganho 0 dB, EQ desligado) pelo tempo pedido (padrão 10 s).
+2. A cada segundo, a ferramenta lê o atômico `monitor_latency_host` ([audio-engine.md](audio-engine.md#latência-do-monitor)) e imprime a latência adicionada em ms, a ocupação da fila, a correção de razão em ppm, `monitor_underruns` e `monitor_overruns`, e a latência total estimada com cada parcela física da HAL.
+3. No fim, imprime mediana, mínimo e máximo da latência adicionada.
 
-Aceitação: mediana da **latência adicionada pelo MicBoost < 20 ms**, medida na ponte
-fonte → BlackHole com o subdispositivo de monitor presente, buffer 256 a 48 kHz, fonte
-interna ou USB e saída interna ou com fio. Dispositivo, safety offset e stream de
-entrada e saída são contexto e não entram no critério. A escuta real com fones é validação manual com o mantenedor.
-Quando a saída for os alto-falantes do Mac, inclusive neste modo silencioso, o ensaio
-só pode ser executado com o mantenedor presente e a pedido dele.
-`run --monitor` exige `--monitor-silent`; o diagnóstico não emite voz na saída física.
+Aceitação: mediana da **latência adicionada pelo MicBoost < 20 ms** no buffer 256 a 48 kHz,
+com zero underruns e overruns depois do primeiro segundo, com uma saída na mesma taxa do
+motor e com uma saída em outra taxa (44,1 kHz). Latências físicas são contexto e não entram
+no critério. A escuta real com fones é validação manual com o mantenedor. Quando a saída
+for os alto-falantes do Mac, inclusive no modo silencioso, o ensaio só pode ser executado
+com o mantenedor presente e a pedido dele. `run --monitor` exige `--monitor-silent`.
 
 ## Ensaio de estabilidade (20 min)
 
