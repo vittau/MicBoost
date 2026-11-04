@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select Xcode
+        run: |
+          developer_dir=$(scripts/select-xcode.sh)
+          echo "DEVELOPER_DIR=$developer_dir" >> "$GITHUB_ENV"
+          export DEVELOPER_DIR="$developer_dir"
+          xcodebuild -version
+          swift --version
+      - name: Build
+        run: swift build
+      - name: Test
+        run: swift test
+      - name: Lint formatting
+        run: swift format lint --strict --recursive Sources Tests Package.swift

@@ -25,11 +25,11 @@ Canais excluídos: Mac App Store, `homebrew/cask` oficial (as regras exigem pass
    - `CFBundleIdentifier`;
    - `CFBundleDevelopmentRegion = en`;
    - `CFBundleLocalizations = [en, pt-BR]`.
-4. Registra no `LC_BUILD_VERSION` do executável o SDK real do Xcode selecionado (`xcrun --sdk macosx --show-sdk-version`), com `scripts/record-build-sdk.sh`/`vtool`, preservando macOS 14 como mínimo e verificando os dois valores. Isso permite ao AppKit escolher a aparência correspondente ao SDK de compilação, em vez de confundir SDK com deployment target.
+4. Registra no `LC_BUILD_VERSION` do executável o SDK real do Xcode selecionado (`xcrun --sdk macosx --show-sdk-version`), com `scripts/record-build-sdk.sh`/`vtool`, preservando macOS 14 como mínimo e verificando os dois valores nos dois slices do binário universal. Isso permite ao AppKit escolher a aparência correspondente ao SDK de compilação, em vez de confundir SDK com deployment target.
 5. Assina com `codesign --force --deep --sign - build/MicBoost.app`, sem hardened runtime e sem entitlements: não há sandbox e o runtime não é exigido sem notarização.
 6. Confere com `codesign --verify --strict build/MicBoost.app`.
 
-O script chama `scripts/compile-icon.sh <App>/Contents/Resources` quando o arquivo existe e é executável. Esse helper fornece `AppIcon.icns` e, opcionalmente, `Assets.car`. O plist define `CFBundleIconFile` e `CFBundleIconName` como `AppIcon`. Sem o helper, o bundle de desenvolvimento continua compilável, sem ícone personalizado. Os bundles de localização SwiftPM são copiados para `Contents/Resources`. A versão vem da última tag `v*` (fallback de desenvolvimento `0.0.0`) e o contador é `git rev-list --count HEAD`. Release sempre usa assinatura ad hoc.
+O script chama `scripts/compile-icon.sh <App>/Contents/Resources` quando o arquivo existe e é executável. Esse helper fornece `AppIcon.icns` e, opcionalmente, `Assets.car`. O plist define `CFBundleIconFile` e `CFBundleIconName` como `AppIcon`. Sem o helper, o bundle de desenvolvimento continua compilável, sem ícone personalizado. Os bundles de localização SwiftPM são copiados para `Contents/Resources`. A versão vem de `MICBOOST_VERSION` quando a variável está definida e, sem ela, da última tag `v*` (fallback de desenvolvimento `0.0.0`); o contador é `git rev-list --count HEAD`. Release sempre usa assinatura ad hoc.
 
 No Apple Silicon, todo binário precisa de assinatura válida para executar; a ad hoc basta.
 
@@ -42,21 +42,40 @@ A fonte em camadas está em `Resources/AppIcon.icon`, com SVGs e variantes clara
 ## Release (download direto)
 
 `scripts/package-release.sh <versão>`:
-1. Build de release universal.
-2. `ditto -c -k --keepParent build/MicBoost.app dist/MicBoost-<versão>.zip`.
-3. `shasum -a 256` → `dist/MicBoost-<versão>.zip.sha256`.
-4. Imprime o trecho do cask com `version` e `sha256` atualizados.
+1. Aceita apenas SemVer `X.Y.Z`, sem `v`. Qualquer outro argumento sai com código 2 e a mensagem de uso. Falha também quando `HEAD` tem uma tag `vX.Y.Z` diferente da versão pedida, para o `.zip` nunca divergir da tag publicada.
+2. Build de release universal com `scripts/build-app.sh release`, entregando a versão pela variável `MICBOOST_VERSION`; é ela que sobrepõe a última tag `v*` no `Info.plist`.
+3. `ditto -c -k --keepParent build/MicBoost.app dist/MicBoost-<versão>.zip`.
+4. `shasum -a 256` → `dist/MicBoost-<versão>.zip.sha256`, no formato do `shasum -c` (hash e nome do arquivo).
+5. Verifica, e falha se não passar: `lipo -archs` do executável com `arm64` e `x86_64`; `codesign --verify --strict --deep`; assinatura ad hoc (`Signature=adhoc` em `codesign -dv`); `LC_BUILD_VERSION` com minos igual a `LSMinimumSystemVersion` (14.0) nos dois slices; `CFBundleShortVersionString` igual à versão pedida.
+6. Imprime o tamanho do `.zip`, o checksum e o cask preenchido por `scripts/print-cask.sh`, lido de `packaging/homebrew/micboost.rb`.
 
-Publicação (com `gh release create`, mediante confirmação do mantenedor): anexar `.zip` + `.sha256`. As notas devem trazer as instruções de instalação, o aviso **"não notarizado"** e a instalação do BlackHole.
+Publicação (com `gh release create`, mediante confirmação do mantenedor): anexar `.zip` + `.sha256`. As notas de release seguem o modelo de `packaging/release-notes.md`, renderizado por `scripts/render-release-notes.sh <versão>`, que troca `X.Y.Z` e o marcador do checksum: instruções de instalação, aviso **"não notarizado"**, instalação do BlackHole, primeira abertura, licença GPL-3.0 com link para `LICENSE` e o checksum da versão. O `.zip` contém só o app; a licença fica no repositório.
+
+## Integração contínua e release automática
+
+`.github/workflows/ci.yml` roda em push para `main` e em pull request: seleciona o Xcode, `swift build`, `swift test` e `swift format lint --strict` em `Sources`, `Tests` e `Package.swift`. O `concurrency` cancela execuções antigas do mesmo ref, e o job tem `timeout-minutes`.
+
+`.github/workflows/release.yml` roda quando o mantenedor empurra uma tag `v*.*.*`:
+1. checkout com `fetch-depth: 0`, porque o build lê as tags e `git rev-list --count`;
+2. `swift test`;
+3. `scripts/package-release.sh "${GITHUB_REF_NAME#v}"`;
+4. falha, com mensagem clara, se já existir release para a tag: nunca sobrescreve;
+5. renderiza as notas com `scripts/render-release-notes.sh`;
+6. `gh release create "$GITHUB_REF_NAME" --draft --verify-tag --notes-file <notas>`, anexando o `.zip` e o `.sha256`;
+7. escreve o cask preenchido, por `scripts/print-cask.sh`, no resumo do job.
+
+A release sai sempre como rascunho: o mantenedor revisa, completa o marcador de mudanças das notas e publica. O tap não é tocado pelo workflow; `Casks/micboost.rb` é atualizado à mão com o trecho do resumo.
+
+Os dois workflows usam `runs-on: macos-26` (GitHub-hosted) e `scripts/select-xcode.sh`, que escolhe o `Xcode_*.app` mais recente em `/Applications` com versão 26 ou posterior: o pacote exige Swift 6 e o ícone exige o `actool` dessa versão. O Xcode escolhido aparece no log. Nenhum segredo é configurado: o token do próprio GitHub (`github.token`) cobre a criação do rascunho.
 
 ## Homebrew (tap próprio)
 
-`packaging/homebrew/micboost.rb` é o modelo publicado em `Casks/micboost.rb` do tap:
+`packaging/homebrew/micboost.rb` é o modelo do cask, publicado como `Casks/micboost.rb` no tap. `version` e `sha256` ficam como marcadores (`X.Y.Z` e `SHA256`); `scripts/package-release.sh` imprime o arquivo com os dois valores da release, e esse é o texto a copiar para o tap:
 
 ```ruby
 cask "micboost" do
   version "X.Y.Z"
-  sha256 "…"
+  sha256 "SHA256"
 
   url "https://github.com/vittau/MicBoost/releases/download/v#{version}/MicBoost-#{version}.zip"
   name "MicBoost"
@@ -97,6 +116,20 @@ Comportamento a validar (etapa 7):
 3. Nas aberturas seguintes, não há aviso. Uma atualização para um novo binário pode repetir o fluxo; validar e documentar.
 
 No macOS 15 ou posterior, o atalho de Control-clique → Abrir não contorna mais o bloqueio; o caminho é o item 2. As instruções ao usuário ficam no README do repositório e nas notas de release.
+
+## Verificação local por `spctl`
+
+Avaliação de um `.app` extraído do `.zip` de 0.1.0 com `ditto -x -k`, com quarentena aplicada manualmente (`xattr -w com.apple.quarantine "0083;<data em hexadecimal>;Safari;" MicBoost.app`), sem abrir o app. O app não foi executado e a cópia foi apagada depois da coleta.
+
+| Verificação | Saída |
+|---|---|
+| `spctl --assess --type execute -vv MicBoost.app` | `MicBoost.app: rejected`, código 3, sem motivo na saída |
+| `syspolicy_check distribution MicBoost.app` | falha (código 70): aviso "Adhoc Signed App" e erro fatal "Notary Ticket Missing" |
+| `codesign -dv --verbose=4 MicBoost.app` | `Format=app bundle with Mach-O universal (x86_64 arm64)`, `Signature=adhoc`, `TeamIdentifier=not set` |
+| `codesign --verify --strict --deep MicBoost.app` | passa (código 0) |
+| `log show` de `syspolicyd` durante a avaliação | assinatura verificada (`SecKeyVerifySignature`), `Error checking with notarization daemon: 3`, `rejecting due to lack of matching active rule` |
+
+Interpretação: a rejeição vem da falta de notarização e de Developer ID, não de bundle danificado — a assinatura ad hoc, o selo de recursos e a verificação estrita passam, e o `syspolicyd` rejeita por política ("lack of matching active rule"). O caso esperado na GUI é o de desenvolvedor não identificado, com "Abrir Mesmo Assim" em Ajustes do Sistema → Privacidade e Segurança. O `spctl` não reproduz a interface, então o painel, o botão e o fluxo do Homebrew continuam exigindo confirmação manual em um Mac de teste.
 
 ## BlackHole no download direto
 

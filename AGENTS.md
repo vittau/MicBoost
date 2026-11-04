@@ -32,7 +32,7 @@ Toolchain: Xcode 27.2 / Swift 6.4. Alvo mínimo: macOS 14. Não há `.xcodeproj`
 - `Sources/MicBoostApp/`: Swift. App, item de status, painel e ajustes (AppKit + SwiftUI).
 - `Sources/micboost-diag/`: CLI de diagnóstico e medição.
 - `Tests/`: Swift Testing. `MicBoostDSPTests` (offline) e `MicBoostCoreTests` (HAL falsa).
-- `Resources/`, `scripts/`, `packaging/homebrew/`, `docs/`.
+- `Resources/`, `scripts/`, `packaging/`, `docs/`, `.github/workflows/` (CI e release em rascunho).
 
 ## Regras invioláveis
 
@@ -85,5 +85,5 @@ Controles:
 
 - Branch principal `main`. Trabalhe em branch ou worktree próprios (`feat/…`, `fix/…`, `docs/…`).
 - Commits pequenos, mensagem em inglês no imperativo (`Add aggregate device builder`).
-- Não faça push, release nem publicação no tap sem pedido explícito do mantenedor.
+- Não faça push, release nem publicação no tap sem pedido explícito do mantenedor. Não crie tags git: o mantenedor cria a tag `vX.Y.Z`, e o push dela dispara o workflow que monta a release em rascunho.
 - Não commite `build/`, `dist/`, `.build/` nem `.scratch/`.

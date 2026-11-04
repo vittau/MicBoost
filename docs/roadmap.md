@@ -10,7 +10,7 @@ Status: `não iniciado` · `em andamento` · `concluído`. Uma etapa só é conc
 | 3 | Equalizador | concluído |
 | 4 | Interface | em andamento |
 | 5 | Recuperação | não iniciado |
-| 6 | Distribuição | não iniciado |
+| 6 | Distribuição | em andamento |
 | 7 | Entrega | não iniciado |
 
 ## 0 — Estrutura e diagnóstico
@@ -74,9 +74,24 @@ Condições de conclusão: cada linha da tabela de [audio-engine.md](audio-engin
 
 ## 6 — Distribuição
 
-Entregas: `package-release.sh`, release `.zip` sem notarização, tap `vittau/homebrew-micboost` com o cask.
+Status: `em andamento`.
+
+Entregas implementadas:
+- `scripts/package-release.sh <versão>`, com build de release universal e as verificações de arquitetura, assinatura ad hoc, minos e versão descritas em [distribution.md](distribution.md#release-download-direto);
+- modelo do cask em `packaging/homebrew/micboost.rb` e modelo das notas de release em `packaging/release-notes.md`;
+- `.zip` + `.sha256` gerados localmente e verificados;
+- `.github/workflows/ci.yml` (build, testes e lint de formatação) e `.github/workflows/release.yml` (release em rascunho a partir da tag), com `scripts/select-xcode.sh` para escolher o Xcode 26 ou posterior;
+- evidência local de Gatekeeper: [distribution.md](distribution.md#verificação-local-por-spctl).
+
+Pendências:
+- publicação da release no GitHub (`gh release create`, com anexos `.zip` e `.sha256`);
+- criação e publicação do tap `vittau/homebrew-micboost` com o cask preenchido;
+- validação dos cenários de instalação e de primeira abertura em um Mac que não participou do desenvolvimento;
+- variante com o instalador do BlackHole: confirmar a orientação do upstream sobre a redistribuição e validar a instalação em máquina limpa.
 
 Condições de conclusão:
+- a primeira execução da CI depois do primeiro push do mantenedor passou;
+- a primeira release em rascunho, criada pelo workflow a partir de uma tag `vX.Y.Z`, foi revisada e aprovada;
 - os cenários de [distribution.md](distribution.md#homebrew-tap-próprio) e da primeira abertura foram validados em um Mac que não participou do desenvolvimento;
 - os resultados reais foram registrados em [distribution.md](distribution.md);
 - a variante com o instalador do BlackHole está decidida (publicada ou descartada).

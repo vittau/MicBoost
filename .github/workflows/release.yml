@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  draft-release:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Select Xcode
+        run: |
+          developer_dir=$(scripts/select-xcode.sh)
+          echo "DEVELOPER_DIR=$developer_dir" >> "$GITHUB_ENV"
+          export DEVELOPER_DIR="$developer_dir"
+          xcodebuild -version
+          swift --version
+      - name: Test
+        run: swift test
+      - name: Package release
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          scripts/package-release.sh "$version"
+      - name: Cask snippet for the tap
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          sha256=$(cut -d ' ' -f 1 "dist/MicBoost-$version.zip.sha256")
+          {
+            echo "### Cask for the tap"
+            echo
+            echo '```ruby'
+            scripts/print-cask.sh "$version" "$sha256"
+            echo '```'
+            echo
+            echo "Copy this into \`Casks/micboost.rb\` of \`vittau/homebrew-micboost\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Check for an existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "::error::a release for $GITHUB_REF_NAME already exists; delete it by hand before re-running"
+            exit 1
+          fi
+      - name: Render release notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          scripts/render-release-notes.sh "$version" > "$RUNNER_TEMP/release-notes.md"
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" \
+            --draft \
+            --verify-tag \
+            --title "MicBoost $version" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            "dist/MicBoost-$version.zip" \
+            "dist/MicBoost-$version.zip.sha256"
