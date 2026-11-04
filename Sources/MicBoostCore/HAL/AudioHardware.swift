@@ -40,6 +40,7 @@ public struct HardwareProperty: Hashable, Sendable {
 }
 public protocol AudioHardware: AnyObject {
     func devices() throws -> [AudioDevice]
+    func defaultOutput() throws -> AudioObjectID
     func defaultInput() throws -> AudioObjectID
     func setDefaultInput(_ device: AudioObjectID) throws
     func addListener(_ property: HardwareProperty, queue: DispatchQueue, handler: @escaping @Sendable () -> Void) throws

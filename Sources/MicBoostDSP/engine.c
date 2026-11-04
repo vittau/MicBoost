@@ -67,7 +67,7 @@ void mb_engine_destroy(mb_engine *e) {
 }
 
 int mb_engine_configure(mb_engine *e, const mb_routing *r) {
-    if (!r->input_count || r->input_count > 64) {
+    if (!r->input_count || r->input_count > 64 || r->monitor_count > 2) {
         return -1;
     }
     e->routing = *r;
@@ -389,6 +389,23 @@ OSStatus mb_ioproc(AudioObjectID device, const AudioTimeStamp *now,
                 size_t index = (size_t)(base + i) * buffer.mNumberChannels + map.channel;
                 if (index < buffer.mDataByteSize / sizeof(float)) {
                     ((float *)buffer.mData)[index] = outputs[c][i];
+                }
+            }
+        }
+        for (unsigned c = 0; c < e->routing.monitor_count; c++) {
+            mb_channel map = e->routing.monitor[c];
+            if (map.buffer >= out->mNumberBuffers) {
+                continue;
+            }
+            AudioBuffer buffer = out->mBuffers[map.buffer];
+            if (!buffer.mData || map.channel >= buffer.mNumberChannels) {
+                continue;
+            }
+            for (uint32_t i = 0; i < n; i++) {
+                size_t index = (size_t)(base + i) * buffer.mNumberChannels + map.channel;
+                if (index < buffer.mDataByteSize / sizeof(float)) {
+                    ((float *)buffer.mData)[index] = e->routing.monitor_count == 1
+                        ? (outputs[0][i] + outputs[1][i]) * 0.5f : outputs[c][i];
                 }
             }
         }

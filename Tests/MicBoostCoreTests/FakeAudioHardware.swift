@@ -13,6 +13,8 @@ import Testing
 final class FakeAudioHardware: AudioHardware, @unchecked Sendable {
     private let lock = NSLock()
     private var storedDevices: [AudioDevice] = []
+    var output: AudioObjectID = 0
+    var failMonitorStart = false
     private var storedInput: AudioObjectID = 0
     private var registrations: [UUID: (HardwareProperty, DispatchQueue, @Sendable () -> Void)] = [:]
     private var storedFailure: EngineError?
@@ -91,6 +93,8 @@ final class FakeAudioHardware: AudioHardware, @unchecked Sendable {
         return engineEvents?.devices(list) ?? list
     }
 
+    func defaultOutput() throws -> AudioObjectID { output }
+
     func defaultInput() throws -> AudioObjectID { input }
 
     func setDefaultInput(_ device: AudioObjectID) throws {
@@ -98,7 +102,10 @@ final class FakeAudioHardware: AudioHardware, @unchecked Sendable {
     }
 
     func writeDefault(_ selector: AudioObjectPropertySelector, _ device: AudioObjectID) throws {
-        guard selector != kAudioHardwarePropertyDefaultOutputDevice else {
+        guard
+            selector != kAudioHardwarePropertyDefaultOutputDevice
+                && selector != kAudioHardwarePropertyDefaultSystemOutputDevice
+        else {
             Issue.record("Forbidden default output write")
             throw EngineError.invalidArgument("Default output write forbidden")
         }
@@ -158,8 +165,8 @@ extension FakeAudioHardware: EngineHardware {
         emit(.init(device, kAudioDevicePropertyNominalSampleRate))
     }
 
-    func createAggregate(source: String, destination: String) throws -> AudioObjectID {
-        let description = AggregateBuilder.description(source: source, destination: destination)
+    func createAggregate(source: String, destination: String, monitor: String?) throws -> AudioObjectID {
+        let description = AggregateBuilder.description(source: source, destination: destination, monitor: monitor)
         let main = description[kAudioAggregateDeviceMainSubDeviceKey] as? String
         let subDevices = (description[kAudioAggregateDeviceSubDeviceListKey] as? [[String: Any]] ?? []).map {
             (
@@ -193,6 +200,7 @@ extension FakeAudioHardware: EngineHardware {
     func createIO(_ device: AudioObjectID, context: OpaquePointer) throws -> AudioDeviceIOProcID { mb_ioproc }
 
     func startIO(_ device: AudioObjectID, proc: AudioDeviceIOProcID) throws {
+        if failMonitorStart && aggregateSubDevices.count == 3 { throw EngineError.formatUnsupported }
         lock.withLock { starts += 1 }
     }
 

@@ -36,6 +36,7 @@ private final class QueueWatchingHardware: AudioHardware {
         return try base.devices()
     }
 
+    func defaultOutput() throws -> AudioObjectID { try base.defaultOutput() }
     func defaultInput() throws -> AudioObjectID {
         probe.recordCall()
         return try base.defaultInput()

@@ -42,6 +42,8 @@ typedef struct {
     uint32_t input_count;
     mb_channel inputs[64];
     mb_channel outputs[2];
+    uint32_t monitor_count;
+    mb_channel monitor[2];
 } mb_routing;
 typedef struct {
     float input_peak, output_peak, gr_max_db;

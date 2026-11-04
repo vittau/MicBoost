@@ -122,3 +122,59 @@ func process(_ engine: OpaquePointer, _ channels: [[Float]]) -> [[Float]] {
     #expect(counters.frames_over_max == 1)
     #expect(counters.io_delta_host == 50)
 }
+
+@Test func ioProcMonitorCopiesFinalSamplesAndZerosExtraChannels() throws {
+    for count: UInt32 in [1, 2] {
+        let engine = try #require(mb_engine_create(16, 48000))
+        defer { mb_engine_destroy(engine) }
+        var routing = mb_routing()
+        routing.input_count = 2
+        routing.inputs.1 = mb_channel(buffer: 0, channel: 1)
+        routing.outputs.0 = mb_channel(buffer: 1, channel: 0)
+        routing.outputs.1 = mb_channel(buffer: 1, channel: 1)
+        routing.monitor_count = count
+        routing.monitor.0 = mb_channel(buffer: 0, channel: 0)
+        routing.monitor.1 = mb_channel(buffer: 0, channel: 1)
+        #expect(mb_engine_configure(engine, &routing) == 0)
+        mb_engine_set_channel_mode(engine, MB_STEREO, 0)
+        let list = AudioBufferList.allocate(maximumBuffers: 2)
+        defer { list.unsafeMutablePointer.deallocate() }
+        list.unsafeMutablePointer.pointee.mNumberBuffers = 2
+        var source: [Float] = Array(repeating: [Float(0.2), -0.1], count: 16).flatMap { $0 }
+        var monitor = Array(repeating: Float(1), count: 48)
+        var blackHole = Array(repeating: Float(1), count: 32)
+        for muted in [false, true] {
+            mb_engine_set_muted(engine, muted)
+            source.withUnsafeMutableBytes { inputBytes in
+                monitor.withUnsafeMutableBytes { outputBytes in
+                    blackHole.withUnsafeMutableBytes { blackHoleBytes in
+                        list[0] = AudioBuffer(
+                            mNumberChannels: 3, mDataByteSize: UInt32(outputBytes.count), mData: outputBytes.baseAddress
+                        )
+                        list[1] = AudioBuffer(
+                            mNumberChannels: 2, mDataByteSize: UInt32(blackHoleBytes.count),
+                            mData: blackHoleBytes.baseAddress)
+                        var input = AudioBufferList(
+                            mNumberBuffers: 1,
+                            mBuffers: AudioBuffer(
+                                mNumberChannels: 2, mDataByteSize: UInt32(inputBytes.count),
+                                mData: inputBytes.baseAddress))
+                        var time = AudioTimeStamp()
+                        var before = AudioTimeStamp()
+                        var after = AudioTimeStamp()
+                        #expect(
+                            mb_ioproc(
+                                1, &time, &input, &before, list.unsafeMutablePointer, &after,
+                                UnsafeMutableRawPointer(engine)) == 0)
+                    }
+                }
+            }
+            for i in 0..<16 {
+                #expect(
+                    monitor[i * 3] == (count == 1 ? (blackHole[i * 2] + blackHole[i * 2 + 1]) / 2 : blackHole[i * 2]))
+                #expect(monitor[i * 3 + 1] == (count == 1 ? 0 : blackHole[i * 2 + 1]))
+                #expect(monitor[i * 3 + 2] == 0)
+            }
+        }
+    }
+}
