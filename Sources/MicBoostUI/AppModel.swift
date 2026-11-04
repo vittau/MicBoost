@@ -65,6 +65,43 @@ import SwiftUI
         guard db.isFinite, db > -60 else { return 0 }
         return min(1, pow(10, db / 20))
     }
+    /// Values and selection of a settings picker. The selection is always one of the
+    /// values, so a picker can never show an empty value.
+    public struct PickerValues: Equatable, Sendable {
+        public var values: [Int]
+        public var selection: Int
+    }
+    /// Buffer sizes offered for a source: the allowed sizes it supports, or all of them when
+    /// the source does not report a usable range. A persisted size outside the list selects
+    /// the closest offered size.
+    public static func bufferPicker(sourceBufferRange: AudioRange?, current: Int) -> PickerValues {
+        var values = Settings.allowedBufferFrames
+        if let range = sourceBufferRange, range.maximum > 0, range.minimum <= range.maximum {
+            let supported = values.filter { Double($0) >= range.minimum && Double($0) <= range.maximum }
+            if !supported.isEmpty { values = supported }
+        }
+        let selection =
+            values.contains(current) ? current : values.min { abs($0 - current) < abs($1 - current) } ?? current
+        return PickerValues(values: values, selection: selection)
+    }
+    /// Channel options for a source with `channelCount` input channels, and the value that
+    /// represents the persisted selection. Mono channels are one-based, `-1` is Mix and `-2`
+    /// is Stereo; a channel above the source count maps to the last channel and Stereo maps to
+    /// Mono 1 on a single-channel source.
+    public static func channelPicker(selection: ChannelSelection, channelCount: Int) -> PickerValues {
+        let count = max(1, channelCount)
+        var values = Array(1...count)
+        values.append(-1)
+        if count >= 2 { values.append(-2) }
+        let preferred: Int
+        switch selection {
+        case .auto: preferred = 1
+        case .mono(let channel): preferred = min(max(channel, 1), count)
+        case .monoMix: preferred = -1
+        case .stereo: preferred = count >= 2 ? -2 : 1
+        }
+        return PickerValues(values: values, selection: preferred)
+    }
     public var icon: String {
         if !controls.processingEnabled { return "mic" }
         if error != nil || status?.defaultInput.divergedByUser == true { return "exclamationmark.triangle.fill" }

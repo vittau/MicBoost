@@ -278,8 +278,7 @@ para as anteriores. Estado final: BlackHole a 48000 Hz, C920 a 16000 Hz, entrada
 Capturas para o README: `docs/screenshots/eq-{light,dark}.png` e
 `settings-{light,dark}.png` foram regeradas com estado de amostra realista (entrada do sistema
 MicBoost com marcação, microfone USB selecionado, ganho +6 dB, medidores com níveis, 48000 Hz,
-buffer 256, latência reportada de 15,3 ms e licença GPL-3.0). O locale vem do idioma resolvido
-pelo catálogo (`en` → `en_US`), então os números usam ponto decimal e vírgula de milhar do
-inglês. `panel-*` e `error-*` continuam geradas, mas não são mais referenciadas no README. O
-switch nativo sai com o estado visual errado na captura clara; a conferência do controle real
-segue sendo a da árvore de acessibilidade.
+buffer 256 no seletor e no diagnóstico, latência reportada de 15,3 ms, switches nativos no
+estado ativo e licença GPL-3.0). O locale vem do idioma resolvido pelo catálogo (`en` →
+`en_US`), então os números usam ponto decimal e vírgula de milhar do inglês. `panel-*` e
+`error-*` continuam geradas, mas não são mais referenciadas no README.

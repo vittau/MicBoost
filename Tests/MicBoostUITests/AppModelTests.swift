@@ -129,6 +129,50 @@ import Testing
     #expect(model.statusMessage == nil)
 }
 
+@MainActor @Test func bufferPickerAlwaysHasASelection() {
+    let normal = AppModel.bufferPicker(sourceBufferRange: .init(8, 2250), current: 256)
+    #expect(normal.values == Settings.allowedBufferFrames)
+    #expect(normal.selection == 256)
+    #expect(normal.values.contains(normal.selection))
+    // A source that reports no buffer range keeps every allowed size.
+    let unknown = AppModel.bufferPicker(sourceBufferRange: .init(0, 0), current: 256)
+    #expect(unknown.values == Settings.allowedBufferFrames)
+    #expect(unknown.selection == 256)
+    #expect(unknown.values.contains(unknown.selection))
+    let missing = AppModel.bufferPicker(sourceBufferRange: nil, current: 1024)
+    #expect(missing.values == Settings.allowedBufferFrames)
+    #expect(missing.selection == 1024)
+    // A persisted size the source does not support selects the closest offered size.
+    let narrow = AppModel.bufferPicker(sourceBufferRange: .init(5, 260), current: 512)
+    #expect(narrow.values == [64, 128, 256])
+    #expect(narrow.selection == 256)
+    #expect(narrow.values.contains(narrow.selection))
+    // A range between two allowed sizes still offers values instead of an empty list.
+    let gap = AppModel.bufferPicker(sourceBufferRange: .init(300, 400), current: 256)
+    #expect(gap.values == Settings.allowedBufferFrames)
+    #expect(gap.values.contains(gap.selection))
+}
+
+@MainActor @Test func channelPickerAlwaysHasASelection() {
+    let stereo = AppModel.channelPicker(selection: .mono(channel: 1), channelCount: 2)
+    #expect(stereo.values == [1, 2, -1, -2])
+    #expect(stereo.selection == 1)
+    let clamped = AppModel.channelPicker(selection: .mono(channel: 3), channelCount: 2)
+    #expect(clamped.selection == 2)
+    let eight = AppModel.channelPicker(selection: .mono(channel: 4), channelCount: 8)
+    #expect(eight.selection == 4)
+    let stereoEight = AppModel.channelPicker(selection: .stereo(firstChannel: 1), channelCount: 8)
+    #expect(stereoEight.selection == -2)
+    let single = AppModel.channelPicker(selection: .stereo(firstChannel: 1), channelCount: 1)
+    #expect(single.values == [1, -1])
+    #expect(single.selection == 1)
+    let mix = AppModel.channelPicker(selection: .monoMix, channelCount: 1)
+    #expect(mix.selection == -1)
+    for picker in [stereo, clamped, eight, stereoEight, single, mix] {
+        #expect(picker.values.contains(picker.selection))
+    }
+}
+
 @MainActor @Test func limiterBadgeKeepsPanelSize() {
     let quiet = AppModel()
     quiet.limitingUntil = .distantPast

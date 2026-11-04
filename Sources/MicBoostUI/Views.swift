@@ -273,14 +273,15 @@ import SwiftUI
                     Task { await model.engine.setDefaultInputManagement(enabled) }
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Picker(localized("Buffer (frames)"), selection: $model.controls.bufferFrames) {
-                        ForEach(
-                            Settings.allowedBufferFrames.filter { frames in
-                                guard let source = model.status?.source else { return true }
-                                return Double(frames) >= source.bufferRange.minimum
-                                    && Double(frames) <= source.bufferRange.maximum
-                            }, id: \.self
-                        ) { Text("\($0)").tag($0) }
+                    let buffer = AppModel.bufferPicker(
+                        sourceBufferRange: model.status?.source?.bufferRange,
+                        current: model.controls.bufferFrames)
+                    Picker(
+                        localized("Buffer (frames)"),
+                        selection: Binding(
+                            get: { buffer.selection }, set: { model.controls.bufferFrames = $0 })
+                    ) {
+                        ForEach(buffer.values, id: \.self) { Text("\($0)").tag($0) }
                     }.onChange(of: model.controls.bufferFrames) {
                         let frames = model.controls.bufferFrames
                         Task {
@@ -298,12 +299,21 @@ import SwiftUI
                     .fixedSize(horizontal: false, vertical: true)
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Picker(localized("Channels"), selection: Binding(get: { channel }, set: setChannel)) {
-                        ForEach(1...sourceChannelCount, id: \.self) {
-                            Text("Mono \($0)").tag($0)
+                    let selection =
+                        model.controls.channelSelectionByUID[model.controls.selectedInputUID ?? ""]
+                        ?? .mono(channel: 1)
+                    let channels = AppModel.channelPicker(
+                        selection: selection, channelCount: sourceChannelCount)
+                    Picker(
+                        localized("Channels"),
+                        selection: Binding(get: { channels.selection }, set: setChannel)
+                    ) {
+                        ForEach(channels.values, id: \.self) { value in
+                            let title =
+                                value == -1
+                                ? localized("Mix") : value == -2 ? localized("Stereo") : "Mono \(value)"
+                            Text(title).tag(value)
                         }
-                        Text(localized("Mix")).tag(-1)
-                        if sourceChannelCount >= 2 { Text(localized("Stereo")).tag(-2) }
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         ForEach(1...sourceChannelCount, id: \.self) { channel in
@@ -361,14 +371,6 @@ import SwiftUI
     }
     private var sourceChannelCount: Int {
         max(1, Int(model.status?.source?.inputChannels ?? 1))
-    }
-    private var channel: Int {
-        switch model.controls.channelSelectionByUID[model.controls.selectedInputUID ?? ""] ?? .mono(channel: 1) {
-        case .auto: 1
-        case .monoMix: -1
-        case .mono(let n): n
-        case .stereo: -2
-        }
     }
     private func setChannel(_ value: Int) {
         guard let uid = model.controls.selectedInputUID else { return }

@@ -18,6 +18,9 @@ if [[ -z "$version" ]]; then
     version=$(git describe --tags --match 'v[0-9]*' --abbrev=0 2>/dev/null || echo v0.0.0)
     version=${version#v}
 fi
+# A distinct bundle identifier: with the app's own identifier, LaunchServices refuses to
+# activate this helper while MicBoost is installed, and an inactive app draws gray switches.
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier io.github.vittau.MicBoost.render-screenshots" "$render_dir/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$render_dir/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(git rev-list --count HEAD)" "$render_dir/Info.plist"
 scripts/record-build-sdk.sh "$render_dir/render-screenshots" "$minimum_macos"

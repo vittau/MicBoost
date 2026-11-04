@@ -3,6 +3,15 @@ import MicBoostCore
 import MicBoostUI
 import SwiftUI
 
+/// The offscreen window is key and main so AppKit draws active controls (a native switch in
+/// an inactive window paints the gray track even when its value is on).
+private final class RenderWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+    override var isKeyWindow: Bool { true }
+    override var isMainWindow: Bool { true }
+}
+
 @MainActor func capture(
     model: AppModel, kind: String, dark: Bool, directory: URL, locale: Locale, write: Bool
 ) throws {
@@ -18,13 +27,15 @@ import SwiftUI
         ).environment(\.locale, locale))
     host.appearance = appearance
     let size = host.fittingSize
-    let window = NSWindow(
+    let window = RenderWindow(
         contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
     window.appearance = appearance
     window.contentView = host
     host.frame = NSRect(origin: .zero, size: size)
     window.makeKeyAndOrderFront(nil)
+    window.makeMain()
     host.layoutSubtreeIfNeeded()
+    window.setFrameOrigin(NSPoint(x: -20000, y: -20000))
     RunLoop.current.run(until: Date().addingTimeInterval(0.05))
     host.displayIfNeeded()
     defer { window.close() }
@@ -44,6 +55,9 @@ import SwiftUI
     var source = AudioDevice(id: 2, uid: "usb.microphone", name: "USB Microphone")
     source.inputChannels = 2
     source.sampleRate = 48000
+    source.bufferRange = .init(8, 2250)
+    source.inputLatency = 38
+    source.inputSafetyOffset = 38
     var blackHole = AudioDevice(id: 3, uid: "BlackHole2ch_UID", name: "BlackHole 2ch")
     blackHole.inputChannels = 2
     blackHole.outputChannels = 2
@@ -67,6 +81,24 @@ import SwiftUI
         }
     }
 }
+/// Runs the render inside the app event loop so the helper can become active and AppKit
+/// paints active controls: an inactive app draws every switch with the gray track.
+final class RenderDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        Task { @MainActor in
+            defer { NSApp.terminate(nil) }
+            // AppKit draws inactive controls gray, so the helper waits to be the active app.
+            for _ in 0..<40 where !NSApp.isActive {
+                NSApp.activate(ignoringOtherApps: true)
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+            FileHandle.standardError.write(Data("active=\(NSApp.isActive)\n".utf8))
+            do { try render() } catch { FileHandle.standardError.write(Data("\(error)\n".utf8)) }
+        }
+    }
+}
 let app = NSApplication.shared
-app.setActivationPolicy(.prohibited)
-try render()
+let delegate = RenderDelegate()
+app.delegate = delegate
+app.setActivationPolicy(.accessory)
+app.run()
