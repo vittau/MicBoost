@@ -18,8 +18,8 @@ calls, recorders, anything — hears the processed voice.
 > review of its human maintainer.
 
 > [!WARNING]
-> **Pre-release:** MicBoost runs from source today. Releases, the Homebrew tap and part of the
-> manual validation (accessibility, sleep/wake) are still pending.
+> **Early version:** 0.1.0 is the first release. The Homebrew tap and part of the manual
+> validation (accessibility, sleep/wake) are still pending.
 
 ## Screenshots
 
