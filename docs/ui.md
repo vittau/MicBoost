@@ -29,7 +29,8 @@ arredondadas à direita. O sistema define a cor conforme a barra de menus. Estad
 - aberto sob o `NSStatusBarButton`, alinhado à direita e limitado à tela pelo AppKit;
 - fechamento e navegação do menu gerenciados pelo AppKit, inclusive Escape e clique fora;
 - o delegate inicia os medidores ao abrir e os cancela ao fechar;
-- entrada no tracking pelo run loop para não manter um job de concorrência Swift ocupado.
+- entrada no tracking pelo run loop para não manter um job de concorrência Swift ocupado;
+- os sliders são `NSSlider` em `NSViewRepresentable`: o controle conduz o próprio laço de arrasto e continua respondendo dentro do tracking do menu, enquanto o gesto do `Slider` do SwiftUI perde o mouse-up fora da view hospedada e deixa o slider preso no estado pressionado. As atualizações são contínuas durante o arrasto, sem marcas de passo, e o knob só acompanha valores externos (campo numérico, teclado, persistência) quando não há arrasto.
 
 **Fechar o painel nunca afeta o motor.** Aparência e preferências de acessibilidade
 são herdadas do sistema. Não alterar o fundo, recorte ou opacidade da janela do menu.
@@ -40,7 +41,7 @@ Conteúdo, de cima para baixo (SwiftUI, `PanelView`):
    - **Desligar:** para o motor por completo (rampa, `AudioDeviceStop`, IOProc e agregado destruídos), de modo que o microfone deixa de ser capturado e o indicador de microfone do macOS apaga. A entrada padrão é restaurada conforme a [política](audio-engine.md#política-de-entrada-padrão-defaultinputmanager), e o ícone vira `mic`.
    - **Ligar:** reconstrói o motor com a fonte e os ajustes persistidos e reaplica a política de entrada padrão.
    - O estado persiste (`processingEnabled`), e a troca nunca fecha o painel.
-2. **Ganho:** botão de mute com o ícone `mic.fill`/`mic.slash.fill` centralizado em uma área fixa de 20 × 20 pt para não deslocar o slider ao alternar, `Slider` de ganho de −12 a +24 dB e rótulo `398% (+12,0dB)` (percentual primeiro; dB entre parênteses). O valor é editável: clicar no rótulo abre um campo numérico em dB. O selo "Limitador ativo" (pílula discreta) aparece ao lado do valor de ganho durante a proteção de pico; sua área permanece reservada e o selo fica oculto para acessibilidade quando inativo, sem alterar a altura do painel ou deslocar controles.
+2. **Ganho:** botão de mute com o ícone `mic.fill`/`mic.slash.fill` centralizado em uma área fixa de 20 × 20 pt para não deslocar o slider ao alternar, slider nativo de ganho de −12 a +24 dB e rótulo `398% (+12,0dB)` (percentual primeiro; dB entre parênteses). O valor é editável: clicar no rótulo abre um campo numérico em dB. O selo "Limitador ativo" (pílula discreta) aparece ao lado do valor de ganho durante a proteção de pico; sua área permanece reservada e o selo fica oculto para acessibilidade quando inativo, sem alterar a altura do painel ou deslocar controles.
 3. **Medidores:** duas barras horizontais de 6 pt de espessura (como a trilha do slider de ganho), "Entrada" e "Saída", com comprimento proporcional à amplitude de pico (0…1), valores de acessibilidade em dBFS de −60 a 0, sempre na cor de destaque do sistema, sem flash vermelho nem aviso textual de saturação.
 4. **Entrada do sistema:** apenas o estado da entrada padrão; a fonte selecionada é indicada pela marcação na lista de microfones, sem uma linha adicional de caminho do áudio:
    - ok: "Entrada do sistema: MicBoost" com marcação;
@@ -96,7 +97,7 @@ junto ao rótulo e linhas de diagnóstico/sobre com rótulo à esquerda e valor 
 
 ## Teclado e acessibilidade
 
-- Todo controle é alcançável por Tab, e as setas ajustam sliders: ganho em passos de 0,5 dB (1 dB com ⌥); EQ em 0,5 dB, frequência em 1/12 de oitava.
+- Todo controle é alcançável por Tab, e as setas ajustam sliders: ganho em passos de 0,5 dB (1 dB com ⌥); EQ em 0,5 dB; largura em 0,1 de Q; frequência em 1/12 de oitava.
 - ⌘Q encerra o app e ⌘, abre os ajustes; campos de texto usam Recortar/Copiar/Colar/Selecionar Tudo do menu Editar nativo. Abrir os ajustes fecha o painel.
 - Atalhos com o painel focado: `M` alterna o mute, `Esc` fecha, ⌘, abre os ajustes.
 - VoiceOver:

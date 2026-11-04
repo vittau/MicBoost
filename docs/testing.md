@@ -236,6 +236,21 @@ barras de nível medem 6 pixels de altura (6 pt), com cantos simétricos da tril
 nativa. As renderizações clara e escura conferem o preenchimento de 100% na
 entrada e 89,13% na saída, sem knob nem moldura de indicador de capacidade.
 
+Sliders do painel em `NSSlider` (2026-11-03): os cinco sliders do painel — ganho,
+ganho de graves, médios e agudos e largura — usam `NSSlider` em `NSViewRepresentable`,
+porque o `Slider` do SwiftUI podia perder o mouse-up no tracking do menu e ficar
+preso no estado pressionado. As capturas regeradas mantêm as dimensões anteriores
+(`panel-*` 320 × 325, `eq-*` 320 × 663, `error-*` 320 × 379, `settings-*` 540 × 808),
+e a comparação pixel a pixel mostra diferença apenas na área do knob (até 22 × 22 pt
+por slider): trilha de 6 pt, preenchimento verde até o knob, espaçamento e altura de
+16 pt do controle são idênticos. A suíte tem 84 testes (57 Core, 11 DSP, 16 UI) com
+execução somada de aproximadamente 1,0 s (Core 0,65 s, DSP 0,16 s, UI 0,2 s); os
+quatro testes novos de UI cobrem a ação do `NSSlider` → binding, valor externo sem
+mover o knob durante o arrasto, passos de seta (0,5 dB, 1 dB com ⌥ e limite da faixa)
+e os cinco `NSSlider` na hierarquia do painel expandido. `swift build`, `swift test`,
+lint de formatação recursivo e a montagem debug passam. O arrasto no menu real,
+inclusive soltando o mouse fora da janela do menu, é verificação manual pendente.
+
 ### Recuperação (etapa 5)
 
 A lógica de recuperação está implementada e coberta pela HAL falsa; os itens que exigem
