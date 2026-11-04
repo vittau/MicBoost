@@ -89,5 +89,5 @@ Interface:
 
 - Branch principal `main`. Trabalhe em branch ou worktree próprios (`feat/…`, `fix/…`, `docs/…`).
 - Commits pequenos, mensagem em inglês no imperativo (`Add aggregate device builder`).
-- Não faça push, release nem publicação no tap sem pedido explícito do mantenedor. Não crie tags git: o mantenedor cria a tag `vX.Y.Z`, e o push dela dispara o workflow que monta a release em rascunho.
+- Push para `main` é feito pelo coordenador, sem pedir confirmação, depois de `swift build`, `swift test` e lint verdes, desde que nada quebrado chegue a usuários; workers não fazem push. Release e publicação no tap exigem pedido explícito do mantenedor. Não crie tags git: o mantenedor cria a tag `vX.Y.Z`, e o push dela dispara o workflow que monta a release em rascunho.
 - Não commite `build/`, `dist/`, `.build/` nem `.scratch/`.
