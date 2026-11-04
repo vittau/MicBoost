@@ -84,6 +84,7 @@ Interface:
 - A permissão de microfone pertence ao app de terminal que executa o `micboost-diag`. Se a captura vier zerada, verifique a permissão antes de depurar.
 - Não declare uma etapa concluída sem cumprir as condições de `docs/roadmap.md`. Diga explicitamente o que não foi possível verificar (por exemplo, "requer teste manual com USB").
 - Encerre todo processo que você iniciou (`MicBoost.app`, `micboost-diag run`/`soak`) antes de terminar a tarefa. Um app esquecido continua na barra de menus do mantenedor e pode alterar a entrada padrão.
+- Nunca rode por conta própria um teste ou comando cuja saída de áudio sejam os alto-falantes do Mac (inclusive o modo monitor, mesmo em modo silencioso): o microfone capta o alto-falante e a realimentação vira um apito alto. Esses testes só acontecem com o mantenedor presente e a pedido dele.
 - Capturar de microfones de outros aparelhos (Continuity/iPhone, Bluetooth) dispara pedidos de permissão ou conexão nesses aparelhos. Só faça isso quando a tarefa pedir, e avise no relatório.
 
 ## Git
