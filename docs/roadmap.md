@@ -10,7 +10,7 @@ Status: `não iniciado` · `em andamento` · `concluído`. Uma etapa só é conc
 | 3 | Equalizador | concluído |
 | 4 | Interface | em andamento |
 | 5 | Recuperação | não iniciado |
-| 6 | Distribuição | não iniciado |
+| 6 | Distribuição | em andamento |
 | 7 | Entrega | não iniciado |
 
 ## 0 — Estrutura e diagnóstico
@@ -74,7 +74,19 @@ Condições de conclusão: cada linha da tabela de [audio-engine.md](audio-engin
 
 ## 6 — Distribuição
 
-Entregas: `package-release.sh`, release `.zip` sem notarização, tap `vittau/homebrew-micboost` com o cask.
+Status: `em andamento`.
+
+Entregas implementadas:
+- `scripts/package-release.sh <versão>`, com build de release universal e as verificações de arquitetura, assinatura ad hoc, minos e versão descritas em [distribution.md](distribution.md#release-download-direto);
+- modelo do cask em `packaging/homebrew/micboost.rb` e modelo das notas de release em `packaging/release-notes.md`;
+- `.zip` + `.sha256` gerados localmente e verificados;
+- evidência local de Gatekeeper: [distribution.md](distribution.md#verificação-local-por-spctl).
+
+Pendências:
+- publicação da release no GitHub (`gh release create`, com anexos `.zip` e `.sha256`);
+- criação e publicação do tap `vittau/homebrew-micboost` com o cask preenchido;
+- validação dos cenários de instalação e de primeira abertura em um Mac que não participou do desenvolvimento;
+- decisão da licença, pré-requisito da variante com o instalador do BlackHole.
 
 Condições de conclusão:
 - os cenários de [distribution.md](distribution.md#homebrew-tap-próprio) e da primeira abertura foram validados em um Mac que não participou do desenvolvimento;

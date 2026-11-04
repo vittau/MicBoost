@@ -29,7 +29,7 @@ Canais excluídos: Mac App Store, `homebrew/cask` oficial (as regras exigem pass
 5. Assina com `codesign --force --deep --sign - build/MicBoost.app`, sem hardened runtime e sem entitlements: não há sandbox e o runtime não é exigido sem notarização.
 6. Confere com `codesign --verify --strict build/MicBoost.app`.
 
-O script chama `scripts/compile-icon.sh <App>/Contents/Resources` quando o arquivo existe e é executável. Esse helper fornece `AppIcon.icns` e, opcionalmente, `Assets.car`. O plist define `CFBundleIconFile` e `CFBundleIconName` como `AppIcon`. Sem o helper, o bundle de desenvolvimento continua compilável, sem ícone personalizado. Os bundles de localização SwiftPM são copiados para `Contents/Resources`. A versão vem da última tag `v*` (fallback de desenvolvimento `0.0.0`) e o contador é `git rev-list --count HEAD`. Release sempre usa assinatura ad hoc.
+O script chama `scripts/compile-icon.sh <App>/Contents/Resources` quando o arquivo existe e é executável. Esse helper fornece `AppIcon.icns` e, opcionalmente, `Assets.car`. O plist define `CFBundleIconFile` e `CFBundleIconName` como `AppIcon`. Sem o helper, o bundle de desenvolvimento continua compilável, sem ícone personalizado. Os bundles de localização SwiftPM são copiados para `Contents/Resources`. A versão vem de `MICBOOST_VERSION` quando a variável está definida e, sem ela, da última tag `v*` (fallback de desenvolvimento `0.0.0`); o contador é `git rev-list --count HEAD`. Release sempre usa assinatura ad hoc.
 
 No Apple Silicon, todo binário precisa de assinatura válida para executar; a ad hoc basta.
 
@@ -42,21 +42,23 @@ A fonte em camadas está em `Resources/AppIcon.icon`, com SVGs e variantes clara
 ## Release (download direto)
 
 `scripts/package-release.sh <versão>`:
-1. Build de release universal.
-2. `ditto -c -k --keepParent build/MicBoost.app dist/MicBoost-<versão>.zip`.
-3. `shasum -a 256` → `dist/MicBoost-<versão>.zip.sha256`.
-4. Imprime o trecho do cask com `version` e `sha256` atualizados.
+1. Aceita apenas SemVer `X.Y.Z`, sem `v`. Qualquer outro argumento sai com código 2 e a mensagem de uso. Falha também quando `HEAD` tem uma tag `vX.Y.Z` diferente da versão pedida, para o `.zip` nunca divergir da tag publicada.
+2. Build de release universal com `scripts/build-app.sh release`, entregando a versão pela variável `MICBOOST_VERSION`; é ela que sobrepõe a última tag `v*` no `Info.plist`.
+3. `ditto -c -k --keepParent build/MicBoost.app dist/MicBoost-<versão>.zip`.
+4. `shasum -a 256` → `dist/MicBoost-<versão>.zip.sha256`, no formato do `shasum -c` (hash e nome do arquivo).
+5. Verifica, e falha se não passar: `lipo -archs` do executável com `arm64` e `x86_64`; `codesign --verify --strict --deep`; assinatura ad hoc (`Signature=adhoc` em `codesign -dv`); `LC_BUILD_VERSION` com minos igual a `LSMinimumSystemVersion` (14.0) nos dois slices; `CFBundleShortVersionString` igual à versão pedida.
+6. Imprime o tamanho do `.zip`, o checksum e o cask preenchido, lido de `packaging/homebrew/micboost.rb`.
 
-Publicação (com `gh release create`, mediante confirmação do mantenedor): anexar `.zip` + `.sha256`. As notas devem trazer as instruções de instalação, o aviso **"não notarizado"** e a instalação do BlackHole.
+Publicação (com `gh release create`, mediante confirmação do mantenedor): anexar `.zip` + `.sha256`. As notas de release seguem o modelo de `packaging/release-notes.md`: instruções de instalação, aviso **"não notarizado"**, instalação do BlackHole, primeira abertura e o checksum da versão.
 
 ## Homebrew (tap próprio)
 
-`packaging/homebrew/micboost.rb` é o modelo publicado em `Casks/micboost.rb` do tap:
+`packaging/homebrew/micboost.rb` é o modelo do cask, publicado como `Casks/micboost.rb` no tap. `version` e `sha256` ficam como marcadores (`X.Y.Z` e `SHA256`); `scripts/package-release.sh` imprime o arquivo com os dois valores da release, e esse é o texto a copiar para o tap:
 
 ```ruby
 cask "micboost" do
   version "X.Y.Z"
-  sha256 "…"
+  sha256 "SHA256"
 
   url "https://github.com/vittau/MicBoost/releases/download/v#{version}/MicBoost-#{version}.zip"
   name "MicBoost"
