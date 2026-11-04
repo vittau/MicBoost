@@ -57,12 +57,12 @@ CLI para verificar o hardware. `run` e `latency` aceitam `--gain-db N`, `--mute`
 
 | Comando | Função |
 |---|---|
-| `micboost-diag devices [--json]` | Lista dispositivos com UID, transporte, canais, taxas, faixa de buffer, latências, safety offsets e elegibilidade; mostra o BlackHole detectado e a entrada padrão |
+| `micboost-diag devices [--json]` | Lista dispositivos com UID, transporte, canais, taxas, faixa de buffer, latências, safety offsets e elegibilidade; mostra o BlackHole detectado, entrada e saída padrão e os componentes HAL de latência dos dispositivos internos |
 | `micboost-diag set-rate --device <uid> --rate <hz>` | Define a taxa nominal de um dispositivo e confirma o valor aplicado; usado no teste de mudança de formato e para devolver o BlackHole a 48000 Hz. Não altera entradas ou saídas padrão |
-| `micboost-diag run --input <uid> [--buffer N] [--seconds N]` | Roda o motor sem UI (mesmo `EngineController` do app), imprimindo estado e contadores a cada segundo e cada transição de estado com o instante. Não altera a entrada ou saída padrão; integração com a política de entrada padrão fica para o app |
+| `micboost-diag run --input <uid> [--buffer N] [--seconds N] [--monitor --monitor-silent]` | Roda o motor sem UI (mesmo `EngineController` do app), imprimindo estado e contadores a cada segundo e cada transição de estado com o instante. Não altera a entrada ou saída padrão; integração com a política de entrada padrão fica para o app |
 | `micboost-diag capture --device <uid> --seconds N --out file.wav` | Grava a entrada bruta de um dispositivo |
 | `micboost-diag latency --input <uid> [--trials N]` | Mede a latência adicional (método abaixo) |
-| `micboost-diag monitor-latency --input <uid> [--output <uid>] [--buffer N] [--trials N]` | Mede a latência do monitor (fonte → saída), [método abaixo](#medição-de-latência-do-monitor). Sem `--output`, usa a saída padrão; nunca altera entradas ou saídas padrão |
+| `micboost-diag monitor-latency --input <uid> [--output <uid>] [--buffer N] [--trials N]` | Estima silenciosamente a latência do monitor: fonte → BlackHole medida mais parcelas de saída da HAL, [método abaixo](#medição-de-latência-do-monitor). Sem `--output`, usa a saída padrão; exige mantenedor presente se a saída forem os alto-falantes do Mac |
 | `micboost-diag soak --input <uid> [--minutes N]` (padrão 20) | Ensaio de estabilidade (abaixo) |
 
 `set-rate` limita a taxa às `AvailableNominalSampleRates` do dispositivo, escreve `kAudioDevicePropertyNominalSampleRate` e espera até 1 s pelo valor aplicado, porque a HAL aplica a mudança de forma assíncrona. Se o dispositivo mantiver outra taxa (por exemplo, enquanto é subdispositivo de um agregado em uso), imprime o valor real e sai com erro. `run` imprime uma linha `event state=… t_ms=…` por transição, o que dá o tempo de retorno a `running`.
@@ -88,16 +88,27 @@ Método (`micboost-diag latency`):
 
 ## Medição de latência do monitor
 
-**Fronteira medida:** do som que chega ao microfone até o mesmo som saindo na saída de monitor.
+`micboost-diag monitor-latency --input <uid> [--output <uid>] [--buffer N] [--trials N]`
+usa a saída indicada ou, sem `--output`, a saída padrão, sem alterá-la.
 
-Método (`micboost-diag monitor-latency`), com laço acústico entre alto-falante e microfone:
-1. O motor roda no próprio processo da ferramenta com o monitor ligado (ganho 0 dB, EQ desligado), na saída padrão ou na de `--output`, que entra no agregado sem virar padrão.
-2. Um IOProc auxiliar captura a fonte diretamente, com o `mHostTime` de cada buffer.
-3. A cada tentativa, um clique de 1 ms é tocado na saída de monitor por fora do motor (`afplay` de um WAV gerado em `.scratch/` ou um IOProc de saída). O microfone capta o clique em t₀; o motor o devolve à saída, e o microfone o capta de novo em t₀ + L + d, em que d é o percurso no ar (≈ 0,1–1 ms entre alto-falante e microfone do mesmo Mac).
-4. A autocorrelação normalizada da captura de 2 s, buscada entre 3 e 150 ms, dá L; exige pico ≥ 0,3 e falha explicitamente sem ele. Repete N vezes (padrão 10) e reporta mediana, mínimo e máximo, em ms e frames, além da latência reportada do monitor.
-5. O laço precisa de alto-falantes e de volume audível, mas moderado: o ganho de 0 dB mantém o eco decaindo. Com fones, não há laço acústico, e a ferramenta reporta só a latência reportada. A ferramenta não altera o volume do sistema.
+1. O motor mantém a saída de monitor no agregado, com os mesmos streams e timing do
+   monitor normal. Um atômico exclusivo do diagnóstico, definido antes do start e lido
+   uma vez por ciclo, faz o IOProc escrever zeros nos canais do monitor. O app não ativa
+   esse atômico. Ganho de 0 dB e EQ desligado.
+2. A correlação cruzada existente mede fonte → BlackHole usando apenas o som ambiente,
+   sem gerar sinal. Correlação inferior a 0,5 falha explicitamente e orienta estalar os
+   dedos perto do microfone antes de repetir.
+3. A estimativa do monitor soma à medição fonte → BlackHole a latência de saída do
+   dispositivo, seu safety offset e a maior latência dos streams de saída, lidos da HAL.
+   A ferramenta imprime cada parcela em frames, a soma em ms e a latência reportada
+   completa do monitor. A parcela de saída é **reportada pela HAL**, não medida fisicamente.
+4. Repete N tentativas (padrão 10), com mediana, mínimo e máximo da soma em ms e frames.
 
-**Aceitação do monitor:** mediana < 50 ms no buffer padrão (256) a 48 kHz, com a fonte interna ou USB e a saída interna ou com fio. Saídas Bluetooth ficam documentadas como limitação, com a latência reportada.
+Aceitação: mediana < 50 ms com buffer 256 a 48 kHz, fonte interna ou USB e saída
+interna ou com fio. A escuta real com fones é validação manual com o mantenedor.
+Quando a saída for os alto-falantes do Mac, inclusive neste modo silencioso, o ensaio
+só pode ser executado com o mantenedor presente e a pedido dele.
+`run --monitor` exige `--monitor-silent`; o diagnóstico não emite voz na saída física.
 
 ## Ensaio de estabilidade (20 min)
 
@@ -144,6 +155,60 @@ Preparação para todos os itens: app aberto com processamento ligado, microfone
 | 8 | Sair do app (Sair do MicBoost) | — | a entrada anterior é restaurada e as taxas que o MicBoost mudou voltam às originais |
 
 ## Resultados registrados
+
+### Modo monitor — 04/11/2026
+
+MacBook Neo, fonte `BuiltInMicrophoneDevice`, saída padrão `BuiltInSpeakerDevice`,
+48 kHz. Os ensaios com monitor silencioso e a escuta manual estão **pendentes** de
+sessão com o mantenedor. Nenhum ensaio com monitor é autorizado sem sua presença
+quando a saída forem os alto-falantes do Mac.
+
+Decomposição somente leitura por `swift run micboost-diag devices`:
+
+| Parcela | Dispositivo | Safety | Stream | Total |
+|---|---:|---:|---:|---:|
+| Entrada interna | 26 | 48 | 1439 | 1513 frames (31,521 ms) |
+| Saída interna | 69 | 48 | 425 | 542 frames (11,292 ms) |
+| Dois buffers de 256 | — | — | — | 512 frames (10,667 ms) |
+
+A fórmula reportada soma cada termo uma vez: `(1513 + 542 + 512) / 48 = 53,479 ms`.
+Não há dupla contagem identificada; omitir os streams produziria 14,646 ms e esconderia
+38,833 ms. Teste unitário usa esses valores para impedir regressão.
+
+O registro acústico de 55,792 ms não é uma medição aceita: inclui a propagação no ar e
+uma segunda captura do eco pelo microfone. A diferença para os ~15,1 ms do caminho
+fonte → BlackHole é compatível principalmente com a latência de captura física
+(31,521 ms) e a saída (11,292 ms), com ressalva de que timestamps e resampling tornam
+essa comparação aproximada. A autocorrelação ficou instável e falhou em seguida
+(correlação 0,130968); não se pode atribuir o excesso ao resampler de drift isoladamente.
+
+Verificação permitida sem monitor:
+`swift run micboost-diag latency --input BuiltInMicrophoneDevice --trials 10 --buffer 256`:
+mediana 13,1875 ms, mínimo 13,1875 ms, máximo 13,2083 ms (633–634 frames),
+zero overloads e `input_missing`; `io_delta_ms = 12,7292`. O log existente com
+subdispositivo de monitor registrou fonte → BlackHole em 15,1042 ms de mediana,
+mínimo 15,1042 e máximo 15,1250 ms; `io_delta_ms = 14,6458`. A diferença de
+aproximadamente 1,917 ms aparece também no timing do IOProc, muito menor que os
+~40 ms do valor acústico; não identifica isoladamente custo de drift ou de buffer.
+As condições não foram repetidas com monitor e a comparação não é ensaio controlado.
+
+`swift build` e `swift format lint --strict --recursive Sources Tests Package.swift`
+aprovados; `swift test`: 137 testes (53 UI em 1,244 s, 12 DSP em 0,131 s,
+72 Core em 0,929 s, incluindo um caso conhecido da HAL falsa), total dos targets
+2,304 s sem compilação. Capturas do painel regeneradas com monitor desligado.
+Entrada e saída padrão conferidas ao encerrar: `BuiltInMicrophoneDevice` e
+`BuiltInSpeakerDevice`. Nenhum processo de diagnóstico permaneceu em execução.
+
+Para confirmar com o mantenedor: comparar fonte → BlackHole com e sem subdispositivo
+de monitor nos buffers 256 e 128; obter a soma silenciosa por tentativa e os componentes
+HAL durante cada start. Se 256 não atingir a meta, medir 128 e 64, sem mudar o padrão.
+A soma ilustrativa `15,104 + 11,292 = 26,396 ms` não substitui esse ensaio.
+
+Pendentes:
+- `swift run micboost-diag monitor-latency --input BuiltInMicrophoneDevice --trials 10 --buffer 256`
+  (e buffers 128/64 conforme necessário), com saída interna e mantenedor presente;
+- `swift run micboost-diag run --input BuiltInMicrophoneDevice --seconds 60 --buffer 256 --monitor --monitor-silent`;
+- escuta com fones, troca de saída e toggle no app com o mantenedor.
 
 ### Testes manuais com o mantenedor (2026-11-03/04)
 
