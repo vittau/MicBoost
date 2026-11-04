@@ -105,6 +105,9 @@ public actor EngineController {
     private var monitorOutputUID: String?
     private var monitorStatus: MonitorStatus = .off
     private var monitorOutput: AudioDevice?
+    /// The resolved candidate is retained even when monitoring is unavailable.
+    private var resolvedMonitorOutput: AudioDevice?
+    private var resolvedMonitorEligible = false
     private var forceRebuild = false
     private var pendingReason: RecoveryReason = .formatChanged
     private let hardware: any EngineHardware
@@ -232,9 +235,8 @@ public actor EngineController {
     public func setMonitorEnabled(_ enabled: Bool) async throws {
         guard monitorEnabled != enabled else { return }
         monitorEnabled = enabled
-        guard selected != nil, !sleeping else { return }
+        guard state == .running, !sleeping else { return }
         try tearDown()
-        restoreRates()
         try await build()
     }
     private func build(withoutMonitor: Bool = false) async throws {
@@ -256,17 +258,17 @@ public actor EngineController {
                 setState(hasRun ? .recovering(.sourceLost) : .error(.sourceUnavailable(selected ?? "")))
                 return
             }
+            let previousMonitor = monitorOutput
             monitorOutput = nil
+            resolvedMonitorOutput = nil
+            resolvedMonitorEligible = false
             monitorStatus = .off
             var monitor: AudioDevice?
             if monitorEnabled {
-                let outputID = try? hardware.defaultOutput()
-                if let output = devices.first(where: {
-                    (monitorOutputUID == nil ? $0.id == outputID : $0.uid == monitorOutputUID) && $0.alive
-                }), output.outputChannels > 0 {
-                    var eligibility = output
-                    eligibility.inputChannels = 1
-                    if !eligibility.isEligible(in: devices) {
+                resolvedMonitorOutput = currentMonitorOutput(in: devices)
+                resolvedMonitorEligible = monitorEligible(resolvedMonitorOutput, in: devices)
+                if let output = resolvedMonitorOutput, output.outputChannels > 0 {
+                    if !resolvedMonitorEligible {
                         monitorStatus = .unavailable(reason: .outputIsLoopback, outputName: output.name)
                     } else if withoutMonitor {
                         monitorStatus = .unavailable(reason: .formatUnsupported, outputName: output.name)
@@ -292,6 +294,12 @@ public actor EngineController {
                     destinationRates = blackHole.supportedRates
                 }
             }
+            if let previousMonitor, previousMonitor.uid != monitor?.uid {
+                restoreMonitorRate(previousMonitor)
+                let refreshed = try hardware.devices()
+                resolvedMonitorOutput = monitorEnabled ? currentMonitorOutput(in: refreshed) : nil
+                resolvedMonitorEligible = monitorEligible(resolvedMonitorOutput, in: refreshed)
+            }
             guard
                 let working = Self.workingSampleRate(
                     source: source.supportedRates, destination: destinationRates)
@@ -309,6 +317,7 @@ public actor EngineController {
                 blackHole.sampleRate = working
             }
             if var output = monitor {
+                if output.uid == source.uid { output.sampleRate = source.sampleRate }
                 monitorOutput = output
                 if output.sampleRate != working {
                     recordRate(uid: output.uid, current: output.sampleRate, target: working)
@@ -317,6 +326,8 @@ public actor EngineController {
                     monitor = output
                     monitorOutput = output
                 }
+                monitor = output
+                resolvedMonitorOutput = output
             }
             self.source = source
             destination = blackHole
@@ -403,7 +414,6 @@ public actor EngineController {
         } catch {
             if monitorOutput != nil, !withoutMonitor {
                 try tearDown()
-                restoreRates()
                 try await build(withoutMonitor: true)
                 return
             }
@@ -413,7 +423,7 @@ public actor EngineController {
         }
     }
     private func monitorChanged() {
-        guard monitorEnabled else { return }
+        guard monitorEnabled, state == .running else { return }
         settleUntil = .distantPast
         changed(force: true)
     }
@@ -538,13 +548,11 @@ public actor EngineController {
         }
         let sameSource = currentSource.map { current in source?.matchesEngineDescriptor(current) ?? false } ?? false
         let sameDestination = destination?.matchesEngineDescriptor(currentDestination) ?? false
-        let currentOutputID = try? hardware.defaultOutput()
-        let currentOutput = devices.first { $0.id == currentOutputID && $0.alive }
+        let currentOutput = currentMonitorOutput(in: devices)
         let sameMonitor =
             !monitorEnabled
-            || (monitorOutput.map { previous in
-                currentOutput.map { previous.matchesEngineDescriptor($0) } ?? false
-            } ?? (currentOutput == nil))
+            || (sameMonitorDescriptor(resolvedMonitorOutput, currentOutput)
+                && resolvedMonitorEligible == monitorEligible(currentOutput, in: devices))
         if state == .running, sameSource, sameDestination, sameMonitor {
             // Right after a build the HAL still reports the engine's own start; a forced
             // notification then is not an external format change.
@@ -560,26 +568,54 @@ public actor EngineController {
         }
         do {
             try tearDown()
-            restoreRates()
             try await build()
         } catch { setState(.error((error as? EngineError) ?? .invalidArgument(String(describing: error)))) }
+    }
+    private func currentMonitorOutput(in devices: [AudioDevice]) -> AudioDevice? {
+        let id = try? hardware.defaultOutput()
+        return devices.first {
+            (monitorOutputUID == nil ? $0.id == id : $0.uid == monitorOutputUID) && $0.alive
+        }
+    }
+    private func monitorEligible(_ output: AudioDevice?, in devices: [AudioDevice]) -> Bool {
+        guard var output, output.outputChannels > 0 else { return false }
+        output.inputChannels = 1
+        return output.isEligible(in: devices)
+    }
+    private func sameMonitorDescriptor(_ previous: AudioDevice?, _ current: AudioDevice?) -> Bool {
+        guard let previous, let current else { return previous == nil && current == nil }
+        return previous.matchesEngineDescriptor(current)
+            && previous.availableSampleRates == current.availableSampleRates
+            && previous.subdeviceUIDs == current.subdeviceUIDs
+    }
+    private func restoreMonitorRate(_ output: AudioDevice) {
+        // A duplex source remains in the aggregate when its monitoring role ends.
+        guard output.uid != source?.uid, output.uid != destination?.uid else { return }
+        restoreRates(only: [output.uid])
     }
     private func recordRate(uid: String, current: Double, target: Double) {
         if previousRates[uid] == nil { previousRates[uid] = current }
         appliedRates[uid] = target
     }
-    /// Best-effort restore of the rates MicBoost changed, on a voluntary stop only.
-    private func restoreRates() {
+    /// Restore all rates on voluntary stop, or only an output leaving the aggregate.
+    private func restoreRates(only uids: Set<String>? = nil) {
         guard !appliedRates.isEmpty else { return }
         let devices = (try? hardware.devices()) ?? []
-        for (uid, applied) in appliedRates {
+        for (uid, applied) in appliedRates where uids == nil || uids?.contains(uid) == true {
             guard let device = devices.first(where: { $0.uid == uid && $0.alive }),
                 let previous = previousRates[uid], previous != applied, device.sampleRate == applied
             else { continue }
             try? hardware.setRate(device.id, rate: previous)
         }
-        appliedRates.removeAll()
-        previousRates.removeAll()
+        if let uids {
+            for uid in uids {
+                appliedRates.removeValue(forKey: uid)
+                previousRates.removeValue(forKey: uid)
+            }
+        } else {
+            appliedRates.removeAll()
+            previousRates.removeAll()
+        }
     }
     private func tearDown() throws {
         for token in tokens { try hardware.removeListener(token) }
@@ -637,7 +673,6 @@ public actor EngineController {
         guard selected != nil, !sleeping else { return }
         do {
             try tearDown()
-            restoreRates()
             try await build()
         } catch {
             setState(.recovering(.wakeFailed))

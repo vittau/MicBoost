@@ -147,3 +147,129 @@ private func monitorHardware() -> FakeAudioHardware {
         sourceToBlackHole: 13.1875, input: .init(device: 0, safety: 0, stream: 0), output: output, sampleRate: 48000)
     #expect(abs((sum - zeroInput) - Double(input.total) / 48) < 0.000001)
 }
+
+@Test(arguments: ["loopback", "format", "fallback", "noChannels"])
+func unavailableMonitorIgnoresAggregateDeviceEvents(_ scenario: String) async throws {
+    let fake = monitorHardware()
+    fake.emitDevicesOnAggregateCreation = true
+    switch scenario {
+    case "loopback": fake.output = 2
+    case "format": fake.update("output") { $0.availableSampleRates = [.init(96000, 96000)] }
+    case "fallback":
+        fake.failMonitorStart = true
+        fake.update("output") {
+            $0.sampleRate = 44100
+            $0.availableSampleRates = [.init(44100, 48000)]
+        }
+    default: fake.update("output") { $0.outputChannels = 0 }
+    }
+    let engine = EngineController(hardware: fake)
+    try await engine.setMonitorEnabled(true)
+    try await engine.start(inputUID: "source")
+    try await Task.sleep(for: .milliseconds(650))
+    #expect(await engine.status().state == .running)
+    #expect(fake.aggregateCreations == (scenario == "fallback" ? 2 : 1))
+    if scenario == "fallback" { #expect(fake.rate(of: "output") == 44100) }
+    try await engine.stop()
+}
+
+@Test func monitorToggleOnlyStoresIntentWhileStoppedOrInError() async throws {
+    let fake = monitorHardware()
+    let engine = EngineController(hardware: fake)
+    try await engine.stop()
+    try await engine.setMonitorEnabled(true)
+    #expect(fake.aggregateCreations == 0)
+    #expect(await engine.status().state == .stopped)
+    try await engine.start(inputUID: "source")
+    #expect(fake.aggregateSubDevices.count == 3)
+    try await engine.stop()
+    try await engine.setMonitorEnabled(false)
+    try await engine.start(inputUID: "absent")
+    let previous = await engine.status().state
+    try await engine.setMonitorEnabled(true)
+    #expect(await engine.status().state == previous)
+    #expect(fake.aggregateCreations == 1)
+    try await engine.start(inputUID: "source")
+    #expect(fake.aggregateSubDevices.count == 3)
+    try await engine.stop()
+}
+
+private func rateMonitorHardware() -> FakeAudioHardware {
+    let fake = monitorHardware()
+    fake.update("source") {
+        $0.sampleRate = 32000
+        $0.availableSampleRates = [.init(24000, 24000), .init(32000, 32000)]
+    }
+    fake.update("BlackHole2ch_UID") { $0.availableSampleRates = [.init(24000, 24000), .init(48000, 48000)] }
+    fake.update("output") {
+        $0.sampleRate = 44100
+        $0.availableSampleRates = [.init(24000, 24000), .init(44100, 44100)]
+    }
+    return fake
+}
+
+@Test func disablingMonitorRestoresOnlyItsOutputRate() async throws {
+    let fake = rateMonitorHardware()
+    let engine = EngineController(hardware: fake)
+    try await engine.setMonitorEnabled(true)
+    try await engine.start(inputUID: "source")
+    let writes = fake.appliedRateWrites.count
+    try await engine.setMonitorEnabled(false)
+    #expect(fake.appliedRateWrites.dropFirst(writes).map(\.uid) == ["output"])
+    #expect(fake.rate(of: "output") == 44100)
+    #expect(fake.rate(of: "source") == 24000)
+    #expect(fake.rate(of: "BlackHole2ch_UID") == 24000)
+    try await engine.stop()
+    #expect(fake.rate(of: "source") == 32000)
+    #expect(fake.rate(of: "BlackHole2ch_UID") == 48000)
+}
+
+@Test func recoveryAndWakeDoNotRestoreAnyRates() async throws {
+    let fake = rateMonitorHardware()
+    let engine = EngineController(hardware: fake, wakeDelay: .milliseconds(10))
+    try await engine.setMonitorEnabled(true)
+    try await engine.start(inputUID: "source")
+    try await Task.sleep(for: .milliseconds(320))
+    let writes = fake.appliedRateWrites.count
+    fake.emit(.init(1, kAudioDevicePropertyStreamConfiguration, kAudioObjectPropertyScopeInput))
+    #expect(await waitUntil { await engine.status().state == .running && fake.aggregateCreations == 2 })
+    #expect(fake.appliedRateWrites.count == writes)
+    try await engine.willSleep()
+    await engine.didWake()
+    #expect(await waitUntil { await engine.status().state == .running && fake.aggregateCreations == 3 })
+    #expect(fake.appliedRateWrites.count == writes)
+    try await engine.stop()
+}
+
+@Test func outputSwitchRestoresOnlyDepartingMonitorAndRespectsExternalRate() async throws {
+    for external in [false, true] {
+        let fake = rateMonitorHardware()
+        let engine = EngineController(hardware: fake)
+        try await engine.setMonitorEnabled(true)
+        try await engine.start(inputUID: "source")
+        let writes = fake.appliedRateWrites.count
+        if external { fake.update("output") { $0.sampleRate = 48000 } }
+        fake.output = 2
+        fake.emit(.init(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDefaultOutputDevice))
+        #expect(await waitUntil { await engine.status().state == .running && fake.aggregateCreations == 2 })
+        #expect(fake.appliedRateWrites.dropFirst(writes).map(\.uid) == (external ? [] : ["output"]))
+        #expect(fake.rate(of: "output") == (external ? 48000 : 44100))
+        try await engine.stop()
+    }
+}
+
+@Test func disablingDuplexMonitorNeverRestoresTheSourceWhileRunning() async throws {
+    let fake = rateMonitorHardware()
+    fake.update("source") { $0.outputChannels = 1 }
+    fake.output = 1
+    let engine = EngineController(hardware: fake)
+    try await engine.setMonitorEnabled(true)
+    try await engine.start(inputUID: "source")
+    #expect(fake.appliedRateWrites.filter { $0.uid == "source" }.count == 1)
+    let writes = fake.appliedRateWrites.count
+    try await engine.setMonitorEnabled(false)
+    #expect(fake.appliedRateWrites.count == writes)
+    #expect(fake.rate(of: "source") == 24000)
+    try await engine.stop()
+    #expect(fake.rate(of: "source") == 32000)
+}

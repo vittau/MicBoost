@@ -13,6 +13,11 @@ import Testing
 final class FakeAudioHardware: AudioHardware, @unchecked Sendable {
     private let lock = NSLock()
     private var storedDevices: [AudioDevice] = []
+    private var storedEmitDevicesOnAggregateCreation = false
+    var emitDevicesOnAggregateCreation: Bool {
+        get { lock.withLock { storedEmitDevicesOnAggregateCreation } }
+        set { lock.withLock { storedEmitDevicesOnAggregateCreation = newValue } }
+    }
     private var storedOutput: AudioObjectID = 0
     private var storedFailMonitorStart = false
     var output: AudioObjectID {
@@ -182,7 +187,7 @@ extension FakeAudioHardware: EngineHardware {
                 driftCompensation: ($0[kAudioSubDeviceDriftCompensationKey] as? Int ?? 0) != 0
             )
         }
-        return lock.withLock {
+        let id = lock.withLock {
             creations += 1
             storedMainSubDevice = main
             storedSubDevices = subDevices
@@ -194,6 +199,10 @@ extension FakeAudioHardware: EngineHardware {
             storedDevices.append(device)
             return id
         }
+        if emitDevicesOnAggregateCreation {
+            emit(.init(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDevices))
+        }
+        return id
     }
 
     func destroyAggregate(_ device: AudioObjectID) throws {

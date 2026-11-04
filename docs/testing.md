@@ -28,7 +28,7 @@ Em 16, 44,1, 48 e 96 kHz:
 
 - Política de entrada padrão: todos os casos de [audio-engine.md](audio-engine.md#política-de-entrada-padrão-defaultinputmanager), incluindo crash simulado (`defaultInputManaged` persistido), divergência do usuário, dispositivo anterior ausente e BlackHole já padrão.
 - Nunca chama a escrita da saída padrão. A fake falha o teste se isso acontecer, inclusive com o monitor ligado e a saída padrão trocando.
-- Modo monitor ([audio-engine.md](audio-engine.md#modo-monitor)): agregado com a saída em terceiro e compensação de drift; saída igual à fonte sem duplicar subdispositivo; mapa de canais de monitor com saída de 1, 2 e 8 canais; saída BlackHole, agregado com BlackHole e sem saída → `unavailable` com o motor em `running`; taxa de trabalho entre os três e saída sem taxa comum → sem monitor; taxa da saída restaurada ao desligar; ligar/desligar reconstrói sem tocar a entrada padrão; troca da saída padrão e saída removida reconstroem sem `error`; falha de start com a saída → novo start sem ela.
+- Modo monitor ([audio-engine.md](audio-engine.md#modo-monitor)): agregado com a saída em terceiro e compensação de drift; saída igual à fonte sem duplicar subdispositivo; mapa de canais de monitor com saída de 1, 2 e 8 canais; saída BlackHole, agregado com BlackHole e sem saída → `unavailable` com o motor em `running`; taxa de trabalho entre os três e saída sem taxa comum → sem monitor; taxa da saída restaurada ao desligar; ligar/desligar reconstrói sem tocar a entrada padrão; troca da saída padrão e saída removida reconstroem sem `error`; falha de start com a saída → novo start sem ela; eventos `Devices` da criação do agregado não repetem builds quando o monitor está indisponível ou em fallback; toggle parado/em erro só guarda intenção; recovery/wake não restauram taxas; monitor desligado ou trocado restaura somente a saída que deixa o agregado, preservando fonte duplex e taxas alteradas externamente.
 - Elegibilidade de fontes: exclui as variantes de BlackHole, o próprio agregado e agregados com BlackHole.
 - Máquina de estados: transições de [architecture.md](architecture.md#ciclo-de-vida-do-motor) para cada evento de recuperação.
 - Recuperação, uma por linha da tabela de [audio-engine.md](audio-engine.md#recuperação): fonte perdida e devolvida; BlackHole removido e devolvido; taxa da fonte e do BlackHole alterada de fora; permissão negada e concedida; suspensão e retomada com sucesso e com falha; `coreaudiod` reiniciado com IDs novos; overload só incrementando o contador; notificação da própria escrita de taxa e mudança de latência/faixa de buffer sem reconstrução. O caminho percorrido é verificado pelo observador de estado, não por polling do estado final.
@@ -206,9 +206,9 @@ anterior à regra são apenas contexto; a aceitação de < 20 ms permanece pende
 de ensaio com monitor e mantenedor presente.
 
 `swift build` e `swift format lint --strict --recursive Sources Tests Package.swift`
-aprovados; `swift test`: 137 testes (53 UI em 1,228 s, 12 DSP em 0,131 s,
-72 Core em 0,943 s, incluindo um caso conhecido da HAL falsa), total dos targets
-2,302 s sem compilação. Capturas do painel regeneradas com monitor desligado.
+aprovados; `swift test`: 143 testes (53 UI em 1,256 s, 12 DSP em 0,136 s,
+78 Core em 0,931 s, incluindo um caso conhecido da HAL falsa), total dos targets
+2,323 s sem compilação. Capturas do painel regeneradas com monitor desligado.
 Entrada e saída padrão conferidas ao encerrar: `BuiltInMicrophoneDevice` e
 `BuiltInSpeakerDevice`. Nenhum processo de diagnóstico permaneceu em execução.
 
