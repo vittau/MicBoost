@@ -102,7 +102,6 @@ No macOS 15 ou posterior, o atalho de Control-clique → Abrir não contorna mai
 
 - O `.zip` contém só o app. A instalação do BlackHole é instruída à parte: `brew install --cask blackhole-2ch` ou o instalador oficial do upstream.
 - Uma variante com o app + o `.pkg` upstream intacto do BlackHole 2ch (duas ações de instalação) **só** é publicada depois de:
-  - definir a licença do MicBoost;
   - confirmar que a redistribuição atende à orientação do upstream (GPL-3.0; o upstream pede contato para outros arranjos);
   - validar a instalação em máquina limpa.
 - Um `.pkg` conjunto não é requisito; seria descartado se exigisse notarização.
@@ -121,7 +120,7 @@ No macOS 15 ou posterior, o atalho de Control-clique → Abrir não contorna mai
 
 Estrutura, nesta ordem:
 1. **Cabeçalho:** imagem centralizada com o ícone e o nome "MicBoost", nas variantes clara e escura (`<picture>` com `prefers-color-scheme`), em `docs/design/readme/header-{light,dark}.png`. As imagens são geradas por script a partir de `Resources/AppIcon.icon` (ou das prévias em `design/icon/previews/`), não desenhadas à mão.
-2. Título, badges (macOS 14+, Apple Silicon + Intel, Swift 6, licença quando definida, "not notarized") e uma frase do que o app faz.
+2. Título, badges (macOS 14+, Apple Silicon + Intel, Swift 6, licença GPL-3.0, "not notarized") e uma frase do que o app faz.
 3. Callout `> [!NOTE]`: o projeto é desenvolvido e mantido com ajuda de agentes de IA, sob direção e revisão do mantenedor.
 4. Callout de status (`> [!WARNING]`) enquanto não houver release: o que já funciona e o que falta, coerente com [roadmap.md](roadmap.md).
 5. **Capturas:** grade em tabela com o painel (clara/escura), o EQ expandido, a janela de ajustes e um estado de erro, mais uma legenda dizendo como as imagens foram geradas. As capturas são renderizações das views SwiftUI reais com estado de exemplo, geradas por `scripts/render-screenshots.sh` em `docs/screenshots/`. A seção só existe depois que a interface existir (etapa 4). O README é para usuários e não descreve detalhes de implementação ou de design, como o ícone.
@@ -132,4 +131,4 @@ Manutenção: toda mudança visível ao usuário (recurso, instalação, limita�
 
 ## Licenciamento
 
-A licença do MicBoost ainda não foi definida (ver [roadmap.md](roadmap.md#decisões-em-aberto)). O MicBoost não incorpora código do BlackHole; ele o usa como dispositivo Core Audio. A redistribuição do instalador do BlackHole está sujeita às regras acima.
+O MicBoost é licenciado sob a GPL-3.0 (`LICENSE` na raiz, texto integral da FSF). O motivo é o copyleft: versões derivadas distribuídas precisam continuar abertas. O MicBoost não incorpora código do BlackHole; ele o usa como dispositivo Core Audio, e a licença do BlackHole não condiciona a do MicBoost. A redistribuição do instalador do BlackHole está sujeita às regras acima.

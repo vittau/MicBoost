@@ -5,6 +5,7 @@
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black.svg)](#requirements)
 [![Apple Silicon and Intel](https://img.shields.io/badge/Apple%20Silicon%20%2B%20Intel-universal-black.svg)](#requirements)
 [![Swift 6](https://img.shields.io/badge/Swift-6-orange.svg)](#requirements)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Not notarized](https://img.shields.io/badge/signing-ad--hoc%2C%20not%20notarized-red.svg)](#first-launch)
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ff69b4.svg)](https://github.com/sponsors/vittau)
 
@@ -255,9 +256,9 @@ in:
 
 ## License
 
-**Not decided yet.** The repository carries no license grant while the choice is open; GPL-3.0 is
-the current recommendation, because it aligns with BlackHole and simplifies a future combined
-installer. See the open decisions in [the roadmap](docs/roadmap.md#decisões-em-aberto).
+MicBoost is free software, released under the [GNU General Public License v3.0](LICENSE). You may
+use, study, modify and share it; versions you distribute must stay under the same license, with
+their source code available.
 
 ## Credits
 
