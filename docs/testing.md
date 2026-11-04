@@ -43,7 +43,9 @@ Em 16, 44,1, 48 e 96 kHz:
 - Linha de entrada do sistema: BlackHole como entrada padrão mostra "MicBoost" com marcação só com o motor rodando; divergência mostra o nome com "Usar MicBoost" habilitado quando o clique funciona; entrada desconhecida não mostra botão.
 - Catálogo de strings: toda chave passada a `localized(...)` ou `String(localized:)` em `MicBoostUI` e `MicBoostApp` existe nos dois `.strings`, os dois catálogos têm exatamente as mesmas chaves e cada tradução preserva os placeholders da chave.
 - Permissão reavaliada ao ativar o app: negada mantém a faixa, concedida limpa e tenta iniciar de novo.
-- Formatação de ganho e escala dos medidores; o medidor ignora o mouse e o foco, e o valor de ganho é texto somente leitura.
+- Formatação de ganho e escala dos medidores; o medidor ignora o mouse e o foco, e os valores de ganho e de frequência são texto somente leitura.
+- Frequência do EQ: a grade quantiza nos limites das faixas de degrau (195, 199, 200, 950, 999, 1000, 1240, 1250, 9750, 9999, 10000, 10400 e 14000 Hz), os padrões e os limites de banda estão na grade, as setas andam para o valor seguinte ou anterior e param nos limites; o mapeamento logarítmico posição ↔ Hz volta ao mesmo valor e o meio da escala é a média geométrica.
+- Slider de frequência do menu: o arrasto (posição logarítmica → Hz → grade → faixa) grava a frequência da banda no `AppModel`, o rótulo e o valor de acessibilidade mostram "1000 Hz", o knob não se move com atualizações do modelo durante o arrasto, um valor persistido fora da grade aparece como está até o slider se mover e o máximo do slider segue 0,45 · fs da taxa atual.
 
 ## Ferramenta de diagnóstico (`micboost-diag`)
 
@@ -140,8 +142,8 @@ fifine USB a 48 kHz, Mono 1, buffer 256, EQ no padrão de voz, voz falada na dis
 - Calibração: com esse microfone, a voz chega ao nível de chamada (≈ −20 dBFS) só no máximo de +24 dB; a faixa atual é necessária e suficiente.
 - Proteção de pico: palmas a +24 dB acionaram "Limitador ativo", mas o BlackHole recebeu picos de até 1,1845 (+1,47 dBFS), com 118 amostras acima do teto de 0,891; as amostras alternam de sinal quase a cada amostra. O DSP limita a 0,891 e corta em ±1, então o excesso vem do resampler de drift do agregado, aplicado ao BlackHole depois do limitador. O teto passou a valer com o BlackHole como relógio principal ([audio-engine.md](audio-engine.md#decisão-dispositivo-agregado-privado-com-um-único-ioproc)); a confirmação medida está na entrada de 2026-11-04 abaixo.
 - Recuperação aprovada no app real: desconectar e reconectar o microfone USB; `killall coreaudiod` (o áudio volta sozinho; as faixas de dispositivo ausente durante o reinício foram eliminadas pela carência de 1,5 s); permissão de microfone negada e concedida (o macOS oferece "Encerrar e Reabrir" ao mudar a permissão com o app aberto; depois de reaberto, o áudio volta); troca manual da entrada padrão com "Usar MicBoost" (sem disputa); mudança de taxa do BlackHole no Configuração de Áudio e MIDI.
-- Menu nativo aprovado: sliders soltos fora do menu, campos de frequência, faixa traduzida, botão de apoio, alinhamento sem coluna de marca.
-- Pendentes: BlackHole ausente (remoção do driver), suspensão e retomada, restauração da entrada ao sair depois de divergir e usar "Usar MicBoost" duas vezes (correção na HAL falsa, falta o app real), medidores somente leitura e ganho sem campo no app real, VoiceOver e preferências de acessibilidade.
+- Menu nativo aprovado: sliders de ganho, largura e frequência, faixa traduzida, botão de apoio, alinhamento sem coluna de marca.
+- Pendentes: BlackHole ausente (remoção do driver), suspensão e retomada, restauração da entrada ao sair depois de divergir e usar "Usar MicBoost" duas vezes (correção na HAL falsa, falta o app real), medidores somente leitura, ganho e frequência sem campo no app real, VoiceOver e preferências de acessibilidade.
 
 ### Relógio do agregado e teto no BlackHole (2026-11-04)
 
@@ -276,19 +278,20 @@ escala de amplitude linear; valores ≤ −60 dBFS ficam em zero. `warningValue`
 O teste de proporcionalidade confere que +6,0206 dB dobra o comprimento para amplitudes de
 entrada de 0,01, 0,1 e 0,4.
 
-Sliders do painel em `NSSlider` (2026-11-03): os cinco sliders do painel — ganho, ganho de
-graves, médios e agudos e largura — são `NSSlider` puro dentro das views de item, porque o
-`Slider` do SwiftUI podia perder o mouse-up no tracking do menu e ficar preso no estado
-pressionado. O knob só acompanha valores externos quando não há arrasto, e as setas andam
-0,5 dB (1 dB com ⌥) ou 0,1 de Q.
+Sliders do painel em `NSSlider` (2026-11-03; frequências em 2026-11-04): os oito sliders do
+painel — ganho, ganho e frequência das três bandas e largura — são `NSSlider` puro dentro das
+views de item, porque o `Slider` do SwiftUI podia perder o mouse-up no tracking do menu e ficar
+preso no estado pressionado. O knob só acompanha valores externos quando não há arrasto, e as
+setas andam 0,5 dB (1 dB com ⌥), 0,1 de Q ou o próximo valor da grade de frequência.
 
-A suíte tem 109 testes (58 Core, 11 DSP, 40 UI) com execução somada de aproximadamente
-1,9 s; os testes de UI cobrem a estrutura do menu (ordem dos itens, seção "Microfone",
+A suíte tem 127 testes (64 Core, 11 DSP, 52 UI) com execução somada de aproximadamente
+2,0 s; os testes de UI cobrem a estrutura do menu (ordem dos itens, seção "Microfone",
 marcação da fonte selecionada, linha de fonte desconectada, atalhos ⌘, ⌘Q e "m"), as linhas
-de view em AppKit (cinco `NSSlider`, dois `NSSwitch`, dois `NSLevelIndicator` somente leitura
-e sem foco), a altura do painel com e sem o selo do limitador, o valor de ganho como rótulo,
-a leitura dos campos numéricos (vazio, inválido, vírgula, ponto, fora da faixa) e o passo de
-seta dos sliders. `swift build`, `swift test`,
+de view em AppKit (oito `NSSlider`, dois `NSSwitch`, dois `NSLevelIndicator` somente leitura
+e sem foco), a altura do painel com e sem o selo do limitador, o valor de ganho e o valor de
+frequência como rótulos, a grade de frequência (limites e arredondamento), o mapeamento
+logarítmico posição ↔ Hz, o arrasto e as setas do slider de frequência e o passo de seta dos
+sliders. `swift build`, `swift test`,
 lint de formatação recursivo e a montagem debug passam. O arrasto no menu real, inclusive
 soltando o mouse fora da janela do menu, a navegação por teclado e o clique nas linhas são
 verificação manual pendente.
@@ -299,8 +302,8 @@ A lógica de recuperação está implementada e coberta pela HAL falsa; os itens
 interação humana (notificações de suspensão, TCC, remoção do driver, reinício real do
 `coreaudiod`) continuam pendentes no roteiro manual acima. A etapa 5 permanece em andamento.
 
-Verificação automatizada: 109 testes (58 Core, 11 DSP, 40 UI) com execução somada de
-aproximadamente 1,9 s; a suíte Core inclui o caso
+Verificação automatizada: 127 testes (64 Core, 11 DSP, 52 UI) com execução somada de
+aproximadamente 2,0 s; a suíte Core inclui o caso
 negativo `fakeRejectsOutputWrite`, que registra uma issue conhecida intencionalmente.
 `swift build`, `swift test`, lint recursivo de formatação, montagem debug e
 `codesign --verify --strict` passam na máquina de referência.
@@ -351,8 +354,8 @@ itens de view alinham com o título dos itens nativos. `settings-*` continua vin
 Reteste do menu (2026-11-04): o medidor é exibição pura — `hitTest` devolve `nil`, `acceptsFirstResponder`
 é falso e o `mouseDown` é inerte —, e o valor de ganho virou rótulo somente leitura, sem campo nem ação de
 clique; o ganho continua pelo slider e pelas setas (0,5 dB, 1 dB com ⌥). As capturas `eq-*`, `panel-*` e
-`error-*` foram regeradas sem anel de foco e sem texto selecionado no primeiro campo de frequência, porque o
-auxiliar solta o primeiro respondedor antes da captura. `swift build`, `swift test` (109 testes) e
+`error-*` foram regeradas sem anel de foco, porque o auxiliar solta o primeiro respondedor antes da captura.
+`swift build`, `swift test` (127 testes) e
 `swift format lint --strict` passam; o arrasto do medidor e o clique no valor de ganho no menu real ficam para
 a verificação manual do mantenedor.
 
@@ -371,3 +374,15 @@ restauração e o prazo de 5 s encerra o app mesmo com o stop pendurado. Falta c
 com hardware real: divergir, usar MicBoost, divergir de novo, usar MicBoost e sair, com a
 entrada anterior restaurada e `log show --last 5m --info --predicate 'subsystem ==
 "io.github.vittau.MicBoost"'` mostrando as linhas da categoria `routing`.
+
+Frequência do EQ em slider (2026-11-04): os campos de frequência do menu foram substituídos
+por sliders `NSSlider` em escala logarítmica, com o valor em Hz como rótulo somente leitura,
+alinhados aos sliders de ganho; a grade quantiza em 10/100/500/1000 Hz conforme a faixa e os
+padrões 70, 3000 e 8000 Hz continuam na grade. `EQFrequencyScale` cobre a quantização nos
+limites (195, 199, 200, 950, 999, 1000, 1240, 1250, 9750, 9999, 10000, 10400 e 14000 Hz), as
+setas, o mapeamento logarítmico posição ↔ Hz e o máximo de 0,45 · fs; o arrasto e as setas do
+slider da banda de médios são exercitados até o `AppModel`. `swift build`, `swift test` (127
+testes, execução somada de ≈ 2,0 s) e `swift format lint --strict` passam, e as capturas
+`eq-{light,dark}` foram regeradas e inspecionadas: os três sliders de frequência aparecem na
+mesma coluna dos de ganho, com "70 Hz", "3000 Hz" e "8000 Hz" à direita. O arrasto real dentro
+do menu aberto, soltando o mouse fora da janela, fica para a verificação manual do mantenedor.
