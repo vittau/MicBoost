@@ -35,6 +35,9 @@ import SwiftUI
 }
 
 @MainActor func render() throws {
+    // The README is written in English, so the renders use the development language and
+    // its number format regardless of the maintainer's system language.
+    UILanguage.override = "en"
     let directory = URL(fileURLWithPath: CommandLine.arguments.dropFirst().first ?? "docs/screenshots")
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     let model = AppModel()

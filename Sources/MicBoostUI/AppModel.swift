@@ -4,14 +4,22 @@ import MicBoostCore
 import Observation
 import SwiftUI
 
-public func localized(_ key: String) -> String {
-    NSLocalizedString(key, bundle: .module, comment: "")
+@MainActor public func localized(_ key: String) -> String {
+    if let language = UILanguage.override, let path = Bundle.module.path(forResource: language, ofType: "lproj"),
+        let bundle = Bundle(path: path)
+    {
+        return bundle.localizedString(forKey: key, value: key, table: nil)
+    }
+    return NSLocalizedString(key, bundle: .module, comment: "")
 }
 
 /// Language and number format the string catalog resolved to.
-public enum UILanguage {
+@MainActor public enum UILanguage {
+    /// Pins the language of `localized(_:)`; `nil` follows the system. The screenshot
+    /// renderer pins English so the English README keeps consistent images.
+    public static var override: String?
     /// `"en"` or `"pt-BR"`.
-    public static var current: String { Bundle.module.preferredLocalizations.first ?? "en" }
+    public static var current: String { override ?? Bundle.module.preferredLocalizations.first ?? "en" }
     /// Number locale matching the resolved language, for renders and previews.
     public static var locale: Locale {
         Locale(identifier: current == "pt-BR" ? "pt_BR" : "en_US")
