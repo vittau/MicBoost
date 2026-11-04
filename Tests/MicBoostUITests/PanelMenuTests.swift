@@ -174,12 +174,18 @@ import Testing
         let panel = PanelMenuController(model: model)
         let rows = panel.menu.items.compactMap(\.view)
         let sliders = rows.flatMap(Self.sliders)
-        // Gain, three band gains and the width of the mid band.
-        #expect(sliders.count == 5)
+        // Gain, the gain and frequency of the three bands, and the width of the mid band.
+        #expect(sliders.count == 8)
         let gain = sliders.first { $0.accessibilityLabel() == localized("Gain") }
         #expect(gain?.isContinuous == true)
         #expect(gain?.numberOfTickMarks == 0)
         #expect(gain?.accessibilityValue() as? String == AppModel.gainLabel(model.controls.gainDB))
+        // The frequency sliders are continuous and show the value in Hz as read-only text.
+        let frequency = sliders.filter { $0.accessibilityLabel()?.hasSuffix("Hz") == true }
+        #expect(frequency.count == 3)
+        #expect(frequency.allSatisfy { $0.isContinuous && $0.numberOfTickMarks == 0 })
+        #expect(
+            frequency.map { $0.accessibilityValue() as? String }.compactMap { $0 } == ["70 Hz", "3000 Hz", "8000 Hz"])
         // Every switch of the panel is a native NSSwitch.
         let switches = rows.flatMap(Self.switches)
         #expect(switches.count == 2)
@@ -246,67 +252,5 @@ import Testing
     private static func textFields(in view: NSView) -> [NSTextField] {
         let own = (view as? NSTextField).map { [$0] } ?? []
         return own + view.subviews.flatMap { textFields(in: $0) }
-    }
-}
-
-/// Commit rule of the numeric menu fields (docs/ui.md "Teclado e acessibilidade").
-@MainActor struct MenuNumberFieldTests {
-    @Test func parseAcceptsCommaAndDotDecimals() {
-        #expect(MenuNumberField.parse("1,5", locale: Locale(identifier: "pt_BR")) == 1.5)
-        #expect(MenuNumberField.parse("1.5", locale: Locale(identifier: "pt_BR")) == 1.5)
-        #expect(MenuNumberField.parse("1.5", locale: Locale(identifier: "en_US")) == 1.5)
-        #expect(MenuNumberField.parse("1,5", locale: Locale(identifier: "en_US")) == 1.5)
-        #expect(MenuNumberField.parse("-12,25", locale: Locale(identifier: "pt_BR")) == -12.25)
-        #expect(MenuNumberField.parse(" 1200 ", locale: Locale(identifier: "pt_BR")) == 1200)
-    }
-
-    @Test func parseRejectsEmptyAndInvalidText() {
-        #expect(MenuNumberField.parse("", locale: .current) == nil)
-        #expect(MenuNumberField.parse("   ", locale: .current) == nil)
-        #expect(MenuNumberField.parse("-", locale: .current) == nil)
-        // A trailing separator is a partial decimal, not a rejected number.
-        #expect(MenuNumberField.parse("1,", locale: Locale(identifier: "pt_BR")) == 1)
-        #expect(MenuNumberField.parse("abc", locale: .current) == nil)
-        #expect(MenuNumberField.parse("nan", locale: .current) == nil)
-        #expect(MenuNumberField.parse("inf", locale: .current) == nil)
-    }
-
-    @Test func parseKeepsOutOfRangeValuesForTheModelToClamp() {
-        #expect(MenuNumberField.parse("9999", locale: .current) == 9999)
-        #expect(MenuNumberField.parse("-40", locale: .current) == -40)
-        // The model clamps the gain to its documented range.
-        let model = AppModel(statusGrace: .zero)
-        model.gain(100)
-        #expect(model.controls.gainDB == Settings.gainRange.upperBound)
-        model.gain(-100)
-        #expect(model.controls.gainDB == Settings.gainRange.lowerBound)
-    }
-
-    @Test func editingTextIsNeverReformatted() {
-        let field = MenuNumberField(width: 80)
-        field.show(6, fractionDigits: 1)
-        let shown = field.stringValue
-        field.isEditingText = true
-        field.stringValue = ""
-        // A model update in the middle of the edit keeps what the user typed.
-        field.show(12, fractionDigits: 1)
-        #expect(field.stringValue == "")
-        // Empty input on commit changes nothing and shows the current value again.
-        var committed: [Double] = []
-        field.onCommit = { committed.append($0) }
-        field.controlTextDidEndEditing(Notification(name: NSControl.textDidEndEditingNotification))
-        #expect(committed.isEmpty)
-        #expect(field.stringValue == MenuNumberField.format(12, fractionDigits: 1, locale: .current))
-        #expect(!shown.isEmpty)
-        // Invalid input behaves the same way.
-        field.isEditingText = true
-        field.stringValue = "-"
-        field.controlTextDidEndEditing(Notification(name: NSControl.textDidEndEditingNotification))
-        #expect(committed.isEmpty)
-        // Valid input commits the typed value.
-        field.isEditingText = true
-        field.stringValue = "3,5"
-        field.controlTextDidEndEditing(Notification(name: NSControl.textDidEndEditingNotification))
-        #expect(committed == [3.5])
     }
 }
