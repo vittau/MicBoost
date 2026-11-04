@@ -294,7 +294,7 @@ import SwiftUI
                         ForEach(1...sourceChannelCount, id: \.self) {
                             Text("Mono \($0)").tag($0)
                         }
-                        if sourceChannelCount >= 2 { Text("Stereo 1–2").tag(-2) }
+                        if sourceChannelCount >= 2 { Text(localized("Stereo")).tag(-2) }
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         Text(localized("Automatic: uses the first channel on both sides."))
@@ -306,7 +306,7 @@ import SwiftUI
                                     Int64(channel), Int64(channel)))
                         }
                         if sourceChannelCount >= 2 {
-                            Text(localized("Stereo 1–2: channel 1 on the left, channel 2 on the right."))
+                            Text(localized("Stereo: channel 1 on the left, channel 2 on the right."))
                         }
                     }
                     .font(.callout)
