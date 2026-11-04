@@ -196,11 +196,13 @@ ou 1,5 s para cair 30 dB, sem atraso de ataque adicionado pelo modelo.
 
 Ensaio visual de degrau 0 → 100% no macOS 27.2, com a mesma atualização SwiftUI
 para os dois controles: numa captura solicitada 100 ms depois do degrau,
-`ProgressView` ainda ocupava aproximadamente um terço da faixa; `NSLevelIndicator`
-já preenchia toda a faixa. O painel usa o indicador de nível nativo para não
+`ProgressView` ainda ocupava aproximadamente um terço da faixa; a trilha nativa
+de `NSSliderCell` usada pelo medidor já preenchia toda a faixa (captura solicitada
+aos 99,96 ms). O medidor aplica o valor diretamente ao desenho nativo, sem
 interpolar a apresentação dos picos. A escala foi conferida em 0 dBFS (100%) e
 −1 dBFS (98,33%), com clamp somente fora de −60…0 dBFS.
 
 Na captura clara renderizada a 1×, a trilha colorida do slider de ganho e as duas
-barras de nível medem 6 pixels de altura (6 pt). O indicador de nível mantém a
-aplicação direta do valor, sem interpolação de progresso.
+barras de nível medem 6 pixels de altura (6 pt), com cantos simétricos da trilha
+nativa. As renderizações clara e escura conferem o preenchimento de 100% na
+entrada e 98,33% na saída, sem knob nem moldura de indicador de capacidade.

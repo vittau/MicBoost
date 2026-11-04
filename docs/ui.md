@@ -74,9 +74,9 @@ Uma faixa no topo do conteúdo, abaixo do cabeçalho, mostra uma mensagem por ve
 
 ### Medidores na UI
 
-`NSLevelIndicator` contínuo apresenta os valores sem interpolação de progresso. As
-cores normal, de aviso e crítica usam `NSColor.controlAccentColor`, mantendo a mesma
-cor em toda a faixa. `MeterPoller` (main actor) lê `mb_engine_read_meters` por meio do controller a 20 Hz, só enquanto o painel está visível, e aplica decaimento visual de 20 dB/s calculado a cada leitura. Subidas usam o pico da leitura seguinte; apenas a queda é gradual (30 dB levam 1,5 s). Essa duração visual é independente da latência do áudio. Com "Reduzir movimento", não há interpolação: cada leitura é exibida diretamente.
+`NSControl` com papel de acessibilidade de indicador de nível, somente de leitura, apresenta os valores sem interpolação de
+progresso. Seu desenho usa apenas a trilha nativa de `NSSliderCell.drawBar`, sem knob,
+na altura de 6 pt; o AppKit define a curvatura e a cor de destaque em toda a faixa. `MeterPoller` (main actor) lê `mb_engine_read_meters` por meio do controller a 20 Hz, só enquanto o painel está visível, e aplica decaimento visual de 20 dB/s calculado a cada leitura. Subidas usam o pico da leitura seguinte; apenas a queda é gradual (30 dB levam 1,5 s). Essa duração visual é independente da latência do áudio. Com "Reduzir movimento", não há interpolação: cada leitura é exibida diretamente.
 
 ## Janela de ajustes
 
