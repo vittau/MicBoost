@@ -5,7 +5,7 @@ import Foundation
 import MicBoostDSP
 
 public struct LatencyMeasurement: Sendable {
-    public static func monitorMilliseconds(
+    public static func monitorPhysicalMilliseconds(
         sourceToBlackHole: Double, input: HardwareLatency, output: HardwareLatency, sampleRate: Double
     )
         -> Double

@@ -112,6 +112,7 @@ do {
             try await controller.start(inputUID: uid, bufferFrames: buffer)
             try await Task.sleep(for: .seconds(1))
             var values: [Double] = []
+            var physicalValues: [Double] = []
             var measuredRate: Double = 0
             let iterations = command == "soak" ? minutes : trials
             let begin = Date()
@@ -121,7 +122,7 @@ do {
                     throw EngineError.invalidArgument("Engine not running")
                 }
                 let result = try hardware.measureLatency(source: source, destination: destination)
-                var measured = result.milliseconds
+                let measured = result.milliseconds
                 if command == "monitor-latency" {
                     guard case .active(let output, let reported) = status.monitor else {
                         throw EngineError.invalidArgument("Monitor unavailable: \(status.monitor)")
@@ -130,11 +131,12 @@ do {
                     let inputMs = Double(input.total) * 1000 / status.sampleRate
                     let parts = try hardware.latencyComponents(output.id, scope: kAudioObjectPropertyScopeOutput)
                     let outputMs = Double(parts.total) * 1000 / status.sampleRate
-                    measured = LatencyMeasurement.monitorMilliseconds(
+                    let physical = LatencyMeasurement.monitorPhysicalMilliseconds(
                         sourceToBlackHole: result.milliseconds, input: input, output: parts,
                         sampleRate: status.sampleRate)
+                    physicalValues.append(physical)
                     report(
-                        "input_device_frames=\(input.device) input_safety_frames=\(input.safety) input_stream_frames=\(input.stream) input_ms=\(inputMs) source_to_BlackHole_ms=\(result.milliseconds) output_device_frames=\(parts.device) output_safety_frames=\(parts.safety) output_stream_frames=\(parts.stream) output_ms=\(outputMs) monitor_sum_ms=\(measured) monitor_reported_ms=\(reported)"
+                        "monitor_added_ms=\(measured) input_device_frames=\(input.device) input_safety_frames=\(input.safety) input_stream_frames=\(input.stream) input_ms=\(inputMs) source_to_BlackHole_ms=\(result.milliseconds) output_device_frames=\(parts.device) output_safety_frames=\(parts.safety) output_stream_frames=\(parts.stream) output_ms=\(outputMs) monitor_physical_estimate_ms=\(physical) monitor_reported_ms=\(reported)"
                     )
                 }
                 values.append(measured)
@@ -152,8 +154,16 @@ do {
             values.sort()
             let median = (values[(values.count - 1) / 2] + values[values.count / 2]) / 2
             report(
-                "latency_ms median=\(median) min=\(values.first ?? 0) max=\(values.last ?? 0) median_frames=\(median * measuredRate / 1000)"
+                "\(command == "monitor-latency" ? "monitor_added_ms" : "latency_ms") median=\(median) min=\(values.first ?? 0) max=\(values.last ?? 0) median_frames=\(median * measuredRate / 1000)"
             )
+            if !physicalValues.isEmpty {
+                physicalValues.sort()
+                let physicalMedian =
+                    (physicalValues[(physicalValues.count - 1) / 2] + physicalValues[physicalValues.count / 2]) / 2
+                report(
+                    "monitor_physical_estimate_ms median=\(physicalMedian) min=\(physicalValues.first ?? 0) max=\(physicalValues.last ?? 0)"
+                )
+            }
             try await controller.stop()
         } catch {
             try await controller.stop()

@@ -130,9 +130,9 @@ O valor oficial é o medido ([testing.md](testing.md#medição-de-latência)); o
 
 ## Modo monitor
 
-Com o monitor ligado, a voz processada sai também na saída padrão do sistema, para o usuário ouvir a si mesmo. A meta é latência da fonte à saída **< 50 ms** (mediana medida, [testing.md](testing.md#medição-de-latência-do-monitor)).
+Com o monitor ligado, a voz processada sai também na saída padrão do sistema, para o usuário ouvir a si mesmo. A meta é latência **adicionada pelo MicBoost < 50 ms**: a mediana fonte → BlackHole medida com o subdispositivo de monitor presente, pois BlackHole e monitor são escritos no mesmo ciclo. Latências físicas de entrada e saída não entram na meta ([testing.md](testing.md#medição-de-latência-do-monitor)).
 
-**Decisão: a saída de monitor é um subdispositivo do mesmo agregado.** O IOProc único escreve no BlackHole e na saída de monitor no mesmo ciclo, sem fila. A latência do monitor fica limitada à latência de entrada da fonte, a dois buffers do agregado e à latência de saída do dispositivo (por exemplo, ≈ 15 ms + latência da saída no buffer padrão). Um segundo IOProc na saída exigiria buffer circular e resampler próprio, e acrescentaria a ocupação da fila à latência.
+**Decisão: a saída de monitor é um subdispositivo do mesmo agregado.** O IOProc único escreve no BlackHole e na saída de monitor no mesmo ciclo, sem fila. A estimativa total do monitor inclui a latência física de entrada da fonte, dois buffers do agregado e a latência física de saída; os termos físicos não fazem parte da meta de latência adicionada. Um segundo IOProc na saída exigiria buffer circular e resampler próprio, e acrescentaria a ocupação da fila à latência.
 
 - **Saída de monitor:** o dispositivo de `kAudioHardwarePropertyDefaultOutputDevice`, apenas lido. O MicBoost nunca escreve a saída padrão (nem `kAudioHardwarePropertyDefaultSystemOutputDevice`).
 - **Elegível** se tiver ≥ 1 canal de saída, **não** for BlackHole (nenhuma variante), **não** for o agregado do MicBoost e **não** for um agregado que contenha BlackHole (mesma verificação recursiva da fonte). Escrever no BlackHole seria realimentação.
@@ -147,9 +147,9 @@ Com o monitor ligado, a voz processada sai também na saída padrão do sistema,
 
 `MonitorStatus` (em `EngineStatus.monitor`): `off` (desligado ou motor parado), `active(output: AudioDevice, reportedLatencyMs: Double)` ou `unavailable(reason, outputName: String?)`, com `reason` `noOutput` (sem saída padrão ou sem canais de saída), `outputIsLoopback` (BlackHole, agregado com BlackHole ou o agregado do MicBoost) e `formatUnsupported`.
 
-O diagnóstico usa um atômico de monitor silencioso, definido antes do start e lido uma vez por ciclo: o agregado e os streams são idênticos, mas os canais de monitor recebem zero. O app nunca ativa esse modo. A medição silenciosa soma os componentes de entrada da fonte reportados pela HAL, fonte → BlackHole medida e os componentes de saída reportados pela HAL ([testing.md](testing.md#medição-de-latência-do-monitor)).
+A latência adicionada é o resultado principal do diagnóstico. O diagnóstico usa um atômico de monitor silencioso, definido antes do start e lido uma vez por ciclo: o agregado e os streams são idênticos, mas os canais de monitor recebem zero. O app nunca ativa esse modo. Como contexto, a estimativa física total soma os componentes de entrada da fonte reportados pela HAL, fonte → BlackHole medida e os componentes de saída reportados pela HAL ([testing.md](testing.md#medição-de-latência-do-monitor)).
 
-**Latência reportada do monitor:** latência e safety offset de entrada da fonte e do stream de entrada, mais dois buffers do agregado, mais latência e safety offset de saída da saída de monitor e do stream de saída. Como a latência do motor, serve de referência; o valor oficial é o medido. Em saídas Bluetooth, a latência de saída do próprio dispositivo costuma passar de 100 ms, e a meta de 50 ms não é alcançável.
+**Latência reportada do monitor:** latência e safety offset de entrada da fonte e do stream de entrada, mais dois buffers do agregado, mais latência e safety offset de saída da saída de monitor e do stream de saída. Essa estimativa total serve de referência no painel (≈ N ms, com "atraso alto" acima de 50 ms), e não é o critério de aceitação. O diagnóstico também imprime a estimativa física com a ponte medida no lugar dos dois buffers. Em saídas Bluetooth, a latência física do próprio dispositivo costuma passar de 100 ms; ela pode aumentar o atraso total sem impedir a meta de latência adicionada pelo MicBoost.
 
 ## Política de entrada padrão (`DefaultInputManager`)
 
