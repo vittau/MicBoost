@@ -57,6 +57,10 @@ Distribuição:
 Controles:
 - Ganho, mute, EQ, bypass e modo de canais não reiniciam o motor.
 
+Interface:
+- Componente nativo sempre que existir um que atenda: AppKit/SwiftUI do sistema, sem controle desenhado ou imitado. Personalização só quando não há equivalente nativo, com o motivo em `docs/ui.md`.
+- Dentro do `NSMenu`, itens de menu (lista de microfones, ações como "Ajustes…" e "Sair") são `NSMenuItem` reais, e controles interativos em views de item são AppKit (`NSSlider`, `NSSwitch`, `NSTextField`, `NSButton`), não controles SwiftUI, cujo tratamento de eventos falha no laço de acompanhamento do menu.
+
 ## Convenções de código
 
 - Swift formatado com `swift format`, usando `.swift-format` na raiz; executar antes de commitar.

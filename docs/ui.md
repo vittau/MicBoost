@@ -4,7 +4,7 @@
 
 - Terminologia: a UI chama a entrada processada de "MicBoost". O nome "BlackHole 2ch" só aparece onde o usuário precisa reconhecê-lo: ao escolher o microfone dentro de um app que não segue a entrada do sistema, e quando o driver está ausente.
 
-- A aparência e o comportamento nativos são a diretriz para toda a interface: preferir componentes AppKit/SwiftUI, métricas e cores do sistema; personalizar apenas o necessário para o painel. Ações de menu ficam em texto, switches usam o estilo do sistema e campos mantêm os comandos padrão de edição.
+- A aparência e o comportamento nativos são a diretriz para toda a interface: usar o componente nativo sempre que existir um que atenda, com métricas e cores do sistema; nada desenhado ou imitado. Personalização só onde não há equivalente nativo, com o motivo registrado aqui. No menu da barra, ações e listas são `NSMenuItem` reais e controles interativos em views de item são AppKit. Ações de menu ficam em texto, switches usam o estilo do sistema e campos mantêm os comandos padrão de edição.
 - Parecer parte do sistema: materiais, tipografia (fonte do sistema, tamanhos de controle `.regular`/`.small`), espaçamento e cantos dos módulos de Som/Bluetooth da Central de Controle; ícones SF Symbols; sliders, toggles e listas nativos.
 - Sem aparência de mixer de estúdio e sem animações contínuas. Os medidores são o único elemento atualizado periodicamente, e só com o painel visível.
 - Toda a UI vem do `AppModel` (`@Observable`, `@MainActor`), que reflete o `EngineStatus` e encaminha comandos ao `EngineController`. A UI nunca chama a HAL.
