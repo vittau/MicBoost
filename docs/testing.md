@@ -235,3 +235,51 @@ Na captura clara renderizada a 1×, a trilha colorida do slider de ganho e as du
 barras de nível medem 6 pixels de altura (6 pt), com cantos simétricos da trilha
 nativa. As renderizações clara e escura conferem o preenchimento de 100% na
 entrada e 89,13% na saída, sem knob nem moldura de indicador de capacidade.
+
+### Recuperação (etapa 5)
+
+A lógica de recuperação está implementada e coberta pela HAL falsa; os itens que exigem
+interação humana (notificações de suspensão, TCC, remoção do driver, reinício real do
+`coreaudiod`) continuam pendentes no roteiro manual acima. A etapa 5 permanece em andamento.
+
+Verificação automatizada: 78 testes (57 Core, 11 DSP, 10 UI) com execução somada de
+aproximadamente 1,2 s (Core 0,64 s, DSP 0,17 s, UI 0,38 s); a suíte Core inclui o caso
+negativo `fakeRejectsOutputWrite`, que registra uma issue conhecida intencionalmente.
+`swift build`, `swift test`, lint recursivo de formatação, montagem debug e
+`codesign --verify --strict` passam na máquina de referência.
+
+Mudança de formato com hardware real (2026-11-03), C920 USB, buffer 256, `micboost-diag run`
+e `micboost-diag set-rate`:
+
+- a taxa de trabalho foi 24000 Hz nas duas pontas: o C920 oferece 16/24/32 kHz e o BlackHole
+  não oferece 32 kHz, então a maior taxa comum abaixo de 48 kHz é 24 kHz;
+- `starting` → `running` em 1111 ms; nenhuma reconstrução espúria depois do start;
+- com o motor rodando, `set-rate` no BlackHole (44100, depois 48000) e no C920 (32000, depois
+  16000) produziu `recovering(formatChanged)` → `running` em 432, 375, 1302 e 1193 ms, sempre
+  de volta a 24000 Hz, com 0 overloads, `input_missing` e `nonfinite_resets`;
+- o agregado privado fixa a taxa dos subdispositivos: o próprio `set-rate` lê a taxa antiga de
+  volta (a HAL aceita e reverte a escrita), mas a notificação chega e o motor reconstrói. Uma
+  mudança externa de taxa, portanto, não fica visível como uma taxa diferente; é a notificação
+  que dispara a recuperação;
+- a faixa de buffer e os safety offsets do dispositivo sobem quando o agregado entra em uso; essa
+  mudança não é formato e não reconstrói o motor (teste `deviceLatencyChangeDoesNotRebuild`);
+- no stop voluntário, as taxas voltaram a 16000 Hz (C920) e 16000 Hz (BlackHole), os valores
+  anteriores à execução.
+
+App com mudança de taxa (2026-11-03): painel aberto, processamento ligado, C920 selecionado,
+ganho +6 dB e "Entrada do sistema: MicBoost". `set-rate` no BlackHole para 44100 com o app
+rodando manteve a entrada padrão em `BlackHole2ch_UID` antes e depois, o rótulo de
+acessibilidade do item de barra em "MicBoost, Ativo, 200% (+6,0dB)" e a linha de roteamento do
+painel inalterada; o BlackHole voltou a 24000 Hz. Nenhum erro do motor restaurou a entrada
+padrão. Sair pelo próprio app restaurou a entrada para `BuiltInMicrophoneDevice` e as taxas
+para as anteriores. Estado final: BlackHole a 48000 Hz, C920 a 16000 Hz, entrada padrão
+`BuiltInMicrophoneDevice` e nenhum processo `MicBoost.app` ou `micboost-diag` restante.
+
+Capturas para o README: `docs/screenshots/eq-{light,dark}.png` e
+`settings-{light,dark}.png` foram regeradas com estado de amostra realista (entrada do sistema
+MicBoost com marcação, microfone USB selecionado, ganho +6 dB, medidores com níveis, 48000 Hz,
+buffer 256, latência reportada de 15,3 ms e licença GPL-3.0). O locale vem do idioma resolvido
+pelo catálogo (`en` → `en_US`), então os números usam ponto decimal e vírgula de milhar do
+inglês. `panel-*` e `error-*` continuam geradas, mas não são mais referenciadas no README. O
+switch nativo sai com o estado visual errado na captura clara; a conferência do controle real
+segue sendo a da árvore de acessibilidade.
