@@ -88,7 +88,7 @@ quit MicBoost, your previous microphone comes back.
 
 - **A louder microphone also makes background noise louder.** If you can, speak closer to the
   microphone, or turn up its own volume knob first.
-- **Bluetooth headsets** (such as AirPods) sound worse while their microphone is in use. This is
+- **Bluetooth headsets** (such as AirPods) can be used as both the microphone and monitoring output, but sound worse while their microphone is in use. This is
   how Bluetooth works, not MicBoost. A USB or built-in microphone sounds better.
 - **The iPhone microphone** (Continuity) adds a noticeable delay of its own.
 - **The MacBook's built-in microphone is off when the lid is closed.**

@@ -178,3 +178,72 @@ func unavailableMonitorDoesNotLoop(_ scenario: String) async throws {
     try await engine.stop()
     #expect(fake.monitorCounts.stopped == 1)
 }
+
+@Test(arguments: [kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE])
+func bluetoothProfileSwitchSettlesWithoutRebuildLoop(_ transport: UInt32) async throws {
+    let fake = monitorHardware()
+    fake.update("source") {
+        $0.transport = transport
+        $0.sampleRate = 44100
+        $0.availableSampleRates = [.init(44100, 44100)]
+        $0.inputChannels = 2
+        $0.outputChannels = 2
+    }
+    fake.update("BlackHole2ch_UID") { $0.availableSampleRates = [.init(16000, 48000)] }
+    fake.output = 1
+    fake.bluetoothProfileUID = "source"
+    fake.deferBluetoothStopEvents = true
+    let engine = EngineController(hardware: fake)
+    try await engine.setMonitorEnabled(true)
+    try await engine.start(inputUID: "source")
+    #expect(await waitUntil { await engine.status().sampleRate == 16000 && fake.aggregateCreations == 2 })
+    try await Task.sleep(for: .seconds(2))
+    fake.emitProfile("source")
+    try await Task.sleep(for: .milliseconds(250))
+    #expect(fake.aggregateCreations == 2)
+    #expect(await engine.status().state == .running)
+    #expect(fake.monitorRates.last == 16000)
+    #expect(fake.monitorCounts.started >= 2)
+    try await Task.sleep(for: .milliseconds(1000))
+    // Retired source listeners from our stop must remain inert beyond the settle window.
+    fake.deliverBluetoothStopEvents()
+    try await Task.sleep(for: .milliseconds(200))
+    #expect(fake.aggregateCreations == 2)
+    let previousMonitorStarts = fake.monitorCounts.started
+    // A real stream change outside the 3 s own-event window rebuilds once.
+    fake.emit(.init(1, kAudioDevicePropertyStreamConfiguration, kAudioObjectPropertyScopeInput))
+    #expect(await waitUntil { fake.aggregateCreations == 3 && fake.monitorCounts.started > previousMonitorStarts })
+    #expect(await engine.status().sampleRate == 16000)
+    try await Task.sleep(for: .milliseconds(180))
+    #expect(fake.aggregateCreations == 3)
+    try await engine.stop()
+    #expect(fake.rate(of: "source") == 44100)
+    #expect(await engine.status().state == .stopped)
+}
+
+@Test(arguments: [false, true])
+func bluetoothOutputAtDifferentRateLeavesMotorAndOutputRatesUntouched(_ lists48: Bool) async throws {
+    let fake = monitorHardware()
+    fake.update("source") {
+        $0.inputChannels = 2
+        $0.transport = kAudioDeviceTransportTypeBuiltIn
+        $0.availableSampleRates = [.init(44100, 96000)]
+    }
+    fake.update("output") {
+        $0.transport = kAudioDeviceTransportTypeBluetooth
+        $0.sampleRate = 44100
+        $0.availableSampleRates = [.init(44100, lists48 ? 48000 : 44100)]
+    }
+    let engine = EngineController(hardware: fake)
+    try await engine.setMonitorEnabled(true)
+    try await engine.start(inputUID: "source")
+    guard case .active = await engine.status().monitor else {
+        Issue.record("Output rejected")
+        try await engine.stop()
+        return
+    }
+    #expect(await engine.status().sampleRate == 48000)
+    #expect(fake.monitorRates == [44100])
+    #expect(!fake.appliedRateWrites.contains { $0.uid == "output" })
+    try await engine.stop()
+}

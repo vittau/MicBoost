@@ -34,6 +34,19 @@ final class FakeAudioHardware: AudioHardware, @unchecked Sendable {
         get { lock.withLock { storedMonitorError } }
         set { lock.withLock { storedMonitorError = newValue } }
     }
+    private var deferStopEvents = false
+    var deferBluetoothStopEvents: Bool {
+        get { lock.withLock { deferStopEvents } }
+        set { lock.withLock { deferStopEvents = newValue } }
+    }
+    private var profileUID: String?
+    private var retiredProfileListeners: [(HardwareProperty, DispatchQueue, @Sendable () -> Void)] = []
+    private var observedMonitorRates: [Double] = []
+    var bluetoothProfileUID: String? {
+        get { lock.withLock { profileUID } }
+        set { lock.withLock { profileUID = newValue } }
+    }
+    var monitorRates: [Double] { lock.withLock { observedMonitorRates } }
     private var storedOutput: AudioObjectID = 0
     private var storedFailMonitorStart = false
     var output: AudioObjectID {
@@ -155,7 +168,17 @@ final class FakeAudioHardware: AudioHardware, @unchecked Sendable {
         return id
     }
 
-    func removeListener(_ token: UUID) throws { lock.withLock { registrations.removeValue(forKey: token) } }
+    func removeListener(_ token: UUID) throws {
+        lock.withLock {
+            if let removed = registrations.removeValue(forKey: token),
+                storedDevices.first(where: { $0.uid == profileUID })?.id == removed.0.object,
+                [kAudioDevicePropertyNominalSampleRate, kAudioDevicePropertyStreamConfiguration].contains(
+                    removed.0.selector)
+            {
+                retiredProfileListeners.append(removed)
+            }
+        }
+    }
 
     func emit(_ property: HardwareProperty) {
         let callbacks = lock.withLock {
@@ -176,7 +199,10 @@ extension FakeAudioHardware: EngineHardware {
     func createMonitor(_ device: AudioDevice, context: OpaquePointer, rate: Double) throws -> any MonitorSession {
         if let monitorError { throw monitorError }
         if failMonitorStart { throw EngineError.halFailure(-321, "Create monitor") }
-        lock.withLock { monitorCreates += 1 }
+        lock.withLock {
+            monitorCreates += 1
+            observedMonitorRates.append(device.sampleRate)
+        }
         return FakeMonitorSession(
             onStart: { [self] in lock.withLock { monitorStarts += 1 } },
             onStop: { [self] in
@@ -246,10 +272,44 @@ extension FakeAudioHardware: EngineHardware {
 
     func startIO(_ device: AudioObjectID, proc: AudioDeviceIOProcID) throws {
         lock.withLock { starts += 1 }
+        if let uid = bluetoothProfileUID {
+            update(uid) {
+                $0.sampleRate = 16000
+                $0.availableSampleRates = [.init(16000, 16000)]
+                $0.inputChannels = 1
+                $0.outputChannels = 1
+            }
+            emitProfile(uid)
+        }
     }
 
     func stopIO(_ device: AudioObjectID, proc: AudioDeviceIOProcID) throws {
         lock.withLock { stops += 1 }
+        if let uid = bluetoothProfileUID {
+            update(uid) {
+                $0.sampleRate = 44100
+                $0.availableSampleRates = [.init(44100, 44100)]
+                $0.inputChannels = 2
+                $0.outputChannels = 2
+            }
+            if !deferBluetoothStopEvents { deliverBluetoothStopEvents() }
+            emitProfile(uid)
+        }
+    }
+    func deliverBluetoothStopEvents() {
+        let retired = lock.withLock {
+            let result = retiredProfileListeners
+            retiredProfileListeners.removeAll()
+            return result
+        }
+        for (_, queue, handler) in retired { queue.async(execute: handler) }
+    }
+    func emitProfile(_ uid: String) {
+        guard let device = device(uid) else { return }
+        emit(.init(device.id, kAudioDevicePropertyNominalSampleRate))
+        emit(.init(device.id, kAudioDevicePropertyStreamConfiguration, kAudioObjectPropertyScopeInput))
+        emit(.init(device.id, kAudioDevicePropertyStreamConfiguration, kAudioObjectPropertyScopeOutput))
+        emit(.init(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDevices))
     }
 
     func destroyIO(_ device: AudioObjectID, proc: AudioDeviceIOProcID) throws {}

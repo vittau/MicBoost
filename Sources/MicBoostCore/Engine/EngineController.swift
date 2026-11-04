@@ -159,6 +159,7 @@ public actor EngineController {
     private var appliedRates: [String: Double] = [:]
     /// Format notifications that arrive right after a build are the engine's own start.
     private var settleUntil = Date.distantPast
+    private var formatGeneration: UInt64 = 0
     /// Delay before the single start attempt after a wake.
     private let wakeDelay: Duration
     private var stateObserver: (@Sendable (EngineState) -> Void)?
@@ -263,7 +264,7 @@ public actor EngineController {
             logMonitorUnavailable()
         }
     }
-    private func build() async throws {
+    private func build(bluetoothProfile: AudioDevice? = nil) async throws {
         setState(.starting)
         do {
             guard hardware.microphoneAuthorized else {
@@ -281,6 +282,11 @@ public actor EngineController {
             else {
                 setState(hasRun ? .recovering(.sourceLost) : .error(.sourceUnavailable(selected ?? "")))
                 return
+            }
+            if let profile = bluetoothProfile, profile.uid == source.uid, Self.isBluetooth(source) {
+                let currentID = source.id
+                source = profile
+                source.id = currentID
             }
             guard
                 let working = Self.workingSampleRate(
@@ -331,6 +337,7 @@ public actor EngineController {
                 enabled: Array(repeating: false, count: sourceLayout.outputStreams)
                     + Array(repeating: true, count: destinationLayout.outputStreams))
             try hardware.startIO(id, proc: io)
+            let generation = formatGeneration
             for device in [source, blackHole] {
                 tokens.append(
                     try hardware.addListener(.init(device.id, kAudioDevicePropertyDeviceIsAlive), queue: queue) {
@@ -341,16 +348,17 @@ public actor EngineController {
                 tokens.append(
                     try hardware.addListener(.init(device.id, kAudioDevicePropertyNominalSampleRate), queue: queue) {
                         [weak self] in
-                        Task { await self?.rateChanged(uid: uid) }
+                        Task { await self?.rateChanged(uid: uid, generation: generation) }
                     })
             }
             for device in [source, blackHole] {
+                let uid = device.uid
                 for scope in [kAudioObjectPropertyScopeInput, kAudioObjectPropertyScopeOutput] {
                     tokens.append(
                         try hardware.addListener(
                             .init(device.id, kAudioDevicePropertyStreamConfiguration, scope), queue: queue
                         ) { [weak self] in
-                            Task { await self?.formatEvent() }
+                            Task { await self?.formatEvent(uid: uid, generation: generation) }
                         })
                 }
             }
@@ -364,9 +372,14 @@ public actor EngineController {
                 + hardware.latencyFrames(id, scope: kAudioObjectPropertyScopeInput) + buffer
             hasRun = true
             setState(.running)
-            settleUntil = Date().addingTimeInterval(0.3)
+            settleUntil = Date().addingTimeInterval(Self.isBluetooth(source) ? 3 : 0.3)
             try await routingManager.engineDidStart(blackHole: blackHole)
             await startMonitor()
+            if Self.isBluetooth(source), let current = try hardware.devices().first(where: { $0.uid == source.uid }),
+                current.sampleRate != source.sampleRate
+            {
+                changed()
+            }
         } catch {
             setState(.error((error as? EngineError) ?? .invalidArgument(String(describing: error))))
             try tearDown()
@@ -619,20 +632,34 @@ public actor EngineController {
             await self?.recover()
         }
     }
-    /// Format notifications during the settling window belong to the engine's own start.
-    private func formatEvent() {
-        guard Date() >= settleUntil else { return }
+    private static func isBluetooth(_ device: AudioDevice) -> Bool {
+        device.transport == kAudioDeviceTransportTypeBluetooth
+            || device.transport == kAudioDeviceTransportTypeBluetoothLE
+    }
+    /// Retired generations include format events queued by our own stop/profile release.
+    private func formatEvent(uid: String, generation: UInt64) {
+        guard generation == formatGeneration else { return }
+        if Date() < settleUntil {
+            if let source, Self.isBluetooth(source), source.uid == uid,
+                let current = try? hardware.devices().first(where: { $0.uid == uid }),
+                current.sampleRate != source.sampleRate
+            {
+                changed(force: true)
+            }
+            return
+        }
         changed(force: true)
     }
-    /// A rate notification caused by MicBoost's own write is not an external format change.
-    private func rateChanged(uid: String) async {
+    private func rateChanged(uid: String, generation: UInt64) async {
+        guard generation == formatGeneration else { return }
         if let applied = appliedRates[uid], (try? hardware.devices().first { $0.uid == uid }?.sampleRate) == applied {
             return
         }
-        formatEvent()
+        formatEvent(uid: uid, generation: generation)
     }
     private func recover() async {
-        guard let uid = selected, !sleeping else { return }
+        // Start owns its asynchronous aggregate wait; never interleave a second build.
+        guard state != .starting, let uid = selected, !sleeping else { return }
         let forced = forceRebuild
         let event = pendingReason
         forceRebuild = false
@@ -653,6 +680,13 @@ public actor EngineController {
             }
             return
         }
+        if let current = currentSource, let previous = source, Self.isBluetooth(previous),
+            Date() < settleUntil, previous.id == current.id, previous.alive == current.alive,
+            previous.sampleRate == current.sampleRate
+        {
+            // HFP republishes stream/channel descriptors after the rate has settled.
+            source = current
+        }
         let sameSource = currentSource.map { current in source?.matchesEngineDescriptor(current) ?? false } ?? false
         let sameDestination = destination?.matchesEngineDescriptor(currentDestination) ?? false
         if state == .running, sameSource, sameDestination {
@@ -670,8 +704,9 @@ public actor EngineController {
             setState(.recovering(.formatChanged))
         }
         do {
+            let profile = currentSource.flatMap { Self.isBluetooth($0) ? $0 : nil }
             try tearDown()
-            try await build()
+            try await build(bluetoothProfile: profile)
         } catch { setState(.error((error as? EngineError) ?? .invalidArgument(String(describing: error)))) }
     }
     private func currentMonitorOutput(in devices: [AudioDevice]) -> AudioDevice? {
@@ -695,7 +730,7 @@ public actor EngineController {
         if previousRates[uid] == nil { previousRates[uid] = current }
         appliedRates[uid] = target
     }
-    /// Restore all rates on voluntary stop, or only an output leaving the aggregate.
+    /// Restore device rates only on voluntary stop or source switch.
     private func restoreRates() {
         guard !appliedRates.isEmpty else { return }
         let devices = (try? hardware.devices()) ?? []
@@ -709,6 +744,7 @@ public actor EngineController {
         previousRates.removeAll()
     }
     private func tearDown() throws {
+        formatGeneration &+= 1
         do { try stopMonitor() } catch {
             // A failed output cleanup retains its context/ring; the bridge can still stop.
             recordMonitorFailure(error, operation: "Stop monitor during engine teardown")
