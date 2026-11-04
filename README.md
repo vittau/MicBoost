@@ -195,9 +195,6 @@ Full results and conditions: [docs/testing.md](docs/testing.md#resultados-regist
 - **Digital gain amplifies noise too**, and it cannot recover audio that was already clipped at
   the source. If your microphone has a hardware gain knob, or you can speak closer to it, use that
   first.
-- **Very loud transients stay at or below −1 dBFS at BlackHole**, including the inter-sample
-  peaks a clock-correction resampler would create after the limiter: corrected for by placing
-  the resampler on the microphone input instead of the BlackHole output.
 - **MicBoost changes the sample rate of the selected microphone** to the working rate it shares
   with BlackHole (48 kHz when both support it). Other apps that read that microphone directly
   adapt to the change, and the previous rate is restored when you quit or switch microphones.

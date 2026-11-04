@@ -6,7 +6,7 @@ Status: `não iniciado` · `em andamento` · `concluído`. Uma etapa só é conc
 |---|---|---|
 | 0 | Estrutura e diagnóstico | concluído |
 | 1 | Ponte mínima | concluído |
-| 2 | Ganho e proteção de pico | em andamento |
+| 2 | Ganho e proteção de pico | concluído |
 | 3 | Equalizador | concluído |
 | 4 | Interface | em andamento |
 | 5 | Recuperação | em andamento |
