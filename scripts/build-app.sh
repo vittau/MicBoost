@@ -14,8 +14,12 @@ cp "$bin/MicBoost" "$app/Contents/MacOS/"
 cp Resources/Info.plist "$app/Contents/Info.plist"
 minimum_macos=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$app/Contents/Info.plist")
 scripts/record-build-sdk.sh "$app/Contents/MacOS/MicBoost" "$minimum_macos"
-version=$(git describe --tags --match 'v[0-9]*' --abbrev=0 2>/dev/null || echo v0.0.0)
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${version#v}" "$app/Contents/Info.plist"
+version=${MICBOOST_VERSION:-}
+if [[ -z "$version" ]]; then
+    version=$(git describe --tags --match 'v[0-9]*' --abbrev=0 2>/dev/null || echo v0.0.0)
+    version=${version#v}
+fi
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(git rev-list --count HEAD)" "$app/Contents/Info.plist"
 for bundle in "$bin"/*.bundle; do
     [[ -d "$bundle" ]] && cp -R "$bundle" "$app/Contents/Resources/"

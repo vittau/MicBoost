@@ -5,6 +5,7 @@
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black.svg)](#requirements)
 [![Apple Silicon and Intel](https://img.shields.io/badge/Apple%20Silicon%20%2B%20Intel-universal-black.svg)](#requirements)
 [![Swift 6](https://img.shields.io/badge/Swift-6-orange.svg)](#requirements)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Not notarized](https://img.shields.io/badge/signing-ad--hoc%2C%20not%20notarized-red.svg)](#first-launch)
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ff69b4.svg)](https://github.com/sponsors/vittau)
 
@@ -22,17 +23,29 @@ calls, recorders, anything — hears the processed voice.
 
 ## Screenshots
 
-| Panel (light) | Panel (dark) |
-| --- | --- |
-| ![Panel](docs/screenshots/panel-light.png) | ![Panel dark](docs/screenshots/panel-dark.png) |
-| EQ expanded | Settings |
-| ![EQ](docs/screenshots/eq-light.png) | ![Settings](docs/screenshots/settings-light.png) |
-| Missing driver | Missing driver (dark) |
-| ![Error](docs/screenshots/error-light.png) | ![Error dark](docs/screenshots/error-dark.png) |
+Everything lives in the menu bar: one click opens MicBoost, with the on/off switch, gain, level
+meters, the microphone list and the equalizer.
 
-Off-screen renders of the real SwiftUI views with sample state; live panel transparency
-adapts to your desktop and macOS appearance. Generated with
-`scripts/render-screenshots.sh`. Both appearances for every view are in `docs/screenshots/`.
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/eq-dark.png">
+    <img src="docs/screenshots/eq-light.png" alt="MicBoost menu with the on/off switch, gain, level meters, microphone list and 3-band equalizer" width="320">
+  </picture>
+  <br>
+  <sub>The MicBoost menu: gain, input and output meters, microphone and equalizer.</sub>
+</p>
+
+Less frequent choices — automatic system input, buffer size, channels and diagnostics — sit in
+the settings window.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/settings-dark.png">
+    <img src="docs/screenshots/settings-light.png" alt="MicBoost settings window with the Audio, Diagnostics and About sections" width="540">
+  </picture>
+  <br>
+  <sub>Settings: audio options, diagnostics and app information.</sub>
+</p>
 
 ## How it works
 
@@ -255,9 +268,9 @@ in:
 
 ## License
 
-**Not decided yet.** The repository carries no license grant while the choice is open; GPL-3.0 is
-the current recommendation, because it aligns with BlackHole and simplifies a future combined
-installer. See the open decisions in [the roadmap](docs/roadmap.md#decisões-em-aberto).
+MicBoost is free software, released under the [GNU General Public License v3.0](LICENSE). You may
+use, study, modify and share it; versions you distribute must stay under the same license, with
+their source code available.
 
 ## Credits
 

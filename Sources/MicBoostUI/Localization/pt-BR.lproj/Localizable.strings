@@ -15,7 +15,7 @@
 "How to install" = "Como instalar";
 "In calling and recording apps, select BlackHole 2ch or the system default input." = "Em apps de chamada e gravação, selecione BlackHole 2ch ou a entrada padrão do sistema.";
 "Input" = "Entrada";
-"License: to be defined" = "Licença: a definir";
+"License: GPL-3.0" = "Licença: GPL-3.0";
 "Limiter active" = "Limitador ativo";
 "Microphone" = "Microfone";
 "Microphone access denied." = "O MicBoost não tem acesso ao microfone.";
