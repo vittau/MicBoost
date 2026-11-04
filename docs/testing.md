@@ -294,3 +294,19 @@ montado pelo `PanelMenuController` com o mesmo estado de exemplo, então mostra 
 nativos, o selo da fonte selecionada, os atalhos ⌘, e ⌘Q e as insets medidas do menu. Os
 itens de view alinham com o título dos itens nativos. `settings-*` continua vindo de
 `NSHostingView.cacheDisplay`: não há menu a compor e os controles SwiftUI são AppKit por baixo.
+
+Restauração na saída (2026-11-04): a sequência manual que não restaurou a entrada padrão —
+divergência em Ajustes do Sistema, "Usar MicBoost", divergência de novo, "Usar MicBoost", sair —
+foi reproduzida na HAL falsa. Com a notificação de `kAudioHardwarePropertyDefaultInputDevice` da
+mudança anterior ainda na fila `engine` quando a ação roda, a política lia a entrada antiga,
+liberava `defaultInputManaged` recém-gravado e o stop não restaurava nada; o estado persistido
+ficava igual ao observado no app (`previousDefaultInputUID` preenchido, `defaultInputManaged =
+false`, entrada padrão ainda o BlackHole). Os testes `pendingDivergenceNotificationDoesNotDropTheAdoption`,
+`quitAfterUseBlackHoleRestoresThePreviousInput`, `relaunchWithBlackHoleAlreadyDefaultKeepsThePersistedOwnership`
+e `stopAndRestartRestoresOncePerVoluntaryStop` cobrem a sequência, e
+`TerminationBarrierTests` cobre o portão de encerramento: a resposta a
+`reply(toApplicationShouldTerminate:)` só vem depois do stop, um segundo ⌘Q não corta a
+restauração e o prazo de 5 s encerra o app mesmo com o stop pendurado. Falta confirmar no app
+com hardware real: divergir, usar MicBoost, divergir de novo, usar MicBoost e sair, com a
+entrada anterior restaurada e `log show --last 5m --info --predicate 'subsystem ==
+"io.github.vittau.MicBoost"'` mostrando as linhas da categoria `routing`.
