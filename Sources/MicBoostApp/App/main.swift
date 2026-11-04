@@ -8,7 +8,10 @@ import SwiftUI
     private var status: NSStatusItem?
     private var optionClickMonitor: Any?
     private var settings: NSWindow?
-    private var quitting = false
+    /// Awaits `AppModel.shutdown` before the process exits (docs/architecture.md "Interface do app").
+    private lazy var termination = TerminationBarrier(
+        shutdown: { [model] in try await model.shutdown() },
+        reply: { NSApplication.shared.reply(toApplicationShouldTerminate: $0) })
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureMenu()
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -122,18 +125,7 @@ import SwiftUI
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         closePanel()
-        guard !quitting else { return .terminateNow }
-        quitting = true
-        Task {
-            do {
-                try await model.shutdown()
-                sender.reply(toApplicationShouldTerminate: true)
-            } catch {
-                quitting = false
-                sender.reply(toApplicationShouldTerminate: false)
-            }
-        }
-        return .terminateLater
+        return termination.shouldTerminate()
     }
 }
 let app = NSApplication.shared

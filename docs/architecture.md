@@ -71,7 +71,7 @@ Frameworks linkados: CoreAudio, AudioToolbox, AVFoundation (só para `AVCaptureD
 - O IOProc é uma função C registrada com `AudioDeviceCreateIOProcID`. O contexto é um `mb_engine *` alocado pelo Swift na fila `engine`, antes do start, e liberado só depois de `AudioDeviceStop` + `AudioDeviceDestroyIOProcID`.
 - Parâmetros (Swift → C): o lado de controle escreve alvos em `_Atomic float`/`_Atomic int` com ordem relaxed; o IOProc lê uma vez por bloco. Combinações momentaneamente inconsistentes entre parâmetros são aceitáveis, porque todos passam por suavização.
 - Medidores (C → Swift): o IOProc mantém picos máximos em atômicos, e o lado de controle lê e zera com `atomic_exchange` (pico desde a última leitura). Contadores (`uint64`) são monotônicos.
-- Logs: `os.Logger` (subsystem `io.github.vittau.MicBoost`) apenas fora da thread de IO; o motor registra cada transição de estado na categoria `engine`. Eventos de IO (NaN, entrada ausente) viram contadores lidos depois.
+- Logs: `os.Logger` (subsystem `io.github.vittau.MicBoost`) apenas fora da thread de IO; o motor registra cada transição de estado na categoria `engine`, e a política de entrada padrão registra cada adoção, liberação e restauração na categoria `routing`. Eventos de IO (NaN, entrada ausente) viram contadores lidos depois.
 
 `DeviceService` recebe uma fila serial e um callback de `Result<DeviceSnapshot, Error>`. `start`, `stop` e `snapshot` são chamados nessa fila; `stop` remove listeners antes de liberar o serviço. A fila confina também o adaptador HAL. Observa sistema e propriedades dos dispositivos enumerados; reenumera após 100 ms sem novos eventos. O snapshot contém todos os dispositivos, fontes elegíveis, BlackHole detectado e UID da entrada padrão. O adaptador real deve ter um único dono nessa fila.
 
@@ -131,6 +131,12 @@ dependência apenas de MicBoostCore e frameworks do sistema. O executável auxil
 `render-screenshots` reutiliza o menu e a janela de ajustes sem iniciar captura.
 `AppDelegate` mantém o item, o menu nativo, a janela de ajustes e as notificações de suspensão; o encerramento
 assíncrono aguarda `AppModel.shutdown`, stop com fade, restauração e flush dos ajustes.
+`TerminationBarrier` é o portão desse encerramento: `applicationShouldTerminate` devolve
+`.terminateLater`, e só depois do `AppModel.shutdown` terminado o app responde
+`reply(toApplicationShouldTerminate:)` e o processo sai — nunca entre destruir o agregado e
+restaurar a entrada padrão. A espera tem prazo de 5 s: uma chamada de HAL que não retorna não
+deixa um quit que não termina, e o app sai mesmo se o stop falhar, porque o estado persistido
+continua valendo para a restauração no stop voluntário seguinte.
 O controller mantém `DefaultInputManager` e seu listener de entrada padrão na fila engine.
 Comandos de processamento são serializados pelo modelo para preservar a ordem dos cliques.
 
