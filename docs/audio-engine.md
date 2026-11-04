@@ -62,8 +62,10 @@ A qualidade do resampler de drift permanece no padrão do sistema (a chave de qu
 
 ## Formato e taxa de amostragem
 
-- **Nunca** alterar a taxa nominal da fonte.
-- Se a taxa nominal do BlackHole for diferente da taxa da fonte e a taxa da fonte estiver em `AvailableNominalSampleRates` do BlackHole, definir a taxa do BlackHole igual à da fonte antes de criar o agregado. Isso afeta os consumidores do BlackHole, que se adaptam. Se não estiver disponível, `error(.formatUnsupported)`.
+- **Taxa de trabalho:** a cada start (inclusive ao trocar de fonte e ao reconstruir após recuperação), escolher entre as taxas suportadas pela fonte e pelo BlackHole: 48 kHz, se houver; senão, a maior taxa abaixo de 48 kHz; senão, a menor acima de 48 kHz. Taxas acima de 48 kHz não trazem ganho para voz e só aumentam CPU, por isso 48 kHz é o teto preferido. Se não houver taxa em comum, `error(.formatUnsupported)`.
+- Antes de criar o agregado, definir a taxa nominal da fonte e a do BlackHole com a taxa de trabalho, quando forem diferentes. Mudar a taxa da fonte afeta outros apps que a leem diretamente, que se adaptam. Dispositivos cuja taxa é imposta pelo próprio perfil (por exemplo, Bluetooth em HFP) simplesmente não oferecem outras taxas.
+- **Restauração:** ao parar voluntariamente (sair, desligar o processamento, trocar de fonte), devolver a taxa anterior de cada dispositivo que o MicBoost alterou, somente se a taxa atual ainda for a que o MicBoost definiu e o dispositivo existir. Erros do motor não restauram. As taxas anteriores ficam em memória durante a sessão; após um crash, não há restauração.
+- Mudanças de taxa feitas pelo próprio MicBoost não contam como mudança externa de formato.
 - O IOProc trabalha com o formato virtual dos streams do agregado. Exigir Float32 linear PCM nativo (`kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked`), intercalado ou não. Se o formato virtual não for Float32, tentar `kAudioStreamPropertyVirtualFormat` Float32 na mesma taxa. Se falhar, `error(.formatUnsupported)`.
 - Uma mudança de taxa ou de configuração de streams, na fonte ou no BlackHole, com o motor em `running`, leva a `recovering` → reconstrução.
 
