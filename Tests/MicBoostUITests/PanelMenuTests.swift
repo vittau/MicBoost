@@ -174,6 +174,29 @@ import Testing
         #expect((quietRow?.frame.width ?? 0) > 0)
     }
 
+    @Test func gainValueIsReadOnlyText() {
+        let model = Self.model()
+        let panel = PanelMenuController(model: model)
+        let row = panel.menu.items.first { $0.view is PanelGainRow }?.view
+        let label = row.flatMap { Self.textFields(in: $0) }?
+            .first { $0.accessibilityLabel() == localized("Gain") }
+        #expect(label?.stringValue == AppModel.gainLabel(model.controls.gainDB))
+        #expect(label?.isEditable == false)
+        #expect(label?.isSelectable == false)
+    }
+
+    @Test func metersIgnoreTheMouseAndTheFocus() {
+        let panel = PanelMenuController(model: Self.model())
+        let meters = panel.menu.items.compactMap(\.view).flatMap(Self.meters)
+        #expect(meters.count == 2)
+        for meter in meters {
+            // The meter is a display: a click belongs to the row and never reaches it.
+            #expect(meter.hitTest(NSPoint(x: 1, y: 1)) == nil)
+            #expect(!meter.acceptsFirstResponder)
+            #expect(meter.refusesFirstResponder)
+        }
+    }
+
     private static func sliders(in view: NSView) -> [MenuSliderControl] {
         let own = (view as? MenuSliderControl).map { [$0] } ?? []
         return own + view.subviews.flatMap { sliders(in: $0) }
@@ -187,6 +210,11 @@ import Testing
     private static func meters(in view: NSView) -> [LevelMeterIndicator] {
         let own = (view as? LevelMeterIndicator).map { [$0] } ?? []
         return own + view.subviews.flatMap { meters(in: $0) }
+    }
+
+    private static func textFields(in view: NSView) -> [NSTextField] {
+        let own = (view as? NSTextField).map { [$0] } ?? []
+        return own + view.subviews.flatMap { textFields(in: $0) }
     }
 }
 
