@@ -16,7 +16,7 @@ Motivação: o VirtuMic tem interface pesada e atraso perceptível (o log dele m
 
 - Qualquer entrada compatível com Core Audio: microfone interno, USB, interfaces de áudio multicanal, Continuity (iPhone) e Bluetooth.
 - Nenhum nome, modelo, UID ou formato de dispositivo específico fixado no código, exceto a identificação do BlackHole ([audio-engine.md](audio-engine.md#identificação-do-blackhole)).
-- Bluetooth: suportado com limitações documentadas. O perfil de voz (HFP) usa taxa baixa (16/24 kHz), degrada a saída do próprio fone enquanto o microfone está em uso e tem latência maior.
+- Bluetooth: suportado com limitações documentadas. O perfil de voz (HFP) usa taxa baixa (16/24 kHz), degrada a saída do próprio fone enquanto o microfone está em uso e tem latência maior. O mesmo fone pode ser microfone e saída do monitor ao mesmo tempo ([audio-engine.md](audio-engine.md#fonte-bluetooth-e-troca-de-perfil)).
 - Continuity (iPhone): a entrada observada reporta latência de 6000 frames (125 ms a 48 kHz); o MicBoost não consegue oferecer baixa latência total com essa fonte, mesmo com pouca latência adicional ([testing.md](testing.md#resultados-registrados)).
 - Sistema mínimo: macOS 14 Sonoma. Arquiteturas: arm64 e x86_64 (binário universal na release).
 
