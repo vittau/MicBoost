@@ -11,7 +11,7 @@ Por quê:
 - Por que não o contrário: com o resampler no subdispositivo de saída, a interpolação entre amostras já limitadas ultrapassa o teto nos transientes. Medido com o microfone fifine a +24 dB e palmas: pico 1,1845 (+1,47 dBFS) e 118 amostras acima de −1 dBFS, com sinal alternando de signo a cada amostra. Uma sequência alternando ±0,891 tem pico interpolado maior que as próprias amostras, então nenhum limitador antes do resampler garante o teto na saída.
 - O agregado privado (`kAudioAggregateDeviceIsPrivateKey = 1`) não aparece para outros apps e morre com o processo.
 
-Alternativa reservada (não implementar sem necessidade): ponte com dois IOProcs (fonte e BlackHole separados), buffer circular SPSC pré-alocado e resampler adaptativo controlado pelo nível do buffer. O agregado está adotado: no ensaio de estabilidade, a deriva de latência ficou em −0,06 ms ([testing.md](testing.md#resultados-registrados)). A alternativa só volta a ser considerada se uma fonte suportada (por exemplo, Bluetooth) não funcionar com o agregado; nesse caso, este documento é reescrito.
+Alternativa reservada (não implementar sem necessidade): ponte com dois IOProcs (fonte e BlackHole separados), buffer circular SPSC pré-alocado e resampler adaptativo controlado pelo nível do buffer. O agregado está adotado: no ensaio de estabilidade do fifine a 48 kHz, a deriva de latência ficou em 0,0 ms em 20 minutos (15,2917 → 15,2917 ms; [testing.md](testing.md#resultados-registrados)). A alternativa só volta a ser considerada se uma fonte suportada (por exemplo, Bluetooth) não funcionar com o agregado; nesse caso, este documento é reescrito.
 
 ## Enumeração e elegibilidade
 
@@ -75,7 +75,7 @@ A qualidade do resampler de drift permanece no padrão do sistema (a chave de qu
 
 ## Tamanho de buffer
 
-- Definir `kAudioDevicePropertyBufferFrameSize` no agregado com `settings.bufferFrames` (padrão 256), limitado a `BufferFrameSizeRange`. Opções: 64/128/256/512/1024 frames. O padrão 256 tem ensaio de estabilidade aprovado e mede 15,3 ms a 48 kHz e 38,9 ms a 16 kHz, dentro dos 100 ms da v1 ([testing.md](testing.md#resultados-registrados)). O tamanho é expresso em frames, então a duração do buffer depende da taxa da fonte.
+- Definir `kAudioDevicePropertyBufferFrameSize` no agregado com `settings.bufferFrames` (padrão 256), limitado a `BufferFrameSizeRange`. Opções: 64/128/256/512/1024 frames. O padrão 256 tem ensaio de estabilidade aprovado no fifine a 48 kHz, medindo 15,3 ms, e o buffer de 64 mede 7,3 ms, dentro dos 100 ms da v1 ([testing.md](testing.md#resultados-registrados)). O tamanho é expresso em frames, então a duração do buffer depende da taxa da fonte.
 - `mb_engine_create` recebe o máximo de frames por ciclo, igual a `kAudioDevicePropertyBufferFrameSize` ou a `kAudioDevicePropertyUsesVariableBufferFrameSizes`, quando presente, para pré-alocar os buffers de trabalho. Se um ciclo chegar com mais frames do que o máximo, o processador trabalha em blocos internos desse tamanho.
 
 ## Mapa de streams e canais

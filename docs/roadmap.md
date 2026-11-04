@@ -43,7 +43,7 @@ Condições de conclusão:
 
 ## 2 — Ganho e proteção de pico
 
-Entregas: ganho suavizado, mute, limitador, medidores e contadores; testes DSP correspondentes. Implementação, medição com som ambiente e calibração com voz verificadas. Pendente: o teto do limitador não vale no BlackHole por causa do resampler de drift (correção do relógio do agregado em andamento).
+Entregas: ganho suavizado, mute, limitador, medidores e contadores; testes DSP correspondentes. Implementação, medição com som ambiente e calibração com voz verificadas. O teto do limitador vale na saída do BlackHole: o resampler de drift fica na fonte, antes do limitador.
 
 Condições de conclusão:
 - níveis conferidos com sinal conhecido (testes) e com gravação de voz;
@@ -108,5 +108,4 @@ Condições de conclusão:
 | Decisão | Recomendação atual | Quando |
 |---|---|---|
 | Queda lenta de latência no ensaio longo | ensaio de várias horas para confirmar que se estabiliza | antes da etapa 6 |
-| Picos acima do teto no BlackHole | BlackHole como relógio principal e compensação de drift na fonte; plano B: teto de −3 dBFS | antes de concluir etapa 2 |
 | Homebrew 7 / macOS 27 com cask sem notarização | investigar com tap local: quarentena e "Abrir Mesmo Assim" para app ad hoc, permissão de microfone após `brew upgrade`, BlackHole já instalado, `brew uninstall` | antes da etapa 6 |
