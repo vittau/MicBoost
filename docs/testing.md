@@ -174,7 +174,7 @@ Observações de hardware:
 - Com a tampa fechada, o macOS silencia o microfone interno por hardware: a permissão continua concedida e os callbacks entregam zeros. A medição de latência recusa esse sinal (correlação 0).
 - As pequenas diferenças de nível entre fonte e BlackHole vêm do resampler de drift e de capturas que começam em instantes distintos.
 - A queda lenta de latência no ensaio de 20 min passa no critério, mas não está claro se ela se estabiliza (resampler de deriva acomodando) ou continua (deriva residual). Um ensaio de várias horas antes da release decide.
-- Reinício real do `coreaudiod` e escuta humana são verificações manuais. A HAL falsa cobre perda e retorno da fonte e do BlackHole.
+- Reinício real do `coreaudiod` e escuta humana são verificações manuais. A HAL falsa cobre perda e retorno da fonte e do BlackHole. As transições de estado do motor ficam no log unificado, na categoria `engine`: aplicar, por exemplo, `log show --last 5m --info --predicate 'subsystem == "io.github.vittau.MicBoost"'` depois de um teste manual.
 
 ### Interface e ciclo de vida do app
 
