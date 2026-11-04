@@ -49,7 +49,7 @@ A fonte em camadas está em `Resources/AppIcon.icon`, com SVGs e variantes clara
 5. Verifica, e falha se não passar: `lipo -archs` do executável com `arm64` e `x86_64`; `codesign --verify --strict --deep`; assinatura ad hoc (`Signature=adhoc` em `codesign -dv`); `LC_BUILD_VERSION` com minos igual a `LSMinimumSystemVersion` (14.0) nos dois slices; `CFBundleShortVersionString` igual à versão pedida.
 6. Imprime o tamanho do `.zip`, o checksum e o cask preenchido, lido de `packaging/homebrew/micboost.rb`.
 
-Publicação (com `gh release create`, mediante confirmação do mantenedor): anexar `.zip` + `.sha256`. As notas de release seguem o modelo de `packaging/release-notes.md`: instruções de instalação, aviso **"não notarizado"**, instalação do BlackHole, primeira abertura e o checksum da versão.
+Publicação (com `gh release create`, mediante confirmação do mantenedor): anexar `.zip` + `.sha256`. As notas de release seguem o modelo de `packaging/release-notes.md`: instruções de instalação, aviso **"não notarizado"**, instalação do BlackHole, primeira abertura, licença GPL-3.0 com link para `LICENSE` e o checksum da versão. O `.zip` contém só o app; a licença fica no repositório.
 
 ## Homebrew (tap próprio)
 
@@ -99,6 +99,20 @@ Comportamento a validar (etapa 7):
 3. Nas aberturas seguintes, não há aviso. Uma atualização para um novo binário pode repetir o fluxo; validar e documentar.
 
 No macOS 15 ou posterior, o atalho de Control-clique → Abrir não contorna mais o bloqueio; o caminho é o item 2. As instruções ao usuário ficam no README do repositório e nas notas de release.
+
+## Verificação local por `spctl`
+
+Avaliação de um `.app` extraído do `.zip` de 0.1.0 com `ditto -x -k`, com quarentena aplicada manualmente (`xattr -w com.apple.quarantine "0083;<data em hexadecimal>;Safari;" MicBoost.app`), sem abrir o app. O app não foi executado e a cópia foi apagada depois da coleta.
+
+| Verificação | Saída |
+|---|---|
+| `spctl --assess --type execute -vv MicBoost.app` | `MicBoost.app: rejected`, código 3, sem motivo na saída |
+| `syspolicy_check distribution MicBoost.app` | falha (código 70): aviso "Adhoc Signed App" e erro fatal "Notary Ticket Missing" |
+| `codesign -dv --verbose=4 MicBoost.app` | `Format=app bundle with Mach-O universal (x86_64 arm64)`, `Signature=adhoc`, `TeamIdentifier=not set` |
+| `codesign --verify --strict --deep MicBoost.app` | passa (código 0) |
+| `log show` de `syspolicyd` durante a avaliação | assinatura verificada (`SecKeyVerifySignature`), `Error checking with notarization daemon: 3`, `rejecting due to lack of matching active rule` |
+
+Interpretação: a rejeição vem da falta de notarização e de Developer ID, não de bundle danificado — a assinatura ad hoc, o selo de recursos e a verificação estrita passam, e o `syspolicyd` rejeita por política ("lack of matching active rule"). O caso esperado na GUI é o de desenvolvedor não identificado, com "Abrir Mesmo Assim" em Ajustes do Sistema → Privacidade e Segurança. O `spctl` não reproduz a interface, então o painel, o botão e o fluxo do Homebrew continuam exigindo confirmação manual em um Mac de teste.
 
 ## BlackHole no download direto
 
