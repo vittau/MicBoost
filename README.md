@@ -23,17 +23,29 @@ calls, recorders, anything — hears the processed voice.
 
 ## Screenshots
 
-| Panel (light) | Panel (dark) |
-| --- | --- |
-| ![Panel](docs/screenshots/panel-light.png) | ![Panel dark](docs/screenshots/panel-dark.png) |
-| EQ expanded | Settings |
-| ![EQ](docs/screenshots/eq-light.png) | ![Settings](docs/screenshots/settings-light.png) |
-| Missing driver | Missing driver (dark) |
-| ![Error](docs/screenshots/error-light.png) | ![Error dark](docs/screenshots/error-dark.png) |
+Everything lives in the menu bar: one click opens MicBoost, with the on/off switch, gain, level
+meters, the microphone list and the equalizer.
 
-Off-screen renders of the real SwiftUI views with sample state; live panel transparency
-adapts to your desktop and macOS appearance. Generated with
-`scripts/render-screenshots.sh`. Both appearances for every view are in `docs/screenshots/`.
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/eq-dark.png">
+    <img src="docs/screenshots/eq-light.png" alt="MicBoost menu with the on/off switch, gain, level meters, microphone list and 3-band equalizer" width="320">
+  </picture>
+  <br>
+  <sub>The MicBoost menu: gain, input and output meters, microphone and equalizer.</sub>
+</p>
+
+Less frequent choices — automatic system input, buffer size, channels and diagnostics — sit in
+the settings window.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/settings-dark.png">
+    <img src="docs/screenshots/settings-light.png" alt="MicBoost settings window with the Audio, Diagnostics and About sections" width="540">
+  </picture>
+  <br>
+  <sub>Settings: audio options, diagnostics and app information.</sub>
+</p>
 
 ## How it works
 
