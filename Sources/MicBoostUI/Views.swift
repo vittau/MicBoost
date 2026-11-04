@@ -51,18 +51,11 @@ import SwiftUI
                 .accessibilityValue(localized(model.controls.muted ? "On" : "Off"))
                 .help(localized("Mute"))
                 .keyboardShortcut("m", modifiers: [])
-                Slider(
-                    value: Binding(get: { model.controls.gainDB }, set: model.gain), in: Settings.gainRange
-                )
-                .accessibilityLabel(localized("Gain"))
-                .accessibilityValue(AppModel.gainLabel(model.controls.gainDB, locale: locale))
-                .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { press in
-                    let direction = press.key == .leftArrow || press.key == .downArrow ? -1.0 : 1.0
-                    model.gain(
-                        model.controls.gainDB + direction * AppModel.gainStep(option: press.modifiers.contains(.option))
-                    )
-                    return .handled
-                }
+                MenuSlider(
+                    value: model.controls.gainDB, range: Settings.gainRange,
+                    step: AppModel.gainStep(option: false), optionStep: AppModel.gainStep(option: true),
+                    label: localized("Gain"),
+                    valueText: AppModel.gainLabel(model.controls.gainDB, locale: locale), onEdit: model.gain)
             }
             HStack {
                 if editing {
@@ -191,23 +184,12 @@ import SwiftUI
                 )
                 .font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
-            Slider(
-                value: Binding(get: { gain.wrappedValue }, set: { gain.wrappedValue = ($0 * 2).rounded() / 2 }),
-                in: EQSettings.gainRange
+            MenuSlider(
+                value: gain.wrappedValue, range: EQSettings.gainRange,
+                step: AppModel.gainStep(option: false), optionStep: AppModel.gainStep(option: true),
+                label: "\(localized(title)), \(localized("Gain"))", valueText: "\(gain.wrappedValue) dB",
+                onEdit: { gain.wrappedValue = ($0 * 2).rounded() / 2 }
             )
-            .accessibilityLabel("\(localized(title)), \(localized("Gain"))").accessibilityValue(
-                "\(gain.wrappedValue) dB"
-            )
-            .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { press in
-                let direction = press.key == .leftArrow || press.key == .downArrow ? -1.0 : 1.0
-                gain.wrappedValue = min(
-                    12,
-                    max(
-                        -12,
-                        gain.wrappedValue + direction * AppModel.gainStep(option: press.modifiers.contains(.option))))
-                model.eq()
-                return .handled
-            }
             .onChange(of: gain.wrappedValue) { model.eq() }
             HStack {
                 Text(localized("Frequency"))
@@ -239,10 +221,11 @@ import SwiftUI
                     Spacer()
                     Text(String(format: "Q %.1f", q.wrappedValue)).foregroundStyle(.secondary)
                 }.font(.caption)
-                Slider(value: q, in: EQSettings.midQRange)
-                    .accessibilityLabel(localized("Width"))
-                    .accessibilityValue(String(format: "Q %.1f", q.wrappedValue))
-                    .onChange(of: q.wrappedValue) { model.eq() }
+                MenuSlider(
+                    value: q.wrappedValue, range: EQSettings.midQRange, step: 0.1, optionStep: 0.5,
+                    label: localized("Width"), valueText: String(format: "Q %.1f", q.wrappedValue),
+                    onEdit: { q.wrappedValue = $0 }
+                ).onChange(of: q.wrappedValue) { model.eq() }
             }
         }.padding(.vertical, 6)
     }
