@@ -102,7 +102,7 @@ stopped ──start──▶ starting ──ok──▶ running
 - `DeviceService` publica `[AudioDevice]` de entrada elegíveis (ver exclusões em [audio-engine.md](audio-engine.md#enumeração-e-elegibilidade)), o BlackHole detectado (se houver) e o UID da entrada padrão atual.
 - `Settings`: preferências persistidas, com `EQSettings` (`low`, `mid`, `high`) e `ChannelSelection` (`auto`, `mono(canal)`, `monoMix`, `stereo(primeiroCanal)`, canais baseados em 1). `SettingsStore` é o actor que as lê e grava ([Persistência](#persistência)).
 - `DefaultInputManager`: aplica a [política de entrada padrão](audio-engine.md#política-de-entrada-padrão-defaultinputmanager) sobre `AudioHardware` e `SettingsStore`, e publica `DefaultInputStatus`.
-- `EngineStatus` (snapshot enviado à UI): `state`, `source: AudioDevice?`, `blackHole: AudioDevice?`, `defaultInput: DefaultInputStatus` (`isBlackHole`, `divergedByUser`, `unknown`), `sampleRate`, `bufferFrames`, `reportedLatencyMs`, `monitor: MonitorStatus` ([audio-engine.md](audio-engine.md#modo-monitor)), contadores (overloads, eventos NaN).
+- `EngineStatus` (snapshot enviado à UI): `state`, `source: AudioDevice?`, `blackHole: AudioDevice?`, `defaultInput: DefaultInputStatus` (`isBlackHole`, `divergedByUser`, `unknown`), `sampleRate`, `bufferFrames`, `reportedLatencyMs`, `monitor: MonitorStatus` ([audio-engine.md](audio-engine.md#modo-monitor)), `monitorOutput` (saída resolvida), `monitorStats` (ocupação, correção, underruns/overruns e timestamp de latência), `lastMonitorFailure` (operação, erro tipado e saída), contadores (overloads, eventos NaN).
 
 ## Persistência
 

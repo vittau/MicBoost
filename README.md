@@ -37,7 +37,7 @@ Microsoft Teams, FaceTime, Discord, QuickTime and more.
   <sub>The MicBoost menu: on/off switch, volume, level meters, microphone and equalizer.</sub>
 </p>
 
-Hear your processed voice through your current speakers or headphones with **Hear My Voice**. Use headphones to avoid feedback; monitoring starts off each time you open MicBoost.
+Hear your processed voice through your current speakers or headphones with **Hear My Voice**. It works with any output, including Bluetooth headphones that use a different audio rate. Switching monitoring on or off keeps audio flowing to your apps. Use headphones to avoid feedback; monitoring starts off each time you open MicBoost.
 
 ## What you need
 
@@ -94,6 +94,8 @@ quit MicBoost, your previous microphone comes back.
 - **The MacBook's built-in microphone is off when the lid is closed.**
 
 ## Something's wrong?
+
+If **Hear My Voice** cannot use your output, open Settings → Diagnostics and use **Copy report**. It includes your microphone and output details and the last monitoring error to help investigate the problem.
 
 **macOS says it can't open MicBoost.** See step 4 of [Install](#install).
 
