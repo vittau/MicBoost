@@ -192,68 +192,49 @@ Capturas claras/escuras verificadas visualmente; sliders sem marcas de passo.
 VoiceOver, todos os atalhos, reduzir movimento/transparência e contraste aumentado
 permanecem sem validação manual completa. A etapa 4 permanece em andamento.
 
-Verificação automatizada da interface: 58 testes (6 UI, 11 DSP, 41 Core),
-execução somada de aproximadamente 2 s; a suíte Core inclui o caso negativo
+Verificação automatizada da interface: 107 testes (38 UI, 11 DSP, 58 Core),
+execução somada de aproximadamente 1,8 s; a suíte Core inclui o caso negativo
 `fakeRejectsOutputWrite`, que registra uma issue conhecida intencionalmente.
 `swift build`, `swift test`, lint recursivo de formatação, montagem debug e
 `codesign --verify --strict` passam na máquina de referência.
 
-O painel usa a moldura de `NSMenu`, sem sobreposição de material, bordas ou seta.
-A conferência inclui a composição real pelo WindowServer e interação com os controles
-durante o tracking do menu.
+O painel é um `NSMenu` de itens reais: lista de microfones, "Ajustes…" (⌘,), "Sair do
+MicBoost" (⌘Q), cabeçalhos de seção e separadores. A conferência inclui a composição real
+pelo WindowServer, com hover, marcação e atalhos desenhados pelo AppKit.
 
-No macOS 27, uma sonda de `NSSwitch`/SwiftUI com mínimo 14 e SDK 27.2 mede
-54 × 24 pt. A mesma sonda com o SDK registrado como 14 mede 38 × 22 pt.
-O build do app verifica SDK igual ao Xcode selecionado e mínimo 14 em cada
-arquitetura antes da assinatura. O renderizador recebe a mesma configuração.
+Menu nativo (2026-11-03): as capturas passaram a vir do menu real aberto pelo auxiliar e
+capturado com `SCScreenshotManager`, porque o painel não é mais uma view SwiftUI. Dimensões
+em 1×: `eq-*` 320 × 601, `panel-*` 320 × 306, `error-*` 320 × 361, `settings-*` 540 × 853.
+As linhas de view alinham com o título dos itens nativos: o auxiliar mede as insets do
+próprio menu na primeira abertura (título de item sem imagem e coluna de atalho) e as
+linhas passam a usá-las; a lista de microfones fica na coluna do ícone, como nas listas de
+dispositivos da Central de Controle. Clicar no cabeçalho do EQ durante o tracking insere o
+item das bandas e o menu passa de 377 para 601 pt de altura na mesma sessão; esconder o
+item não redimensiona o menu, por isso as linhas condicionais são inseridas e removidas.
 
-Na composição real do menu no macOS 27, o controle ligado foi verificado pela
-acessibilidade como 54 × 24 pt e valor 1, com a cor verde oliva do sistema.
-A conferência incluiu ausência de seta e de corte vertical, remoção da linha
-redundante do caminho de áudio e atualização dos medidores com o menu aberto.
-O ajuste do SDK foi validado também em um executável de teste universal
-(arm64 + x86_64), com mínimo 14, SDK 27.2 e assinatura ad hoc válida em ambas
-as arquiteturas.
+Os medidores são `NSLevelIndicator` (`continuousCapacity`, `.small`): o bloco nativo mede
+10 pt de altura no macOS 27, com preenchimento na cor de destaque do sistema. As duas barras
+das capturas clara e escura mostram 0 dBFS preenchendo a faixa e −1 dBFS em 89,13% dela na
+escala de amplitude linear; valores ≤ −60 dBFS ficam em zero. `warningValue` e
+`criticalValue` ficam acima do máximo, então nenhuma captura mostra amarelo ou vermelho.
+O teste de proporcionalidade confere que +6,0206 dB dobra o comprimento para amplitudes de
+entrada de 0,01, 0,1 e 0,4.
 
-Ao alternar mute e restaurar o estado original, a acessibilidade reportou o slider
-de ganho com a mesma origem nas três leituras e tamanho constante de 260 × 16 pt.
-Os dois símbolos de mute ficam centralizados na mesma área de 20 × 20 pt.
+Sliders do painel em `NSSlider` (2026-11-03): os cinco sliders do painel — ganho, ganho de
+graves, médios e agudos e largura — são `NSSlider` puro dentro das views de item, porque o
+`Slider` do SwiftUI podia perder o mouse-up no tracking do menu e ficar preso no estado
+pressionado. O knob só acompanha valores externos quando não há arrasto, e as setas andam
+0,5 dB (1 dB com ⌥) ou 0,1 de Q.
 
-Cadência dos medidores com o menu aberto: em 20 intervalos consecutivos, mediana
-53,5 ms e máximo 76,8 ms; espera máxima pela leitura no controller 22,6 ms.
-Medição com relógio monotônico na chegada dos snapshots à UI; não representa
-a latência entre falar e o pixel mudar. O decaimento visual é separado: 20 dB/s,
-ou 1,5 s para cair 30 dB, sem atraso de ataque adicionado pelo modelo.
-
-Ensaio visual de degrau 0 → 100% no macOS 27.2, com a mesma atualização SwiftUI
-para os dois controles: numa captura solicitada 100 ms depois do degrau,
-`ProgressView` ainda ocupava aproximadamente um terço da faixa; a trilha nativa
-de `NSSliderCell` usada pelo medidor já preenchia toda a faixa (captura solicitada
-aos 99,96 ms). O medidor aplica o valor diretamente ao desenho nativo, sem
-interpolar a apresentação dos picos. A escala foi conferida em 0 dBFS (100%) e
-−1 dBFS (89,13%) na escala de amplitude linear; valores ≤ −60 dBFS ficam em zero.
-O teste de proporcionalidade confere que +6,0206 dB dobra o comprimento para
-amplitudes de entrada de 0,01, 0,1 e 0,4.
-
-Na captura clara renderizada a 1×, a trilha colorida do slider de ganho e as duas
-barras de nível medem 6 pixels de altura (6 pt), com cantos simétricos da trilha
-nativa. As renderizações clara e escura conferem o preenchimento de 100% na
-entrada e 89,13% na saída, sem knob nem moldura de indicador de capacidade.
-
-Sliders do painel em `NSSlider` (2026-11-03): os cinco sliders do painel — ganho,
-ganho de graves, médios e agudos e largura — usam `NSSlider` em `NSViewRepresentable`,
-porque o `Slider` do SwiftUI podia perder o mouse-up no tracking do menu e ficar
-preso no estado pressionado. As capturas regeradas mantêm as dimensões anteriores
-(`panel-*` 320 × 325, `eq-*` 320 × 663, `error-*` 320 × 379, `settings-*` 540 × 808),
-e a comparação pixel a pixel mostra diferença apenas na área do knob (até 22 × 22 pt
-por slider): trilha de 6 pt, preenchimento verde até o knob, espaçamento e altura de
-16 pt do controle são idênticos. A suíte tem 84 testes (57 Core, 11 DSP, 16 UI) com
-execução somada de aproximadamente 1,0 s (Core 0,65 s, DSP 0,16 s, UI 0,2 s); os
-quatro testes novos de UI cobrem a ação do `NSSlider` → binding, valor externo sem
-mover o knob durante o arrasto, passos de seta (0,5 dB, 1 dB com ⌥ e limite da faixa)
-e os cinco `NSSlider` na hierarquia do painel expandido. `swift build`, `swift test`,
-lint de formatação recursivo e a montagem debug passam. O arrasto no menu real,
-inclusive soltando o mouse fora da janela do menu, é verificação manual pendente.
+A suíte tem 107 testes (58 Core, 11 DSP, 38 UI) com execução somada de aproximadamente
+1,8 s; os testes de UI cobrem a estrutura do menu (ordem dos itens, seção "Microfone",
+marcação da fonte selecionada, linha de fonte desconectada, atalhos ⌘, ⌘Q e "m"), as linhas
+de view em AppKit (cinco `NSSlider`, dois `NSSwitch`, dois `NSLevelIndicator`), a altura do
+painel com e sem o selo do limitador, a leitura dos campos numéricos (vazio, inválido,
+vírgula, ponto, fora da faixa) e o passo de seta dos sliders. `swift build`, `swift test`,
+lint de formatação recursivo e a montagem debug passam. O arrasto no menu real, inclusive
+soltando o mouse fora da janela do menu, a navegação por teclado e o clique nas linhas são
+verificação manual pendente.
 
 ### Recuperação (etapa 5)
 
@@ -261,8 +242,8 @@ A lógica de recuperação está implementada e coberta pela HAL falsa; os itens
 interação humana (notificações de suspensão, TCC, remoção do driver, reinício real do
 `coreaudiod`) continuam pendentes no roteiro manual acima. A etapa 5 permanece em andamento.
 
-Verificação automatizada: 78 testes (57 Core, 11 DSP, 10 UI) com execução somada de
-aproximadamente 1,2 s (Core 0,64 s, DSP 0,17 s, UI 0,38 s); a suíte Core inclui o caso
+Verificação automatizada: 107 testes (58 Core, 11 DSP, 38 UI) com execução somada de
+aproximadamente 1,8 s; a suíte Core inclui o caso
 negativo `fakeRejectsOutputWrite`, que registra uma issue conhecida intencionalmente.
 `swift build`, `swift test`, lint recursivo de formatação, montagem debug e
 `codesign --verify --strict` passam na máquina de referência.
@@ -301,3 +282,11 @@ buffer 256 no seletor e no diagnóstico, latência reportada de 15,3 ms, switche
 estado ativo e licença GPL-3.0). O locale vem do idioma resolvido pelo catálogo (`en` →
 `en_US`), então os números usam ponto decimal e vírgula de milhar do inglês. `panel-*` e
 `error-*` continuam geradas, mas não são mais referenciadas no README.
+
+O menu deixou de ser uma view SwiftUI: as capturas `eq-*`, `panel-*` e `error-*` são do
+`NSMenu` real, aberto pelo auxiliar e capturado com `SCScreenshotManager` (ScreenCaptureKit) a
+partir do laço de tracking, com recorte na view de conteúdo do menu. A captura usa o menu
+montado pelo `PanelMenuController` com o mesmo estado de exemplo, então mostra os itens
+nativos, a marcação da fonte selecionada, os atalhos ⌘, e ⌘Q e as insets medidas do menu. Os
+itens de view alinham com o título dos itens nativos. `settings-*` continua vindo de
+`NSHostingView.cacheDisplay`: não há menu a compor e os controles SwiftUI são AppKit por baixo.

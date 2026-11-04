@@ -4,8 +4,8 @@
 
 ```text
 ┌──────────────────────── MicBoostApp (main thread) ────────────────────────┐
-│ AppKit: NSStatusItem + NSMenu  ·  SwiftUI: PanelView,     │
-│ SettingsView  ·  @Observable AppModel  ·  MeterPoller (20 Hz, só visível) │
+│ AppKit: NSStatusItem + NSMenu e as linhas em AppKit  ·                    │
+│ SwiftUI: SettingsView  ·  @Observable AppModel  ·  MeterPoller (20 Hz, só visível) │
 └───────────────┬───────────────────────────────────────────▲───────────────┘
                 │ comandos async                            │ snapshots de estado
 ┌───────────────▼──────────── MicBoostCore (EngineController) ──────────────┐
@@ -29,7 +29,7 @@ O projeto é um único pacote SwiftPM (sem `.xcodeproj`). O `.app` é montado po
 |---|---|---|
 | `MicBoostDSP` | C (C17) | Tudo que roda na thread de IO: `mb_ioproc`, processador, biquads, ganho, limitador, medidores e parâmetros atômicos. Sem dependências além de `<CoreAudio/CoreAudioTypes.h>`, `<stdatomic.h>` e `<math.h>`. |
 | `MicBoostCore` | Swift library | Abstração da HAL (`AudioHardware` protocol + implementação real), `DeviceService`, `AggregateBuilder`, `EngineController`, `DefaultInputManager`, `SettingsStore`, modelos de domínio e permissão de microfone. Sem AppKit/SwiftUI. |
-| `MicBoostApp` | Swift executable (produto `MicBoost`) | Ciclo de vida do app, item de status, painel, ajustes, mensagens. Depende de `MicBoostCore`. |
+| `MicBoostApp` | Swift executable (produto `MicBoost`) | Ciclo de vida do app, item de status, menu do painel, ajustes, mensagens. Depende de `MicBoostUI`. |
 | `micboost-diag` | Swift executable | CLI de diagnóstico e medição ([testing.md](testing.md#ferramenta-de-diagnóstico)). Depende de `MicBoostCore`. |
 | `MicBoostDSPTests` | Swift Testing | Testes offline do processador via API C. |
 | `MicBoostCoreTests` | Swift Testing | Política de entrada padrão, máquina de estados, settings e mapa de canais, com HAL falsa. |
@@ -44,7 +44,8 @@ Estrutura de diretórios:
 Package.swift
 Sources/MicBoostDSP/{include/MicBoostDSP.h, *.c}
 Sources/MicBoostCore/{HAL/, Devices/, Engine/, Routing/, Settings/, Permissions/}
-Sources/MicBoostApp/{App/, StatusItem/, Panel/, Settings/, Localization/}
+Sources/MicBoostUI/{AppModel.swift, Menu/, Views.swift, Localization/}
+Sources/MicBoostApp/{App/main.swift, StatusItemImage.swift}
 Sources/micboost-diag/
 Tests/MicBoostDSPTests/  Tests/MicBoostCoreTests/
 Resources/{Info.plist, AppIcon.icns}
@@ -122,15 +123,22 @@ Cada campo é decodificado isoladamente (`decodeIfPresent`), então um campo aus
 
 ## Interface do app
 
-`MicBoostUI` é uma biblioteca interna com `AppModel`, `PanelView` e `SettingsView`,
-localizações `.strings` e dependência apenas de MicBoostCore e frameworks do sistema.
-O executável auxiliar `render-screenshots` reutiliza as views sem iniciar captura.
-`AppDelegate` mantém o item, menu nativo, janela de ajustes e notificações de suspensão; o encerramento
+`MicBoostUI` é uma biblioteca interna com `AppModel`, `PanelMenuController` (o `NSMenu` do
+painel e suas linhas em AppKit), `SettingsView` em SwiftUI, localizações `.strings` e
+dependência apenas de MicBoostCore e frameworks do sistema. O executável auxiliar
+`render-screenshots` reutiliza o menu e a janela de ajustes sem iniciar captura.
+`AppDelegate` mantém o item, o menu nativo, a janela de ajustes e as notificações de suspensão; o encerramento
 assíncrono aguarda `AppModel.shutdown`, stop com fade, restauração e flush dos ajustes.
 O controller mantém `DefaultInputManager` e seu listener de entrada padrão na fila engine.
 Comandos de processamento são serializados pelo modelo para preservar a ordem dos cliques.
 
-O painel usa `NSMenu` e um item com `NSHostingView<PanelView>` transparente.
-O AppKit controla moldura, tracking e fechamento. O frame do host acompanha a
-geometria SwiftUI, e o delegate acompanha a visibilidade para iniciar/cancelar os
-medidores. O tracking começa pelo run loop, fora de um job de concorrência Swift.
+O painel é um `NSMenu` de itens reais: lista de microfones, "Ajustes…", "Sair do MicBoost",
+cabeçalhos de seção e separadores. Só cabeçalho, faixa de estado, ganho, medidores,
+roteamento e equalizador usam um `NSMenuItem` com view, e essas views são AppKit puro.
+`PanelMenuController` reescreve as linhas a cada snapshot de estado (1 Hz) e os medidores a
+20 Hz, e insere ou remove os itens que aparecem e desaparecem, porque o menu AppKit só
+recalcula a altura quando a lista de itens muda. O AppKit controla moldura, tracking,
+fechamento e a navegação de teclado; o delegate acompanha a visibilidade para iniciar e
+cancelar os medidores. O tracking começa pelo run loop, fora de um job de concorrência Swift.
+As insets das linhas são medidas do próprio menu na primeira abertura, para que o conteúdo
+caia na mesma coluna do título de um item nativo.
