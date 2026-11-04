@@ -295,3 +295,11 @@ montado pelo `PanelMenuController` com o mesmo estado de exemplo, então mostra 
 nativos, o selo da fonte selecionada, os atalhos ⌘, e ⌘Q e as insets medidas do menu. Os
 itens de view alinham com o título dos itens nativos. `settings-*` continua vindo de
 `NSHostingView.cacheDisplay`: não há menu a compor e os controles SwiftUI são AppKit por baixo.
+
+Reteste do menu (2026-11-04): o medidor é exibição pura — `hitTest` devolve `nil`, `acceptsFirstResponder`
+é falso e o `mouseDown` é inerte —, e o valor de ganho virou rótulo somente leitura, sem campo nem ação de
+clique; o ganho continua pelo slider e pelas setas (0,5 dB, 1 dB com ⌥). As capturas `eq-*`, `panel-*` e
+`error-*` foram regeradas sem anel de foco e sem texto selecionado no primeiro campo de frequência, porque o
+auxiliar solta o primeiro respondedor antes da captura. `swift build`, `swift test` (109 testes) e
+`swift format lint --strict` passam; o arrasto do medidor e o clique no valor de ganho no menu real ficam para
+a verificação manual do mantenedor.
