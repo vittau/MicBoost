@@ -225,8 +225,17 @@ extension NSImage {
 /// could never start.
 @MainActor final class RenderDelegate: NSObject, NSApplicationDelegate {
     private var attempts = 0
+    private var activationWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 80, height: 40),
+            styleMask: [.titled], backing: .buffered, defer: false)
+        window.title = "MicBoost screenshots"
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        activationWindow = window
+        NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps])
         NSApp.activate(ignoringOtherApps: true)
         waitForActive()
     }
@@ -243,6 +252,8 @@ extension NSImage {
         }
         FileHandle.standardError.write(Data("active=\(NSApp.isActive)\n".utf8))
         MainActor.assumeIsolated {
+            activationWindow?.close()
+            activationWindow = nil
             do {
                 try render()
             } catch {
@@ -255,5 +266,5 @@ extension NSImage {
 let app = NSApplication.shared
 let delegate = RenderDelegate()
 app.delegate = delegate
-app.setActivationPolicy(.accessory)
+app.setActivationPolicy(.regular)
 app.run()

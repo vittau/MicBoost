@@ -212,10 +212,16 @@ sem o mantenedor presente e seu pedido explícito.
 
 Verificação final: `swift build`, `swift test` e
 `swift format lint --strict --recursive Sources Tests Package.swift` aprovados.
-145 testes: 55 UI em 1,268 s, 16 DSP em 0,116 s e 74 Core em 0,677 s (um caso
-conhecido esperado da HAL falsa); soma de execução dos targets 2,061 s, sem compilação.
-As capturas de ajustes foram regeneradas com monitor desligado. A ferramenta de
-captura não conseguiu ativar seu app nesta sessão; os controles aparecem inativos.
+147 testes: 55 UI em 1,336 s, 16 DSP em 0,148 s e 76 Core em 4,118 s (um caso
+conhecido esperado da HAL falsa); soma de execução dos targets 5,602 s, sem compilação.
+HAL falsa de Bluetooth e Bluetooth LE: A2DP 44,1 → HFP 16 kHz após start, republicação
+em 2 s, callbacks de stop entregues depois dos 3 s e mudança real fora da janela:
+exatamente uma reconstrução inicial, nenhuma por eventos de stop antigos, e uma pela
+mudança real. O monitor no mesmo headset foi refeito a 16 kHz. Nenhum Bluetooth real
+foi aberto. Saída Bluetooth a 44,1 kHz com lista só 44,1 ou também 48 kHz funciona na
+fake, preservando a saída em 44,1 e o motor em 48 kHz.
+As capturas de ajustes foram regeneradas com monitor desligado, app ativo e janela key;
+log do auxiliar `active=true` e verificação visual nas duas aparências.
 Entrada/saída padrão conferidas por `micboost-diag devices`: `BuiltInMicrophoneDevice`
 e `BuiltInSpeakerDevice`. Nenhum processo de captura ou diagnóstico ficou rodando.
 
