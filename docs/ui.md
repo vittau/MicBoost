@@ -31,7 +31,8 @@ arredondadas à direita. O sistema define a cor conforme a barra de menus. Estad
 - hover, foco de teclado e VoiceOver dos itens de menu vêm do AppKit; nenhum destaque é desenhado pelo app;
 - o delegate inicia os medidores ao abrir e os cancela ao fechar;
 - entrada no tracking pelo run loop para não manter um job de concorrência Swift ocupado;
-- items de view: a view preenche a largura do menu (`autoresizingMask = .width`) e o conteúdo começa e termina nas mesmas insets do título de um `NSMenuItem` padrão. Essas insets são medidas do próprio menu na primeira abertura (o `x` do título de um item sem imagem e a coluna do atalho), não estimadas; os valores iniciais apenas evitam um salto nessa primeira abertura;
+- o menu não reserva a coluna de marcação (`showsStateColumn = false`): nenhuma linha começa num vão vazio, e as linhas de view começam na mesma coluna do título de um item nativo;
+- items de view: a view preenche a largura do menu (`autoresizingMask = .width`) e o conteúdo começa e termina nas mesmas insets do título de um `NSMenuItem` padrão. Essas insets são medidas do próprio menu na primeira abertura (o `x` do título de um item sem imagem e a coluna do atalho) e ficam guardadas em `UserDefaults.menuRowInsets`, para o painel abrir já alinhado nas execuções seguintes;
 - os sliders são `NSSlider`: o controle conduz o próprio laço de arrasto e continua respondendo dentro do tracking do menu, enquanto o gesto do `Slider` do SwiftUI perde o mouse-up fora da view hospedada e deixa o slider preso no estado pressionado. As atualizações são contínuas durante o arrasto, sem marcas de passo, e o knob só acompanha valores externos (campo numérico, teclado, persistência) quando não há arrasto.
 
 **Fechar o painel nunca afeta o motor.** Aparência e preferências de acessibilidade
@@ -47,13 +48,13 @@ Itens, de cima para baixo:
 3. **Ganho (view):** botão de mute sem borda com o ícone `mic.fill`/`mic.slash.fill` centralizado em uma área fixa de 20 × 20 pt para não deslocar o slider ao alternar, slider nativo de ganho de −12 a +24 dB e rótulo `398% (+12,0dB)` (percentual primeiro; dB entre parênteses). O valor é editável: clicar no rótulo abre um `NSTextField` numérico em dB. O selo "Limitador ativo" (`NSBox` com cantos arredondados) aparece ao lado do valor de ganho durante a proteção de pico; sua área permanece reservada e o selo fica oculto para acessibilidade quando inativo, sem alterar a altura do painel ou deslocar controles.
 4. **Medidores (view):** duas linhas, "Entrada" e "Saída", com rótulo em `.caption` e um `NSLevelIndicator` nativo ao lado (ver [Medidores na UI](#medidores-na-ui)).
 5. **Separador** nativo (`NSMenuItem.separator()`).
-6. **Entrada do sistema (view):** apenas o estado da entrada padrão; a fonte selecionada é indicada pela marcação na lista de microfones, sem uma linha adicional de caminho do áudio:
+6. **Entrada do sistema (view):** apenas o estado da entrada padrão; a fonte selecionada é indicada pelo selo na lista de microfones, sem uma linha adicional de caminho do áudio:
    - entrada padrão no BlackHole 2ch: "Entrada do sistema: MicBoost", com a marcação de verificação apenas enquanto o motor está rodando; o nome "BlackHole" nunca aparece na linha, qualquer que seja o estado do motor;
    - divergência: "Entrada do sistema: <nome>" com o botão "Usar MicBoost", habilitado quando o clique funciona (o motor já iniciou e o BlackHole está presente), mesmo com o motor parado;
    - entrada padrão desconhecida: "Entrada do sistema: Desconhecida", sem botão;
    - com `manageDefaultInput` desligado, a linha só informa a entrada atual, sem tratá-la como divergência; o botão "Usar MicBoost" aparece se a entrada não for o BlackHole.
 7. **Cabeçalho de seção "Microfone"** nativo (`NSMenuItem.sectionHeader(title:)`).
-8. **Microfone:** um `NSMenuItem` por fonte elegível, com o ícone SF Symbol do transporte, o nome e `state = .on` na selecionada — a lista de dispositivos da Central de Controle em forma de menu, com hover, seleção e VoiceOver nativos. Selecionar troca a fonte (reconstrução do motor com rampa). Uma fonte persistida que não está conectada aparece como um item desabilitado "<nome> (desconectado)" com o último nome conhecido daquele UID, guardado em `Settings.knownSourceNames` para sobreviver a um relançamento com o dispositivo ausente; se o nome nunca foi visto, a linha mostra "Microfone desconectado". O UID do dispositivo nunca aparece na interface.
+8. **Microfone:** um `NSMenuItem` com view por fonte elegível, no desenho das listas de dispositivos dos menus de Wi-Fi e Bluetooth: o símbolo SF do transporte em um selo circular de 18 pt, preenchido com a cor de destaque quando a fonte está selecionada e neutro nas demais, seguido do nome. O destaque de hover, a seleção por setas e o VoiceOver são os do menu; a linha não pinta fundo nem cria cor de hover, só acompanha o item destacado trocando o texto para a cor de seleção do sistema. Selecionar troca a fonte (reconstrução do motor com rampa). Uma fonte persistida que não está conectada aparece como um item desabilitado "<nome> (desconectado)" com o último nome conhecido daquele UID, guardado em `Settings.knownSourceNames` para sobreviver a um relançamento com o dispositivo ausente; se o nome nunca foi visto, a linha mostra "Microfone desconectado". O UID do dispositivo nunca aparece na interface.
 9. **Separador** nativo.
 10. **Equalizador (duas views):** o cabeçalho é um `NSButton` de disclosure nativo (triângulo) com o título "Equalizador" e um `NSSwitch` "Ativar EQ" sempre visível à direita, independente da expansão. O estado de expansão persiste (`eqExpanded`); clicar no triângulo ou no título alterna, e alternar o switch não expande nem recolhe os ajustes. Apenas as bandas e ações ficam na área recolhível:
     - Graves: slider de ganho (dB) + campo de frequência (Hz);
@@ -63,7 +64,7 @@ Itens, de cima para baixo:
     - Cada banda é um bloco separado por espaçamento e por um separador `NSBox`, com título em negrito e marcação de cabeçalho para acessibilidade. O controle de largura fica dentro do bloco de Médios. O ganho de cada banda aparece numericamente junto ao título; campos de frequência têm largura compacta e alinhamento numérico à direita.
     - Valores editáveis, validados e limitados às faixas de [dsp.md](dsp.md#equalizador). Sem gráfico de resposta.
 11. **Separador** nativo.
-12. **"Ajustes…"** (⌘,) e **"Sair do MicBoost"** (⌘Q): `NSMenuItem` reais, com atalho, hover e destaque do menu. Abrir os ajustes fecha o painel.
+12. **"Ajustes…"** (⌘,) e **"Sair do MicBoost"** (⌘Q): `NSMenuItem` reais, em texto puro como "Settings…" nos menus da Apple, com atalho, hover e destaque do menu. O macOS 27 desenha ícones automáticos nesses itens; `preferredImageVisibility = .hidden` mantém o texto puro. Abrir os ajustes fecha o painel.
 
 O menu não tem largura fixa: ela vem do item mais largo (as views têm 320 pt de referência e crescem junto com o menu). O menu AppKit só assume uma nova altura quando a lista de itens muda; esconder um item deixa o espaço dele. Por isso a faixa de estado, a linha de microfone desconectado e as bandas do EQ são inseridas e removidas durante o tracking, em vez de apenas ocultadas.
 
@@ -111,7 +112,8 @@ Cada elemento do menu e da janela de ajustes, e o que o desenha:
 | Valor de ganho / campos de frequência | `NSTextField` editável (borda arredondada do sistema) |
 | Selo do limitador e fundo da faixa | `NSBox` com preenchimento do sistema |
 | Medidores de entrada e saída | `NSLevelIndicator` (`continuousCapacity`, `.small`) |
-| Lista de microfones, "Ajustes…", "Sair do MicBoost", cabeçalhos de seção e separadores | `NSMenuItem` nativos |
+| Lista de microfones | `NSMenuItem` com view AppKit: selo circular (camada com `controlAccentColor`) e `NSTextField` |
+| "Ajustes…", "Sair do MicBoost", cabeçalhos de seção e separadores | `NSMenuItem` nativos |
 | Textos de estado e rótulos | `NSTextField` |
 | Ajustes: seções, switch, seletores, links, botões, linhas de diagnóstico | SwiftUI sobre AppKit (`Form` `.grouped`, `Toggle`, `Picker`, `Link`, `Button`, `LabeledContent`) |
 
@@ -128,7 +130,7 @@ Não há nenhum controle desenhado ou imitado: todos os elementos usam controles
   - sliders com `accessibilityLabel` ("Ganho", "Graves, ganho"…) e `accessibilityValue` em dB e percentual;
   - medidores com papel de indicador de nível e valor em dBFS;
   - estados ("Limitador ativo", divergência) anunciados como valor ou dica, não só como cor;
-  - lista de microfones com estado "selecionado" no próprio item de menu.
+  - cada linha de microfone é um elemento de menu com o nome como rótulo, marcada como selecionada e com o valor "Selecionado" quando é a fonte atual.
 - Contraste e cores: só cores semânticas do sistema (`.labelColor`, `.secondaryLabelColor`, `.controlAccentColor`).
 - Aparência clara e escura e "Aumentar contraste" seguem o sistema automaticamente.
 

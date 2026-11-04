@@ -200,20 +200,24 @@ execução somada de aproximadamente 1,8 s; a suíte Core inclui o caso negativo
 
 O painel é um `NSMenu` de itens reais: lista de microfones, "Ajustes…" (⌘,), "Sair do
 MicBoost" (⌘Q), cabeçalhos de seção e separadores. A conferência inclui a composição real
-pelo WindowServer, com hover, marcação e atalhos desenhados pelo AppKit.
+pelo WindowServer, com hover, destaque e atalhos desenhados pelo AppKit.
 
 Menu nativo (2026-11-03): as capturas passaram a vir do menu real aberto pelo auxiliar e
 capturado com `SCScreenshotManager`, porque o painel não é mais uma view SwiftUI. Dimensões
 em 1×: `eq-*` 320 × 601, `panel-*` 320 × 306, `error-*` 320 × 361, `settings-*` 540 × 853.
-As linhas de view alinham com o título dos itens nativos: o auxiliar mede as insets do
-próprio menu na primeira abertura (título de item sem imagem e coluna de atalho) e as
-linhas passam a usá-las; a lista de microfones fica na coluna do ícone, como nas listas de
-dispositivos da Central de Controle. Clicar no cabeçalho do EQ durante o tracking insere o
+As linhas de view alinham com o título dos itens nativos: o menu abre sem a coluna de
+marcação (`showsStateColumn = false`), o auxiliar mede as insets do próprio menu na primeira
+abertura (título de item sem imagem e coluna de atalho) e as linhas passam a usá-las. Na
+captura final, as linhas de view começam em 15 pt e os itens nativos "Ajustes…" e "Sair do
+MicBoost" em 17 pt — a diferença é o desenho do glifo, não a coluna. A fonte selecionada é
+marcada por um selo circular de 18 pt com a cor de destaque (sem coluna de marcação, sem
+checkmark), e "Ajustes…" fica em texto puro, sem o ícone automático que o macOS 27 desenha
+em itens com ⌘, Clicar no cabeçalho do EQ durante o tracking insere o
 item das bandas e o menu passa de 377 para 601 pt de altura na mesma sessão; esconder o
 item não redimensiona o menu, por isso as linhas condicionais são inseridas e removidas.
 
-Os medidores são `NSLevelIndicator` (`continuousCapacity`, `.small`): o bloco nativo mede
-10 pt de altura no macOS 27, com preenchimento na cor de destaque do sistema. As duas barras
+Os medidores são `NSLevelIndicator` (`continuousCapacity`, `.small`): o controle nativo tem
+16 pt de altura intrínseca no macOS 27, com preenchimento na cor de destaque do sistema. As duas barras
 das capturas clara e escura mostram 0 dBFS preenchendo a faixa e −1 dBFS em 89,13% dela na
 escala de amplitude linear; valores ≤ −60 dBFS ficam em zero. `warningValue` e
 `criticalValue` ficam acima do máximo, então nenhuma captura mostra amarelo ou vermelho.
@@ -277,7 +281,7 @@ para as anteriores. Estado final: BlackHole a 48000 Hz, C920 a 16000 Hz, entrada
 
 Capturas para o README: `docs/screenshots/eq-{light,dark}.png` e
 `settings-{light,dark}.png` foram regeradas com estado de amostra realista (entrada do sistema
-MicBoost com marcação, microfone USB selecionado, ganho +6 dB, medidores com níveis, 48000 Hz,
+MicBoost com marcação, microfone USB com o selo de seleção, ganho +6 dB, medidores com níveis, 48000 Hz,
 buffer 256 no seletor e no diagnóstico, latência reportada de 15,3 ms, switches nativos no
 estado ativo e licença GPL-3.0). O locale vem do idioma resolvido pelo catálogo (`en` →
 `en_US`), então os números usam ponto decimal e vírgula de milhar do inglês. `panel-*` e
@@ -287,6 +291,6 @@ O menu deixou de ser uma view SwiftUI: as capturas `eq-*`, `panel-*` e `error-*`
 `NSMenu` real, aberto pelo auxiliar e capturado com `SCScreenshotManager` (ScreenCaptureKit) a
 partir do laço de tracking, com recorte na view de conteúdo do menu. A captura usa o menu
 montado pelo `PanelMenuController` com o mesmo estado de exemplo, então mostra os itens
-nativos, a marcação da fonte selecionada, os atalhos ⌘, e ⌘Q e as insets medidas do menu. Os
+nativos, o selo da fonte selecionada, os atalhos ⌘, e ⌘Q e as insets medidas do menu. Os
 itens de view alinham com o título dos itens nativos. `settings-*` continua vindo de
 `NSHostingView.cacheDisplay`: não há menu a compor e os controles SwiftUI são AppKit por baixo.

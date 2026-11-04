@@ -29,10 +29,12 @@ O projeto é um único pacote SwiftPM (sem `.xcodeproj`). O `.app` é montado po
 |---|---|---|
 | `MicBoostDSP` | C (C17) | Tudo que roda na thread de IO: `mb_ioproc`, processador, biquads, ganho, limitador, medidores e parâmetros atômicos. Sem dependências além de `<CoreAudio/CoreAudioTypes.h>`, `<stdatomic.h>` e `<math.h>`. |
 | `MicBoostCore` | Swift library | Abstração da HAL (`AudioHardware` protocol + implementação real), `DeviceService`, `AggregateBuilder`, `EngineController`, `DefaultInputManager`, `SettingsStore`, modelos de domínio e permissão de microfone. Sem AppKit/SwiftUI. |
+| `MicBoostUI` | Swift library | `AppModel` (`@Observable`), o menu do painel (`PanelMenuController` e as linhas em AppKit), `SettingsView` em SwiftUI e as localizações. |
 | `MicBoostApp` | Swift executable (produto `MicBoost`) | Ciclo de vida do app, item de status, menu do painel, ajustes, mensagens. Depende de `MicBoostUI`. |
 | `micboost-diag` | Swift executable | CLI de diagnóstico e medição ([testing.md](testing.md#ferramenta-de-diagnóstico)). Depende de `MicBoostCore`. |
 | `MicBoostDSPTests` | Swift Testing | Testes offline do processador via API C. |
 | `MicBoostCoreTests` | Swift Testing | Política de entrada padrão, máquina de estados, settings e mapa de canais, com HAL falsa. |
+| `MicBoostUITests` | Swift Testing | Estrutura do menu, linhas AppKit do painel e leitura dos campos numéricos. |
 
 `EngineHardware` estende `AudioHardware` com criação/destruição de agregado, mapa de buffers/streams, taxa do destino, tamanho de buffer, registro/uso de IOProc e latências. A fake implementa ambas as interfaces.
 
