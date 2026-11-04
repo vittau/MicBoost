@@ -111,7 +111,7 @@ stopped ──start──▶ starting ──ok──▶ running
 | `gainDB` | `0` | Faixa em [dsp.md](dsp.md#ganho) |
 | `muted` | `false` | |
 | `eq` | ver [dsp.md](dsp.md#equalizador) | `enabled` (padrão `true`), `low{frequency, gainDB}`, `mid{frequency, gainDB, q}`, `high{frequency, gainDB}` |
-| `channelSelectionByUID` | `[:]` | Modo de canais por dispositivo ([audio-engine.md](audio-engine.md#canais)), codificado como `{mode, channel}` com canal baseado em 1 |
+| `channelSelectionByUID` | `[:]` | Modo de canais por dispositivo (ausência = `mono(1)`; `auto` persistido normalizado para `mono(1)`, [audio-engine.md](audio-engine.md#canais)), codificado como `{mode, channel}` com canal baseado em 1 |
 | `bufferFrames` | `256` | Opções 64/128/256/512/1024, limitadas pela faixa do dispositivo |
 | `previousDefaultInputUID` | `nil` | Entrada anterior ao MicBoost assumir a padrão |
 | `defaultInputManaged` | `false` | `true` enquanto a entrada padrão atual foi definida pelo MicBoost |

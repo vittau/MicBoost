@@ -82,6 +82,7 @@ Available today:
   buffer, channels, automatic system input switching and diagnostics, using native grouped
   sections and switches. Buffer sizes are labeled in frames, with guidance on latency and audio stability;
   channel options each explain how the microphone inputs map to the left and right output.
+  Channel choices are ordered Mono 1 (default), Mono 2 and any further mono channels, Mix, then Stereo.
   Stereo preserves separate left and right inputs; mono sends the selected channel to both sides.
 - **Voice preset** for rumble reduction and gentle presence, plus a flat EQ reset.
 - **Processing switch** releases the microphone; quitting restores the previous system input

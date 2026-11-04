@@ -80,6 +80,7 @@ public struct Settings: Codable, Equatable, Sendable {
         copy.bufferFrames = Self.allowedBufferFrames.contains(bufferFrames) ? bufferFrames : 256
         copy.eq = eq.sanitized()
         copy.channelSelectionByUID = channelSelectionByUID.filter { _, selection in selection.isValid }
+            .mapValues { $0 == .auto ? .mono(channel: 1) : $0 }
         return copy
     }
 }

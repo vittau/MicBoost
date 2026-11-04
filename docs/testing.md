@@ -161,7 +161,7 @@ Capturas claras/escuras verificadas visualmente; sliders sem marcas de passo.
 VoiceOver, todos os atalhos, reduzir movimento/transparência e contraste aumentado
 permanecem sem validação manual completa. A etapa 4 permanece em andamento.
 
-Verificação automatizada da interface: 57 testes (6 UI, 11 DSP, 40 Core),
+Verificação automatizada da interface: 58 testes (6 UI, 11 DSP, 41 Core),
 execução somada de aproximadamente 2 s; a suíte Core inclui o caso negativo
 `fakeRejectsOutputWrite`, que registra uma issue conhecida intencionalmente.
 `swift build`, `swift test`, lint recursivo de formatação, montagem debug e

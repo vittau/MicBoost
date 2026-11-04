@@ -289,22 +289,20 @@ import SwiftUI
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Picker(localized("Channels"), selection: Binding(get: { channel }, set: setChannel)) {
-                        Text(localized("Automatic")).tag(0)
-                        Text(localized("Mono mix")).tag(-1)
                         ForEach(1...sourceChannelCount, id: \.self) {
                             Text("Mono \($0)").tag($0)
                         }
+                        Text(localized("Mix")).tag(-1)
                         if sourceChannelCount >= 2 { Text(localized("Stereo")).tag(-2) }
                     }
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(localized("Automatic: uses the first channel on both sides."))
-                        Text(localized("Mono mix: combines all channels on both sides."))
                         ForEach(1...sourceChannelCount, id: \.self) { channel in
                             Text(
                                 String.localizedStringWithFormat(
                                     localized("Mono %lld: uses channel %lld on both sides."),
                                     Int64(channel), Int64(channel)))
                         }
+                        Text(localized("Mix: combines all channels on both sides."))
                         if sourceChannelCount >= 2 {
                             Text(localized("Stereo: channel 1 on the left, channel 2 on the right."))
                         }
@@ -354,8 +352,8 @@ import SwiftUI
         max(1, Int(model.status?.source?.inputChannels ?? 1))
     }
     private var channel: Int {
-        switch model.controls.channelSelectionByUID[model.controls.selectedInputUID ?? ""] ?? .auto {
-        case .auto: 0
+        switch model.controls.channelSelectionByUID[model.controls.selectedInputUID ?? ""] ?? .mono(channel: 1) {
+        case .auto: 1
         case .monoMix: -1
         case .mono(let n): n
         case .stereo: -2
@@ -364,7 +362,7 @@ import SwiftUI
     private func setChannel(_ value: Int) {
         guard let uid = model.controls.selectedInputUID else { return }
         let selection: ChannelSelection =
-            value == 0 ? .auto : value == -1 ? .monoMix : value == -2 ? .stereo(firstChannel: 1) : .mono(channel: value)
+            value == -1 ? .monoMix : value == -2 ? .stereo(firstChannel: 1) : .mono(channel: value)
         model.controls.channelSelectionByUID[uid] = selection
         Task { await model.engine.setChannelSelection(selection, forUID: uid) }
     }

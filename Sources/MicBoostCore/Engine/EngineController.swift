@@ -36,7 +36,7 @@ public actor EngineController {
     private let settings: SettingsStore
     private var controls = Settings()
     private lazy var routingManager = DefaultInputManager(hardware: hardware, settings: settings)
-    private var channelSelection: ChannelSelection = .auto
+    private var channelSelection: ChannelSelection = .mono(channel: 1)
     private var forceRebuild = false
     private let hardware: any EngineHardware
     private var state: EngineState = .stopped
@@ -76,7 +76,7 @@ public actor EngineController {
         let stored = await settings.current
         controls = stored
         let bufferFrames = bufferFrames ?? UInt32(stored.bufferFrames)
-        channelSelection = stored.channelSelectionByUID[inputUID] ?? .auto
+        channelSelection = stored.channelSelectionByUID[inputUID] ?? .mono(channel: 1)
         guard bufferFrames > 0 else { throw EngineError.invalidArgument("Buffer must be positive") }
         try tearDown()
         hasRun = false

@@ -1,7 +1,6 @@
 "About" = "About";
 "Active" = "Active";
 "Audio" = "Audio";
-"Automatic" = "Automatic";
 "Bass" = "Bass";
 "BlackHole 2ch not found." = "BlackHole 2ch not found.";
 "Buffer" = "Buffer";
@@ -23,7 +22,7 @@
 "Microphone disconnected. Audio resumes when reconnected." = "Microphone disconnected. Audio resumes when reconnected.";
 "Microphone format unsupported." = "Microphone format unsupported.";
 "Mid" = "Mid";
-"Mono mix" = "Mono mix";
+"Mix" = "Mix";
 "Mute" = "Mute";
 "Open Privacy Settings" = "Open Privacy Settings";
 "Output" = "Output";
@@ -65,8 +64,7 @@
 "Buffer (frames)" = "Buffer (frames)";
 "Smaller buffers reduce latency. Increase this if audio cuts out or crackles; keep the default if audio is stable." = "Smaller buffers reduce latency. Increase this if audio cuts out or crackles; keep the default if audio is stable.";
 
-"Automatic: uses the first channel on both sides." = "Automatic: uses the first channel on both sides.";
-"Mono mix: combines all channels on both sides." = "Mono mix: combines all channels on both sides.";
+"Mix: combines all channels on both sides." = "Mix: combines all channels on both sides.";
 "Mono %lld: uses channel %lld on both sides." = "Mono %lld: uses channel %lld on both sides.";
 "Stereo: channel 1 on the left, channel 2 on the right." = "Stereo: channel 1 on the left, channel 2 on the right.";
 "Stereo" = "Stereo";

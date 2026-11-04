@@ -168,3 +168,12 @@ import Testing
     try await Task.sleep(for: .milliseconds(500))
     #expect(storage.writes == 1)
 }
+
+@Test func storedAutomaticChannelSelectionUsesMonoOne() async throws {
+    let storage = MemorySettingsStorage()
+    try storage.seed(Settings(channelSelectionByUID: ["automatic": .auto, "chosen": .mono(channel: 2)]))
+    let store = SettingsStore(storage: storage)
+    let settings = await store.current
+    #expect(settings.channelSelectionByUID["automatic"] == .mono(channel: 1))
+    #expect(settings.channelSelectionByUID["chosen"] == .mono(channel: 2))
+}
