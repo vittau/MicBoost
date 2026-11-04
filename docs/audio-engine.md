@@ -53,7 +53,7 @@ Mudanças chegam em rajadas. O controller agrupa eventos com 100 ms de coalescê
 | `kAudioAggregateDeviceUIDKey` | `"io.github.vittau.MicBoost.engine"` |
 | `kAudioAggregateDeviceIsPrivateKey` | `1` |
 | `kAudioAggregateDeviceIsStackedKey` | `0` |
-| `kAudioAggregateDeviceSubDeviceListKey` | `[{UID: fonte, kAudioSubDeviceDriftCompensationKey: 1}, {UID: BlackHole}]` (ordem fixa: fonte primeiro) |
+| `kAudioAggregateDeviceSubDeviceListKey` | `[{UID: fonte, kAudioSubDeviceDriftCompensationKey: 1}, {UID: BlackHole}]` (ordem fixa: fonte primeiro); com o [monitor](#modo-monitor) ativo, `{UID: saída de monitor, kAudioSubDeviceDriftCompensationKey: 1}` entra em terceiro |
 | `kAudioAggregateDeviceMainSubDeviceKey` | UID do BlackHole |
 
 A lista de subdispositivos define a ordem dos streams do agregado (fonte, depois BlackHole); o subdispositivo principal define apenas o clock. Por isso a compensação de drift fica na fonte e a ordem da lista não muda em relação ao mapa de canais.
@@ -114,7 +114,7 @@ Por ciclo:
 1. Ler alvos atômicos (ganho, mute, EQ, bypass, modo de canais, fade-out).
 2. Extrair os canais da fonte segundo o mapa para os buffers de trabalho pré-alocados. Se a entrada não vier (buffer nulo, tamanho zero), usar silêncio e incrementar `input_missing`.
 3. Rodar a cadeia DSP ([dsp.md](dsp.md)).
-4. Escrever L/R no BlackHole e zerar as demais saídas habilitadas.
+4. Escrever L/R no BlackHole e, com o monitor ativo, as mesmas amostras nos canais da saída de monitor; zerar as demais saídas habilitadas.
 5. Atualizar medidores e o contador de ciclos. Guardar `outTime->mHostTime - inTime->mHostTime` no atômico `io_delta_host` (diagnóstico).
 6. Retornar `noErr` sempre.
 
@@ -127,6 +127,27 @@ Por ciclo:
 - a latência do agregado reportada pela HAL, quando disponível.
 
 O valor oficial é o medido ([testing.md](testing.md#medição-de-latência)); o reportado serve só como referência.
+
+## Modo monitor
+
+Com o monitor ligado, a voz processada sai também na saída padrão do sistema, para o usuário ouvir a si mesmo. A meta é latência da fonte à saída **< 50 ms** (mediana medida, [testing.md](testing.md#medição-de-latência-do-monitor)).
+
+**Decisão: a saída de monitor é um subdispositivo do mesmo agregado.** O IOProc único escreve no BlackHole e na saída de monitor no mesmo ciclo, sem fila. A latência do monitor fica limitada à latência de entrada da fonte, a dois buffers do agregado e à latência de saída do dispositivo (por exemplo, ≈ 15 ms + latência da saída no buffer padrão). Um segundo IOProc na saída exigiria buffer circular e resampler próprio, e acrescentaria a ocupação da fila à latência.
+
+- **Saída de monitor:** o dispositivo de `kAudioHardwarePropertyDefaultOutputDevice`, apenas lido. O MicBoost nunca escreve a saída padrão (nem `kAudioHardwarePropertyDefaultSystemOutputDevice`).
+- **Elegível** se tiver ≥ 1 canal de saída, **não** for BlackHole (nenhuma variante), **não** for o agregado do MicBoost e **não** for um agregado que contenha BlackHole (mesma verificação recursiva da fonte). Escrever no BlackHole seria realimentação.
+- **Agregado:** com o monitor ativo, a saída entra como terceiro subdispositivo (fonte, BlackHole, saída), com compensação de drift; o BlackHole continua como clock principal, e o resampler da saída fica depois do limitador, o que só afeta o monitor (o teto de −1 dBFS vale no BlackHole). Se a saída for o próprio dispositivo da fonte (headset USB com entrada e saída), ela não é adicionada de novo: o IOProc usa as saídas desse subdispositivo, que deixam de ser zeradas.
+- **Canais:** as mesmas amostras de L e R do BlackHole vão para os canais 1 e 2 da saída. Com uma saída de um canal, vai `(L + R) / 2`. Demais canais da saída recebem zero. `mb_routing` leva os canais de monitor (`monitor_count` 0, 1 ou 2 e `monitor[2]`), calculados pelo `AggregateBuilder` a partir de `StreamConfiguration`, como os do BlackHole; os streams de entrada da saída de monitor são desativados com `kAudioDevicePropertyIOProcStreamUsage`.
+- **Sinal:** é o que o BlackHole recebe (depois de EQ, ganho, mute e limitador). Mute e fade-out silenciam também o monitor. Não há volume próprio: o volume da saída do sistema controla o monitor.
+- **Taxa de trabalho:** com o monitor ativo, a regra de seleção ([Formato e taxa](#formato-e-taxa-de-amostragem)) usa as taxas comuns aos três dispositivos. Se a saída não tiver taxa em comum com a fonte e o BlackHole, o motor inicia sem o monitor, com o monitor indisponível por formato. A taxa da saída é definida e restaurada como a da fonte e a do BlackHole (stop voluntário, desligar o monitor, trocar de saída). Mudar a taxa da saída afeta o áudio de outros apps nela, que o sistema reamostra.
+- **Ligar e desligar** o monitor reconstrói o motor (stop com rampa → start), como trocar de fonte. É o único controle de áudio do painel que reconstrói; a entrada padrão não muda, e os apps consumidores recebem só a rampa e um silêncio curto.
+- **Estado em memória:** o monitor começa desligado a cada abertura do app (não é persistido), para não tocar a voz nos alto-falantes sem o usuário pedir.
+- **Mudanças:** com o monitor ligado, o controller observa `kAudioHardwarePropertyDefaultOutputDevice` e, na saída de monitor, `kAudioDevicePropertyDeviceIsAlive`, `kAudioDevicePropertyNominalSampleRate` e `kAudioDevicePropertyStreamConfiguration`, com a mesma coalescência de 100 ms e a mesma janela de 300 ms após o start. Saída padrão trocada, saída de monitor removida ou com formato alterado → reconstrução com a saída padrão atual. Esses eventos nunca levam a `error` e não mostram faixa; se a nova saída for inelegível, o motor volta a `running` sem monitor.
+- **Falha só do monitor:** se o start com a saída falhar por HAL ou formato, o motor tenta de novo sem a saída e publica o monitor indisponível; a voz no BlackHole tem prioridade.
+
+`MonitorStatus` (em `EngineStatus.monitor`): `off` (desligado ou motor parado), `active(output: AudioDevice, reportedLatencyMs: Double)` ou `unavailable(reason, outputName: String?)`, com `reason` `noOutput` (sem saída padrão ou sem canais de saída), `outputIsLoopback` (BlackHole, agregado com BlackHole ou o agregado do MicBoost) e `formatUnsupported`.
+
+**Latência reportada do monitor:** latência e safety offset de entrada da fonte e do stream de entrada, mais dois buffers do agregado, mais latência e safety offset de saída da saída de monitor e do stream de saída. Como a latência do motor, serve de referência; o valor oficial é o medido. Em saídas Bluetooth, a latência de saída do próprio dispositivo costuma passar de 100 ms, e a meta de 50 ms não é alcançável.
 
 ## Política de entrada padrão (`DefaultInputManager`)
 
@@ -152,7 +173,7 @@ Erros do motor (`recovering`/`error`) **não** restauram a entrada padrão: `eng
 
 `DefaultInputStatus` tem três sinais: `isBlackHole` (a entrada padrão é o BlackHole 2ch), `divergedByUser` (o motor roda e a entrada não é o BlackHole) e `unknown` (o `DefaultInputManager` ainda não conhece o BlackHole, por exemplo antes do start, ou não conseguiu resolver a entrada atual).
 
-Invariantes: nunca definir uma fonte física como padrão, exceto na restauração descrita acima; nunca tocar em `kAudioHardwarePropertyDefaultOutputDevice` nem em `kAudioHardwarePropertyDefaultSystemOutputDevice`.
+Invariantes: nunca definir uma fonte física como padrão, exceto na restauração descrita acima; nunca escrever `kAudioHardwarePropertyDefaultOutputDevice` nem `kAudioHardwarePropertyDefaultSystemOutputDevice` (o [modo monitor](#modo-monitor) só lê a saída padrão).
 
 ## Recuperação
 

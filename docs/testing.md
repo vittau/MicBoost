@@ -27,7 +27,8 @@ Em 16, 44,1, 48 e 96 kHz:
 ### `MicBoostCoreTests` (com `FakeAudioHardware`)
 
 - Política de entrada padrão: todos os casos de [audio-engine.md](audio-engine.md#política-de-entrada-padrão-defaultinputmanager), incluindo crash simulado (`defaultInputManaged` persistido), divergência do usuário, dispositivo anterior ausente e BlackHole já padrão.
-- Nunca chama a escrita da saída padrão. A fake falha o teste se isso acontecer.
+- Nunca chama a escrita da saída padrão. A fake falha o teste se isso acontecer, inclusive com o monitor ligado e a saída padrão trocando.
+- Modo monitor ([audio-engine.md](audio-engine.md#modo-monitor)): agregado com a saída em terceiro e compensação de drift; saída igual à fonte sem duplicar subdispositivo; mapa de canais de monitor com saída de 1, 2 e 8 canais; saída BlackHole, agregado com BlackHole e sem saída → `unavailable` com o motor em `running`; taxa de trabalho entre os três e saída sem taxa comum → sem monitor; taxa da saída restaurada ao desligar; ligar/desligar reconstrói sem tocar a entrada padrão; troca da saída padrão e saída removida reconstroem sem `error`; falha de start com a saída → novo start sem ela.
 - Elegibilidade de fontes: exclui as variantes de BlackHole, o próprio agregado e agregados com BlackHole.
 - Máquina de estados: transições de [architecture.md](architecture.md#ciclo-de-vida-do-motor) para cada evento de recuperação.
 - Recuperação, uma por linha da tabela de [audio-engine.md](audio-engine.md#recuperação): fonte perdida e devolvida; BlackHole removido e devolvido; taxa da fonte e do BlackHole alterada de fora; permissão negada e concedida; suspensão e retomada com sucesso e com falha; `coreaudiod` reiniciado com IDs novos; overload só incrementando o contador; notificação da própria escrita de taxa e mudança de latência/faixa de buffer sem reconstrução. O caminho percorrido é verificado pelo observador de estado, não por polling do estado final.
@@ -43,6 +44,7 @@ Em 16, 44,1, 48 e 96 kHz:
 - Linha de entrada do sistema: BlackHole como entrada padrão mostra "MicBoost" com marcação só com o motor rodando; divergência mostra o nome com "Usar MicBoost" habilitado quando o clique funciona; entrada desconhecida não mostra botão.
 - Catálogo de strings: toda chave passada a `localized(...)` ou `String(localized:)` em `MicBoostUI` e `MicBoostApp` existe nos dois `.strings`, os dois catálogos têm exatamente as mesmas chaves e cada tradução preserva os placeholders da chave.
 - Permissão reavaliada ao ativar o app: negada mantém a faixa, concedida limpa e tenta iniciar de novo.
+- Linha do monitor: o clique no switch (`mouseUp`) liga e desliga o monitor no `AppModel`; a linha de texto aparece e some com o switch e mostra cada `MonitorStatus`, inclusive o aviso de atraso acima de 50 ms; o switch fica desabilitado com o processamento desligado.
 - Formatação de ganho e escala dos medidores; o medidor ignora o mouse e o foco, e os valores de ganho e de frequência são texto somente leitura.
 - Frequência do EQ: a grade quantiza nos limites das faixas de degrau (195, 199, 200, 950, 999, 1000, 1240, 1250, 9750, 9999, 10000, 10400 e 14000 Hz), os padrões e os limites de banda estão na grade, as setas andam para o valor seguinte ou anterior e param nos limites; o mapeamento logarítmico posição ↔ Hz volta ao mesmo valor e o meio da escala é a média geométrica.
 - Slider de frequência do menu: o arrasto (posição logarítmica → Hz → grade → faixa) grava a frequência da banda no `AppModel`, o rótulo e o valor de acessibilidade mostram "1000 Hz", o knob não se move com atualizações do modelo durante o arrasto, um valor persistido fora da grade aparece como está até o slider se mover e o máximo do slider segue 0,45 · fs da taxa atual.
@@ -60,6 +62,7 @@ CLI para verificar o hardware. `run` e `latency` aceitam `--gain-db N`, `--mute`
 | `micboost-diag run --input <uid> [--buffer N] [--seconds N]` | Roda o motor sem UI (mesmo `EngineController` do app), imprimindo estado e contadores a cada segundo e cada transição de estado com o instante. Não altera a entrada ou saída padrão; integração com a política de entrada padrão fica para o app |
 | `micboost-diag capture --device <uid> --seconds N --out file.wav` | Grava a entrada bruta de um dispositivo |
 | `micboost-diag latency --input <uid> [--trials N]` | Mede a latência adicional (método abaixo) |
+| `micboost-diag monitor-latency --input <uid> [--output <uid>] [--buffer N] [--trials N]` | Mede a latência do monitor (fonte → saída), [método abaixo](#medição-de-latência-do-monitor). Sem `--output`, usa a saída padrão; nunca altera entradas ou saídas padrão |
 | `micboost-diag soak --input <uid> [--minutes N]` (padrão 20) | Ensaio de estabilidade (abaixo) |
 
 `set-rate` limita a taxa às `AvailableNominalSampleRates` do dispositivo, escreve `kAudioDevicePropertyNominalSampleRate` e espera até 1 s pelo valor aplicado, porque a HAL aplica a mudança de forma assíncrona. Se o dispositivo mantiver outra taxa (por exemplo, enquanto é subdispositivo de um agregado em uso), imprime o valor real e sai com erro. `run` imprime uma linha `event state=… t_ms=…` por transição, o que dá o tempo de retorno a `running`.
@@ -81,7 +84,20 @@ Método (`micboost-diag latency`):
 
 **Aceitação (v1, fonte → BlackHole):** mediana ≤ 100 ms em toda fonte suportada, exceto fontes cuja própria latência de entrada reportada já exceda esse valor (por exemplo, Continuity), que ficam documentadas como limitação.
 
-**Objetivo de engenharia:** mediana < 20 ms no buffer padrão para fontes USB e internas a 48 kHz. É o requisito do modo monitor da v2, então desvios são registrados abaixo com a causa.
+**Objetivo de engenharia:** mediana < 20 ms no buffer padrão para fontes USB e internas a 48 kHz, para deixar margem ao [modo monitor](#medição-de-latência-do-monitor); desvios são registrados abaixo com a causa.
+
+## Medição de latência do monitor
+
+**Fronteira medida:** do som que chega ao microfone até o mesmo som saindo na saída de monitor.
+
+Método (`micboost-diag monitor-latency`), com laço acústico entre alto-falante e microfone:
+1. O motor roda no próprio processo da ferramenta com o monitor ligado (ganho 0 dB, EQ desligado), na saída padrão ou na de `--output`, que entra no agregado sem virar padrão.
+2. Um IOProc auxiliar captura a fonte diretamente, com o `mHostTime` de cada buffer.
+3. A cada tentativa, um clique de 1 ms é tocado na saída de monitor por fora do motor (`afplay` de um WAV gerado em `.scratch/` ou um IOProc de saída). O microfone capta o clique em t₀; o motor o devolve à saída, e o microfone o capta de novo em t₀ + L + d, em que d é o percurso no ar (≈ 0,1–1 ms entre alto-falante e microfone do mesmo Mac).
+4. A autocorrelação normalizada da captura de 2 s, buscada entre 3 e 150 ms, dá L; exige pico ≥ 0,3 e falha explicitamente sem ele. Repete N vezes (padrão 10) e reporta mediana, mínimo e máximo, em ms e frames, além da latência reportada do monitor.
+5. O laço precisa de alto-falantes e de volume audível, mas moderado: o ganho de 0 dB mantém o eco decaindo. Com fones, não há laço acústico, e a ferramenta reporta só a latência reportada. A ferramenta não altera o volume do sistema.
+
+**Aceitação do monitor:** mediana < 50 ms no buffer padrão (256) a 48 kHz, com a fonte interna ou USB e a saída interna ou com fio. Saídas Bluetooth ficam documentadas como limitação, com a latência reportada.
 
 ## Ensaio de estabilidade (20 min)
 
