@@ -69,6 +69,7 @@ Available today:
 - **Safe silence on zero input**: a source that delivers zeros — the built-in microphone with the
   lid closed, for example — produces silence in BlackHole, not noise.
 
+- **Recognizable menu bar icon**, with a microphone and rising bars matching the app icon.
 - **Standard macOS menu surface**, with system-managed appearance and dismissal, without a popover arrow.
 - **Gain readout** shows the percentage first, followed by decibels, for example `126% (+2.0dB)`.
 - **Slim level meters**, matching the gain slider track, refresh about 20 times per second

@@ -12,7 +12,7 @@ import SwiftUI
     private var quitting = false
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureMenu()
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         status = item
         panelMenu.autoenablesItems = false
         panelMenu.delegate = self
@@ -81,7 +81,7 @@ import SwiftUI
         NSApplication.shared.mainMenu = main
     }
     private func update() {
-        status?.button?.image = NSImage(systemSymbolName: model.icon, accessibilityDescription: nil)
+        status?.button?.image = StatusItemImage.image(symbol: model.icon)
         status?.button?.image?.isTemplate = true
         status?.button?.setAccessibilityLabel(
             "MicBoost, \(model.message ?? localized(model.controls.processingEnabled ? "Active" : "Stopped")), \(AppModel.gainLabel(model.controls.gainDB))"

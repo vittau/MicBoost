@@ -12,11 +12,13 @@
 
 ## Item da barra de menus
 
-- `NSStatusItem` com SF Symbol template:
-  - `mic.fill`: rodando;
-  - `mic.slash.fill`: mudo;
-  - `mic`: processamento desligado;
-  - `exclamationmark.triangle.fill`: erro ou divergência da entrada padrão.
+- `NSStatusItem` de largura variável com imagem template monocromática de 24 × 18 pt,
+inspirada no ícone do aplicativo: microfone SF Symbol e três barras ascendentes
+arredondadas à direita. O sistema define a cor conforme a barra de menus. Estados:
+  - `mic.fill` + barras: rodando;
+  - `mic.slash.fill` + barras: mudo;
+  - `mic` + barras: processamento desligado;
+  - `exclamationmark.triangle.fill`, sem barras e na mesma área: erro ou divergência da entrada padrão.
 - Clique (esquerdo ou direito) abre e fecha o painel. ⌥-clique liga ou desliga o processamento direto, sem abrir o painel. O rótulo de acessibilidade descreve o estado (por exemplo, "MicBoost, ativo, +12 dB").
 
 ## Painel
