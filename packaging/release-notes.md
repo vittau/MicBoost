@@ -51,9 +51,10 @@ BlackHole, because other apps may use it.
 
 ## License
 
-MicBoost is free software under the [GNU General Public License v3.0](https://github.com/vittau/MicBoost/blob/main/LICENSE).
-The archive contains only the app; the license text lives in the repository, and the source for
-this version is the tag `vX.Y.Z`.
+MicBoost is free software, released under the [GNU General Public License v3.0
+(GPL-3.0)](https://github.com/vittau/MicBoost/blob/main/LICENSE). The archive contains only the
+app; the license text lives in the repository, and the source for this version is the tag
+`vX.Y.Z`.
 
 ## Checksums
 

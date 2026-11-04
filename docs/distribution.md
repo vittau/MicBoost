@@ -25,7 +25,7 @@ Canais excluídos: Mac App Store, `homebrew/cask` oficial (as regras exigem pass
    - `CFBundleIdentifier`;
    - `CFBundleDevelopmentRegion = en`;
    - `CFBundleLocalizations = [en, pt-BR]`.
-4. Registra no `LC_BUILD_VERSION` do executável o SDK real do Xcode selecionado (`xcrun --sdk macosx --show-sdk-version`), com `scripts/record-build-sdk.sh`/`vtool`, preservando macOS 14 como mínimo e verificando os dois valores. Isso permite ao AppKit escolher a aparência correspondente ao SDK de compilação, em vez de confundir SDK com deployment target.
+4. Registra no `LC_BUILD_VERSION` do executável o SDK real do Xcode selecionado (`xcrun --sdk macosx --show-sdk-version`), com `scripts/record-build-sdk.sh`/`vtool`, preservando macOS 14 como mínimo e verificando os dois valores nos dois slices do binário universal. Isso permite ao AppKit escolher a aparência correspondente ao SDK de compilação, em vez de confundir SDK com deployment target.
 5. Assina com `codesign --force --deep --sign - build/MicBoost.app`, sem hardened runtime e sem entitlements: não há sandbox e o runtime não é exigido sem notarização.
 6. Confere com `codesign --verify --strict build/MicBoost.app`.
 
