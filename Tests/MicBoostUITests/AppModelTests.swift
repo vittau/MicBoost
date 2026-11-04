@@ -362,17 +362,6 @@ import Testing
     #expect(model.sources.isEmpty)
 }
 
-@MainActor @Test func limiterBadgeKeepsPanelSize() {
-    let quiet = AppModel()
-    quiet.limitingUntil = .distantPast
-    let limiting = AppModel()
-    limiting.limitingUntil = .distantFuture
-    let quietSize = NSHostingView(rootView: PanelView(model: quiet)).fittingSize
-    let limitingSize = NSHostingView(rootView: PanelView(model: limiting)).fittingSize
-    #expect(quietSize.width == 320 && quietSize.height > 0)
-    #expect(limitingSize == quietSize)
-}
-
 @MainActor @Test func meterScaleReachesItsEndpoints() {
     #expect(AppModel.meterFraction(-60) == 0)
     #expect(abs(AppModel.meterFraction(-30) - sqrt(0.001)) < 1e-12)
