@@ -158,7 +158,7 @@ Interpretação: a rejeição vem da falta de notarização e de Developer ID, n
 Estrutura, nesta ordem:
 1. **Cabeçalho:** imagem centralizada com o ícone e o nome "MicBoost", nas variantes clara e escura (`<picture>` com `prefers-color-scheme`), em `docs/design/readme/header-{light,dark}.png`, gerada por `scripts/render-readme-header.sh` a partir das prévias do ícone.
 2. Título, badges (macOS 14+, Apple Silicon + Intel, licença GPL-3.0, Sponsor) e uma frase do benefício, citando apps de chamada conhecidos.
-3. Callout `> [!NOTE]`: o projeto é desenvolvido e mantido com ajuda de agentes de IA, sob direção e revisão do mantenedor. Callout `> [!WARNING]` curto com o estado da versão, coerente com [roadmap.md](roadmap.md).
+3. Callout `> [!NOTE]`: o projeto é desenvolvido e mantido com ajuda de agentes de IA, sob direção e revisão do mantenedor. O README não fala de status, validação ou etapas; isso fica em [roadmap.md](roadmap.md).
 4. **What it does:** benefícios em linguagem simples, seguidos da captura do menu com o EQ aberto (`eq-*.png`), centralizada, com legenda abaixo.
 5. **What you need** e **Install:** passos numerados: instalar o BlackHole (instalador do site; Homebrew como alternativa), baixar o `.zip` das releases, arrastar para Aplicativos, primeira abertura com "Abrir Mesmo Assim" ([Primeira abertura](#primeira-abertura-sem-notarização), sem `xattr` nem remoção de quarentena) e permissão de microfone. O tap só entra depois de validado.
 6. **How to use:** passos numerados (ícone, microfone, chave, escolher "BlackHole 2ch" ou o padrão no app de chamada, ajustar o slider pela barra de saída e pelo selo do limitador), seguidos da captura dos ajustes (`settings-*.png`) com legenda.

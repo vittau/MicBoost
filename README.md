@@ -15,10 +15,6 @@ Microsoft Teams, FaceTime, Discord, QuickTime and more.
 > This project is developed and maintained with the help of AI agents, under the direction and
 > review of its human maintainer.
 
-> [!WARNING]
-> **Early version (0.1.0).** It works for everyday calls, but some situations are still being
-> tested.
-
 ## What it does
 
 - **Makes a quiet microphone loud enough**: up to 16 times louder (+24 dB), with a simple slider.
