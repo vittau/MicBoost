@@ -51,7 +51,7 @@ private final class RenderWindow: NSWindow {
     UILanguage.override = "en"
     let directory = URL(fileURLWithPath: CommandLine.arguments.dropFirst().first ?? "docs/screenshots")
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    let model = AppModel()
+    let model = AppModel(statusGrace: .zero)
     var source = AudioDevice(id: 2, uid: "usb.microphone", name: "USB Microphone")
     source.inputChannels = 2
     source.sampleRate = 48000

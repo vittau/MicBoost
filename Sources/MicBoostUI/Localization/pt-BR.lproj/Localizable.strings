@@ -7,7 +7,7 @@
 "Channels" = "Canais";
 "Copy report" = "Copiar relatório";
 "Diagnostics" = "Diagnóstico";
-"Disconnected" = "Desconectado";
+"Disconnected microphone" = "Microfone desconectado";
 "Enable EQ" = "Ativar EQ";
 "Equalizer" = "Equalizador";
 "Frequency" = "Frequência";
@@ -20,6 +20,8 @@
 "Microphone" = "Microfone";
 "Microphone access denied." = "O MicBoost não tem acesso ao microfone.";
 "Microphone disconnected. Audio resumes when reconnected." = "Microfone desconectado. O áudio volta quando ele for reconectado.";
+"%@ disconnected. Audio resumes when it is reconnected." = "%@ desconectado. O áudio volta quando ele for reconectado.";
+"%@ (disconnected)" = "%@ (desconectado)";
 "Microphone format unsupported." = "Formato do microfone não suportado.";
 "Mid" = "Médios";
 "Mix" = "Misturar";

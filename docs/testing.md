@@ -38,6 +38,10 @@ Em 16, 44,1, 48 e 96 kHz:
 ### `MicBoostUITests`
 
 - Mapeamento de `AppModel` para cada linha de [ui.md](ui.md#mensagens-de-estado): estado do motor → mensagem, ação da faixa e ícone; a mensagem de BlackHole ausente some sozinha quando o motor volta a `running`.
+- Fonte desconectada: a linha da lista e a faixa usam o último nome conhecido daquele UID, inclusive o nome persistido quando o app abre com o dispositivo ausente; sem nome conhecido, a linha mostra o rótulo genérico, nunca o UID.
+- Carência de 1,5 s: uma ausência de dispositivo que dura menos que isso (reinício do `coreaudiod`) não mostra faixa; a faixa aparece quando a condição persiste. A linha de entrada do sistema e a lista de microfones mantêm o último estado conhecido durante a carência.
+- Linha de entrada do sistema: BlackHole como entrada padrão mostra "MicBoost" com marcação só com o motor rodando; divergência mostra o nome com "Usar MicBoost" habilitado quando o clique funciona; entrada desconhecida não mostra botão.
+- Catálogo de strings: toda chave passada a `localized(...)` ou `String(localized:)` em `MicBoostUI` e `MicBoostApp` existe nos dois `.strings`, os dois catálogos têm exatamente as mesmas chaves e cada tradução preserva os placeholders da chave.
 - Permissão reavaliada ao ativar o app: negada mantém a faixa, concedida limpa e tenta iniciar de novo.
 - Formatação de ganho e escala dos medidores.
 
@@ -114,7 +118,7 @@ Preparação para todos os itens: app aberto com processamento ligado, microfone
 |---|---|---|---|
 | 1 | Com o áudio tocando, desconectar o microfone USB; esperar 5 s; reconectar | "<nome> desconectado. O áudio volta quando ele for reconectado." durante a ausência; a faixa some quando ele volta, sem escolher outro microfone | continua BlackHole 2ch; volta a tocar no mesmo microfone |
 | 2 | Suspender o Mac (menu Apple → Suspender) e acordar | nenhuma durante o sono; ícone volta a "ativo" cerca de 1 s depois de acordar. Se a tentativa falhar, a faixa "Falha no áudio do sistema." aparece com "Tentar novamente" | continua BlackHole 2ch |
-| 3 | `sudo killall coreaudiod` com o áudio tocando; esperar 10 s | nenhuma faixa (ou a de falha por um instante), áudio volta sozinho | continua BlackHole 2ch |
+| 3 | `sudo killall coreaudiod` com o áudio tocando; esperar 10 s | nenhuma faixa e nenhuma troca da linha de entrada do sistema; áudio volta sozinho | continua BlackHole 2ch |
 | 4 | Ajustes do Sistema → Privacidade e Segurança → Microfone: desligar o MicBoost; voltar ao app; religar a permissão e voltar ao app | com a permissão desligada, "O MicBoost não tem acesso ao microfone." com "Abrir Ajustes de Privacidade"; ao religar e voltar ao app a faixa some e o áudio volta | continua BlackHole 2ch |
 | 5 | Com o áudio tocando: `sudo mv /Library/Audio/Plug-Ins/HAL/BlackHole2ch.driver /tmp/` e `sudo killall coreaudiod`. Depois: `sudo mv /tmp/BlackHole2ch.driver /Library/Audio/Plug-Ins/HAL/` e `sudo killall coreaudiod` | "BlackHole 2ch não encontrado." com "Como instalar" enquanto o driver está ausente; a faixa some sozinha quando ele volta | continua a entrada que estava em uso; nada é escrito enquanto falta o BlackHole |
 | 6 | Em Ajustes do Sistema → Som → Entrada, escolher outro microfone; no painel, clicar em "Usar MicBoost" | linha "Entrada do sistema: <nome>" com "Usar MicBoost"; depois "Entrada do sistema: MicBoost" com marcação. Trocar a entrada de novo deve marcar divergência sem reverter sozinho | volta a BlackHole 2ch só depois do clique no botão |
@@ -170,7 +174,7 @@ Observações de hardware:
 - Com a tampa fechada, o macOS silencia o microfone interno por hardware: a permissão continua concedida e os callbacks entregam zeros. A medição de latência recusa esse sinal (correlação 0).
 - As pequenas diferenças de nível entre fonte e BlackHole vêm do resampler de drift e de capturas que começam em instantes distintos.
 - A queda lenta de latência no ensaio de 20 min passa no critério, mas não está claro se ela se estabiliza (resampler de deriva acomodando) ou continua (deriva residual). Um ensaio de várias horas antes da release decide.
-- Reinício real do `coreaudiod` e escuta humana são verificações manuais. A HAL falsa cobre perda e retorno da fonte e do BlackHole.
+- Reinício real do `coreaudiod` e escuta humana são verificações manuais. A HAL falsa cobre perda e retorno da fonte e do BlackHole. As transições de estado do motor ficam no log unificado, na categoria `engine`: aplicar, por exemplo, `log show --last 5m --info --predicate 'subsystem == "io.github.vittau.MicBoost"'` depois de um teste manual.
 
 ### Interface e ciclo de vida do app
 

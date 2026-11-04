@@ -7,7 +7,7 @@
 "Channels" = "Channels";
 "Copy report" = "Copy report";
 "Diagnostics" = "Diagnostics";
-"Disconnected" = "Disconnected";
+"Disconnected microphone" = "Disconnected microphone";
 "Enable EQ" = "Enable EQ";
 "Equalizer" = "Equalizer";
 "Frequency" = "Frequency";
@@ -20,6 +20,8 @@
 "Microphone" = "Microphone";
 "Microphone access denied." = "Microphone access denied.";
 "Microphone disconnected. Audio resumes when reconnected." = "Microphone disconnected. Audio resumes when reconnected.";
+"%@ disconnected. Audio resumes when it is reconnected." = "%@ disconnected. Audio resumes when it is reconnected.";
+"%@ (disconnected)" = "%@ (disconnected)";
 "Microphone format unsupported." = "Microphone format unsupported.";
 "Mid" = "Mid";
 "Mix" = "Mix";

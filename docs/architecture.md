@@ -68,7 +68,7 @@ Frameworks linkados: CoreAudio, AudioToolbox, AVFoundation (só para `AVCaptureD
 - O IOProc é uma função C registrada com `AudioDeviceCreateIOProcID`. O contexto é um `mb_engine *` alocado pelo Swift na fila `engine`, antes do start, e liberado só depois de `AudioDeviceStop` + `AudioDeviceDestroyIOProcID`.
 - Parâmetros (Swift → C): o lado de controle escreve alvos em `_Atomic float`/`_Atomic int` com ordem relaxed; o IOProc lê uma vez por bloco. Combinações momentaneamente inconsistentes entre parâmetros são aceitáveis, porque todos passam por suavização.
 - Medidores (C → Swift): o IOProc mantém picos máximos em atômicos, e o lado de controle lê e zera com `atomic_exchange` (pico desde a última leitura). Contadores (`uint64`) são monotônicos.
-- Logs: `os.Logger` (subsystem `io.github.vittau.MicBoost`) apenas fora da thread de IO. Eventos de IO (NaN, entrada ausente) viram contadores lidos depois.
+- Logs: `os.Logger` (subsystem `io.github.vittau.MicBoost`) apenas fora da thread de IO; o motor registra cada transição de estado na categoria `engine`. Eventos de IO (NaN, entrada ausente) viram contadores lidos depois.
 
 `DeviceService` recebe uma fila serial e um callback de `Result<DeviceSnapshot, Error>`. `start`, `stop` e `snapshot` são chamados nessa fila; `stop` remove listeners antes de liberar o serviço. A fila confina também o adaptador HAL. Observa sistema e propriedades dos dispositivos enumerados; reenumera após 100 ms sem novos eventos. O snapshot contém todos os dispositivos, fontes elegíveis, BlackHole detectado e UID da entrada padrão. O adaptador real deve ter um único dono nessa fila.
 
@@ -113,6 +113,7 @@ stopped ──start──▶ starting ──ok──▶ running
 | `muted` | `false` | |
 | `eq` | ver [dsp.md](dsp.md#equalizador) | `enabled` (padrão `true`), `low{frequency, gainDB}`, `mid{frequency, gainDB, q}`, `high{frequency, gainDB}` |
 | `channelSelectionByUID` | `[:]` | Modo de canais por dispositivo (ausência = `mono(1)`; `auto` persistido normalizado para `mono(1)`, [audio-engine.md](audio-engine.md#canais)), codificado como `{mode, channel}` com canal baseado em 1 |
+| `knownSourceNames` | `[:]` | Último nome que cada fonte informou, por UID, para a lista e a faixa de fonte desconectada ([ui.md](ui.md#painel)); UIDs e nomes vazios são descartados na leitura |
 | `bufferFrames` | `256` | Opções 64/128/256/512/1024, limitadas pela faixa do dispositivo |
 | `previousDefaultInputUID` | `nil` | Entrada anterior ao MicBoost assumir a padrão |
 | `defaultInputManaged` | `false` | `true` enquanto a entrada padrão atual foi definida pelo MicBoost |

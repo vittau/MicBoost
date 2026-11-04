@@ -79,15 +79,21 @@ import SwiftUI
                     .opacity(model.limitingUntil > Date() ? 1 : 0)
                     .accessibilityHidden(model.limitingUntil <= Date())
             }.frame(minHeight: 24)
-            meter("Input", model.inputDB)
-            meter("Output", model.outputDB)
+            meter(localized("Input"), model.inputDB)
+            meter(localized("Output"), model.outputDB)
             Divider()
-            if model.status?.defaultInput.isBlackHole == true {
-                Label(localized("System input: MicBoost"), systemImage: "checkmark.circle.fill").font(.caption)
+            if model.routing.isBlackHole {
+                if model.routing.running {
+                    Label(localized("System input: MicBoost"), systemImage: "checkmark.circle.fill").font(.caption)
+                } else {
+                    Text(localized("System input: MicBoost")).font(.caption)
+                }
             } else {
-                Text("\(localized("System input")): \(model.status?.defaultInputName ?? localized("Unknown"))").font(
-                    .caption)
-                Button(localized("Use MicBoost"), action: model.useBlackHole).disabled(model.status?.state != .running)
+                Text("\(localized("System input")): \(model.routing.name ?? localized("Unknown"))").font(.caption)
+                if model.routing.name != nil {
+                    Button(localized("Use MicBoost"), action: model.useBlackHole).disabled(
+                        !model.routing.canUseMicBoost)
+                }
             }
             Text(localized("Microphone")).font(.headline)
             VStack(spacing: 0) {
@@ -107,22 +113,23 @@ import SwiftUI
                 }
             }.buttonStyle(PanelMenuItemStyle())
             if let uid = model.controls.selectedInputUID, !model.sources.contains(where: { $0.uid == uid }) {
-                Text("\(uid) (\(localized("Disconnected")))").font(.caption)
+                Text(model.disconnectedSourceLabel).font(.caption)
             }
             Divider()
             DisclosureGroup(isExpanded: $model.expanded) {
                 VStack(alignment: .leading, spacing: 8) {
                     band(
-                        "Bass", gain: $model.controls.eq.low.gainDB, frequency: $model.controls.eq.low.frequency,
-                        range: EQSettings.lowFrequencyRange)
+                        localized("Bass"), gain: $model.controls.eq.low.gainDB,
+                        frequency: $model.controls.eq.low.frequency, range: EQSettings.lowFrequencyRange)
                     Divider()
                     band(
-                        "Mid", gain: $model.controls.eq.mid.gainDB, frequency: $model.controls.eq.mid.frequency,
-                        range: EQSettings.midFrequencyRange, q: $model.controls.eq.mid.q)
+                        localized("Mid"), gain: $model.controls.eq.mid.gainDB,
+                        frequency: $model.controls.eq.mid.frequency, range: EQSettings.midFrequencyRange,
+                        q: $model.controls.eq.mid.q)
                     Divider()
                     band(
-                        "Treble", gain: $model.controls.eq.high.gainDB, frequency: $model.controls.eq.high.frequency,
-                        range: EQSettings.highFrequencyRange)
+                        localized("Treble"), gain: $model.controls.eq.high.gainDB,
+                        frequency: $model.controls.eq.high.frequency, range: EQSettings.highFrequencyRange)
                     HStack {
                         Button(localized("Voice preset"), action: model.voicePreset)
                         Spacer()
@@ -165,9 +172,9 @@ import SwiftUI
     }
     private func meter(_ title: String, _ db: Double) -> some View {
         HStack {
-            Text(localized(title)).font(.caption).frame(width: 42, alignment: .leading)
+            Text(title).font(.caption).frame(width: 42, alignment: .leading)
             LevelMeterView(fraction: AppModel.meterFraction(db)).frame(maxWidth: .infinity)
-                .accessibilityLabel(localized(title)).accessibilityValue("\(Int(db)) dBFS")
+                .accessibilityLabel(title).accessibilityValue("\(Int(db)) dBFS")
         }
     }
     private func band(
@@ -176,7 +183,7 @@ import SwiftUI
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(localized(title)).font(.headline).accessibilityAddTraits(.isHeader)
+                Text(title).font(.headline).accessibilityAddTraits(.isHeader)
                 Spacer()
                 Text(
                     gain.wrappedValue.formatted(
@@ -187,7 +194,7 @@ import SwiftUI
             MenuSlider(
                 value: gain.wrappedValue, range: EQSettings.gainRange,
                 step: AppModel.gainStep(option: false), optionStep: AppModel.gainStep(option: true),
-                label: "\(localized(title)), \(localized("Gain"))", valueText: "\(gain.wrappedValue) dB",
+                label: "\(title), \(localized("Gain"))", valueText: "\(gain.wrappedValue) dB",
                 onEdit: { gain.wrappedValue = ($0 * 2).rounded() / 2 }
             )
             .onChange(of: gain.wrappedValue) { model.eq() }
@@ -198,7 +205,7 @@ import SwiftUI
                     .textFieldStyle(.roundedBorder)
                     .multilineTextAlignment(.trailing)
                     .frame(width: 80)
-                    .accessibilityLabel("\(localized(title)), Hz")
+                    .accessibilityLabel("\(title), Hz")
                     .onKeyPress(keys: [.upArrow, .downArrow]) { press in
                         let direction = press.key == .upArrow ? 1.0 : -1.0
                         let maximum = min(range.upperBound, (model.status?.sampleRate ?? 48000) * 0.45)
