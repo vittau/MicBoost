@@ -2,14 +2,16 @@
 
 ## Decisão: dispositivo agregado privado com um único IOProc
 
-O motor cria um **dispositivo agregado privado** com dois subdispositivos: a fonte (dispositivo de clock principal) e o BlackHole 2ch (com compensação de drift). Um único IOProc C recebe a entrada da fonte e escreve a saída do BlackHole no mesmo ciclo.
+O motor cria um **dispositivo agregado privado** com dois subdispositivos: a fonte (com compensação de drift) e o BlackHole 2ch (dispositivo de clock principal). Um único IOProc C recebe a entrada da fonte e escreve a saída do BlackHole no mesmo ciclo.
 
 Por quê:
 - Não há fila entre callbacks: o processamento é in-place no ciclo de IO, e a latência adicional fica limitada a buffers e safety offsets dos dispositivos.
 - A diferença entre os relógios da fonte e do BlackHole fica a cargo do resampler de drift do Core Audio. Assim a fila não cresce, sem buffer circular nem descarte e inserção de amostras.
+- O BlackHole comanda o clock e o resampler fica na fonte, ou seja, antes do EQ, do ganho e do limitador. O limitador é o último estágio que toca a amostra: o BlackHole recebe exatamente o que `mb_engine_process` escreveu, e o teto de −1 dBFS medido na saída é o teto do limitador.
+- Por que não o contrário: com o resampler no subdispositivo de saída, a interpolação entre amostras já limitadas ultrapassa o teto nos transientes. Medido com o microfone fifine a +24 dB e palmas: pico 1,1845 (+1,47 dBFS) e 118 amostras acima de −1 dBFS, com sinal alternando de signo a cada amostra. Uma sequência alternando ±0,891 tem pico interpolado maior que as próprias amostras, então nenhum limitador antes do resampler garante o teto na saída.
 - O agregado privado (`kAudioAggregateDeviceIsPrivateKey = 1`) não aparece para outros apps e morre com o processo.
 
-Alternativa reservada (não implementar sem necessidade): ponte com dois IOProcs (fonte e BlackHole separados), buffer circular SPSC pré-alocado e resampler adaptativo controlado pelo nível do buffer. O agregado está adotado: no ensaio de estabilidade, a deriva de latência ficou em −0,06 ms ([testing.md](testing.md#resultados-registrados)). A alternativa só volta a ser considerada se uma fonte suportada (por exemplo, Bluetooth) não funcionar com o agregado; nesse caso, este documento é reescrito.
+Alternativa reservada (não implementar sem necessidade): ponte com dois IOProcs (fonte e BlackHole separados), buffer circular SPSC pré-alocado e resampler adaptativo controlado pelo nível do buffer. O agregado está adotado: no ensaio de estabilidade do fifine a 48 kHz, a deriva de latência ficou em 0,0 ms em 20 minutos (15,2917 → 15,2917 ms; [testing.md](testing.md#resultados-registrados)). A alternativa só volta a ser considerada se uma fonte suportada (por exemplo, Bluetooth) não funcionar com o agregado; nesse caso, este documento é reescrito.
 
 ## Enumeração e elegibilidade
 
@@ -51,14 +53,16 @@ Mudanças chegam em rajadas. O controller agrupa eventos com 100 ms de coalescê
 | `kAudioAggregateDeviceUIDKey` | `"io.github.vittau.MicBoost.engine"` |
 | `kAudioAggregateDeviceIsPrivateKey` | `1` |
 | `kAudioAggregateDeviceIsStackedKey` | `0` |
-| `kAudioAggregateDeviceSubDeviceListKey` | `[{UID: fonte}, {UID: BlackHole, kAudioSubDeviceDriftCompensationKey: 1}]` (ordem fixa: fonte primeiro) |
-| `kAudioAggregateDeviceMainSubDeviceKey` | UID da fonte |
+| `kAudioAggregateDeviceSubDeviceListKey` | `[{UID: fonte, kAudioSubDeviceDriftCompensationKey: 1}, {UID: BlackHole}]` (ordem fixa: fonte primeiro) |
+| `kAudioAggregateDeviceMainSubDeviceKey` | UID do BlackHole |
+
+A lista de subdispositivos define a ordem dos streams do agregado (fonte, depois BlackHole); o subdispositivo principal define apenas o clock. Por isso a compensação de drift fica na fonte e a ordem da lista não muda em relação ao mapa de canais.
 
 Depois da criação, aguardar que o agregado apareça na lista de dispositivos e responda a `kAudioDevicePropertyDeviceIsAlive` (limite de 2 s). Se falhar, `error(.halFailure)`. Destruir com `AudioHardwareDestroyAggregateDevice` no stop. No launch, se existir um agregado com o UID acima (sobra de outra instância), destruí-lo antes de criar.
 
 O adaptador valida formato virtual Float32 nativo e tenta configurar Float32 nos streams do agregado, preservando taxa e intercalação, antes de recusar um formato incompatível.
 
-A qualidade do resampler de drift permanece no padrão do sistema (a chave de qualidade não é sobrescrita). Na webcam USB a 16 kHz, 18 minutos de correlação mostraram deriva de −0,0625 ms, sem overloads nem resets numéricos; a avaliação auditiva de artefatos permanece manual.
+A qualidade do resampler de drift permanece no padrão do sistema (a chave de qualidade não é sobrescrita). A compensação fica na fonte: o resampler recebe o sinal cru do microfone e entrega amostras na taxa do BlackHole antes do EQ, do ganho e do limitador. A avaliação auditiva de artefatos permanece manual; a deriva de latência medida nos ensaios de estabilidade fica em [testing.md](testing.md#resultados-registrados).
 
 ## Formato e taxa de amostragem
 
@@ -71,7 +75,7 @@ A qualidade do resampler de drift permanece no padrão do sistema (a chave de qu
 
 ## Tamanho de buffer
 
-- Definir `kAudioDevicePropertyBufferFrameSize` no agregado com `settings.bufferFrames` (padrão 256), limitado a `BufferFrameSizeRange`. Opções: 64/128/256/512/1024 frames. O padrão 256 tem ensaio de estabilidade aprovado e mede 15,3 ms a 48 kHz e 38,9 ms a 16 kHz, dentro dos 100 ms da v1 ([testing.md](testing.md#resultados-registrados)). O tamanho é expresso em frames, então a duração do buffer depende da taxa da fonte.
+- Definir `kAudioDevicePropertyBufferFrameSize` no agregado com `settings.bufferFrames` (padrão 256), limitado a `BufferFrameSizeRange`. Opções: 64/128/256/512/1024 frames. O padrão 256 tem ensaio de estabilidade aprovado no fifine a 48 kHz, medindo 15,3 ms, e o buffer de 64 mede 7,3 ms, dentro dos 100 ms da v1 ([testing.md](testing.md#resultados-registrados)). O tamanho é expresso em frames, então a duração do buffer depende da taxa da fonte.
 - `mb_engine_create` recebe o máximo de frames por ciclo, igual a `kAudioDevicePropertyBufferFrameSize` ou a `kAudioDevicePropertyUsesVariableBufferFrameSizes`, quando presente, para pré-alocar os buffers de trabalho. Se um ciclo chegar com mais frames do que o máximo, o processador trabalha em blocos internos desse tamanho.
 
 ## Mapa de streams e canais

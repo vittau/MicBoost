@@ -64,7 +64,7 @@ CLI para verificar o hardware. `run` e `latency` aceitam `--gain-db N`, `--mute`
 
 A CLI usa parsing manual, sem dependências externas. `devices` exibe transporte por nome, taxas como lista simples em Hz (intervalos quando aplicável), latências e safety offsets em frames e milissegundos na taxa nominal. O JSON preserva os valores numéricos do `DeviceSnapshot` (`devices` e `defaultInputUID`); elegibilidade e BlackHole são derivados dos campos.
 
-`capture` aceita duração positiva de até 300 segundos e grava WAV IEEE Float32 intercalado na taxa nominal. Imprime frames efetivamente capturados, pico e RMS lineares por canal. A duração inclui a partida do dispositivo; Continuity pode entregar menos frames durante a conexão. A extensão de `CoreAudioHardware` valida os formatos virtuais Float32 nativos sem modificar formatos ou padrões, cria um IOProc C e pré-aloca o buffer em `mb_capture_create`. O callback apenas copia amostras; gravação WAV e cálculo de pico/RMS acontecem após stop e destruição do IOProc. Outros formatos são recusados sem alterar o hardware. Capturas locais ficam em `.scratch/` e não entram no git.
+`capture` aceita duração positiva de até 300 segundos e grava WAV IEEE Float32 intercalado na taxa nominal. Imprime frames efetivamente capturados, pico, RMS e contagem de amostras acima de −1 dBFS (0,8913) por canal. A contagem mede o teto do limitador na saída do BlackHole sem depender do WAV. A duração inclui a partida do dispositivo; Continuity pode entregar menos frames durante a conexão. A extensão de `CoreAudioHardware` valida os formatos virtuais Float32 nativos sem modificar formatos ou padrões, cria um IOProc C e pré-aloca o buffer em `mb_capture_create`. O callback apenas copia amostras; gravação WAV e cálculo de pico/RMS acontecem após stop e destruição do IOProc. Outros formatos são recusados sem alterar o hardware. Capturas locais ficam em `.scratch/` e não entram no git.
 
 ## Medição de latência
 
@@ -138,10 +138,46 @@ fifine USB a 48 kHz, Mono 1, buffer 256, EQ no padrão de voz, voz falada na dis
 | +24 dB | −20,4 / −17,3 dBFS | −1,6 dBFS | −42,6 dBFS |
 
 - Calibração: com esse microfone, a voz chega ao nível de chamada (≈ −20 dBFS) só no máximo de +24 dB; a faixa atual é necessária e suficiente.
-- Proteção de pico: palmas a +24 dB acionaram "Limitador ativo", mas o BlackHole recebeu picos de até 1,1845 (+1,47 dBFS), com 118 amostras acima do teto de 0,891; as amostras alternam de sinal quase a cada amostra. O DSP limita a 0,891 e corta em ±1, então o excesso vem do resampler de drift do agregado, aplicado ao BlackHole depois do limitador. Correção em andamento: BlackHole como relógio principal e compensação de drift na fonte ([roadmap.md](roadmap.md#decisões-em-aberto)).
+- Proteção de pico: palmas a +24 dB acionaram "Limitador ativo", mas o BlackHole recebeu picos de até 1,1845 (+1,47 dBFS), com 118 amostras acima do teto de 0,891; as amostras alternam de sinal quase a cada amostra. O DSP limita a 0,891 e corta em ±1, então o excesso vem do resampler de drift do agregado, aplicado ao BlackHole depois do limitador. O teto passou a valer com o BlackHole como relógio principal ([audio-engine.md](audio-engine.md#decisão-dispositivo-agregado-privado-com-um-único-ioproc)); a confirmação medida está na entrada de 2026-11-04 abaixo.
 - Recuperação aprovada no app real: desconectar e reconectar o microfone USB; `killall coreaudiod` (o áudio volta sozinho; as faixas de dispositivo ausente durante o reinício foram eliminadas pela carência de 1,5 s); permissão de microfone negada e concedida (o macOS oferece "Encerrar e Reabrir" ao mudar a permissão com o app aberto; depois de reaberto, o áudio volta); troca manual da entrada padrão com "Usar MicBoost" (sem disputa); mudança de taxa do BlackHole no Configuração de Áudio e MIDI.
 - Menu nativo aprovado: sliders soltos fora do menu, campos de frequência, faixa traduzida, botão de apoio, alinhamento sem coluna de marca.
 - Pendentes: BlackHole ausente (remoção do driver), suspensão e retomada, restauração da entrada ao sair depois de divergir e usar "Usar MicBoost" duas vezes (correção na HAL falsa, falta o app real), medidores somente leitura e ganho sem campo no app real, VoiceOver e preferências de acessibilidade.
+
+### Relógio do agregado e teto no BlackHole (2026-11-04)
+
+Fifine USB a 48 kHz, Mono 1, buffer 256, EQ no padrão de voz, ganho +24 dB. Motor rodando por `micboost-diag run` e, em paralelo, `micboost-diag capture --device BlackHole2ch_UID --seconds 60`; o mantenedor palmeou 3–4 vezes, na mesma distância e força, nas duas execuções. "Antes" é o binário do `main` (601f58d), com a fonte como relógio principal e o resampler de drift no BlackHole; "depois" é o binário desta mudança, com o BlackHole como relógio principal e o resampler na fonte. A contagem de amostras acima de −1 dBFS veio do resumo novo do `capture` e foi conferida lendo o WAV gravado.
+
+| Execução | Pico de saída do motor | GR máximo | Pico no BlackHole | Amostras acima de −1 dBFS |
+|---|---|---|---|---|
+| antes (main) | 0,891 | 25,0 dB | 1,0700 (+0,59 dBFS) | 752 por canal |
+| depois | 0,891 | 26,2 dB | 0,8910 (−1,00 dBFS) | 0 |
+
+- O pico de entrada chegou a 1,0 (antes) e 1,1541 (depois) com as palmas, ou seja, o microfone saturou e o limitador trabalhou nos dois casos; L = R nas duas capturas. `input_missing`, `nonfinite_resets` e overloads ficaram em 0 nas duas execuções.
+- `io_delta_host` subiu de 13,25 ms (antes) para 15,83 ms (depois) no buffer 256, coerente com o buffer inteiro a mais entre entrada e saída; a latência medida não mudou.
+- O mesmo teste não foi refeito com ar normal: a fala não chega ao teto, então a diferença entre os dois arranjos só aparece em transientes.
+
+Latência adicional com o novo relógio, 3 tentativas cada (mediana / mín. / máx.):
+
+| Fonte | Buffer | Latência | HAL reportada |
+|---|---|---|---|
+| fifine, 48 kHz | 64 | 7,29 / 7,29 / 7,31 ms | 7,5 ms |
+| fifine, 48 kHz | 128 | 9,96 / 9,94 / 9,96 ms | 8,83 ms |
+| fifine, 48 kHz | 256 | 15,29 / 15,27 / 15,29 ms | 11,5 ms |
+| C920, 16 kHz | 256 | não medido: dispositivo ausente da máquina nesta janela | — |
+
+As três medições do fifine repetem os valores de 2026-11-03 (7,29, 9,96 e 15,31 ms), então a troca de relógio não custa latência. A C920 continua com o valor de 38,94 ms registrado em 2026-11-03, medido antes da troca de relógio e não remedido.
+
+Ensaio de estabilidade, fifine a 48 kHz, buffer 256, 20 min:
+
+- latência por minuto entre 15,2917 e 15,3125 ms; primeiro e último minuto 15,2917 ms, deriva 0,0 ms (amplitude 0,02 ms);
+- 0 overloads, 0 `input_missing`, 0 `nonfinite_resets`;
+- RSS instantânea 17,8–21,0 MB (pico 21,2 MB), sem tendência de crescimento depois do minuto 13;
+- CPU 9,21 s em 20 min (≈ 0,77% de um núcleo);
+- correlação da medição de latência entre 0,994 e 0,999 em todas as 20 tentativas.
+
+Estado final da máquina: BlackHole a 48000 Hz (`set-rate`), entrada padrão `BlackHole2ch_UID` como estava ao abrir a janela (nenhum comando de diagnóstico altera a entrada padrão), fifine a 48000 Hz, nenhum processo `micboost-diag` ou `MicBoost.app` iniciado pela tarefa.
+
+Testes automatizados desta mudança: 119 testes (64 Core, 11 DSP, 44 UI) com execução somada em torno de 2 s, a maior suíte em 0,65 s; dois testes novos cobrem a descrição do agregado (BlackHole como principal, compensação só na fonte) e o caminho do `EngineController` até a HAL falsa. `swift build`, `swift test` e lint de formatação recursivo passam.
 
 
 Validação de ganho e EQ (2026-11-03): C920 USB, 16 kHz, buffer 256, canal automático (primeiro canal copiado para L/R). Capturas simultâneas da fonte e do BlackHole de 3 s após 2 s de assentamento, usando o sinal ambiente; picos variam com o alinhamento e com o resampler de drift.
@@ -189,7 +225,7 @@ Máquina de referência: MacBook Neo (Apple A18 Pro), macOS 27.2. Latências med
 Observações de hardware:
 - Com a tampa fechada, o macOS silencia o microfone interno por hardware: a permissão continua concedida e os callbacks entregam zeros. A medição de latência recusa esse sinal (correlação 0).
 - As pequenas diferenças de nível entre fonte e BlackHole vêm do resampler de drift e de capturas que começam em instantes distintos.
-- A queda lenta de latência no ensaio de 20 min passa no critério, mas não está claro se ela se estabiliza (resampler de deriva acomodando) ou continua (deriva residual). Um ensaio de várias horas antes da release decide.
+- A queda lenta de latência do ensaio de 20 min com a C920 (2026-11-03) é anterior à troca de relógio e não se repetiu no fifine com o novo arranjo, que ficou em 0,0 ms de deriva. Se ela dependia do resampler no BlackHole, o arranjo atual a elimina; um ensaio de várias horas continua decidindo.
 - Reinício real do `coreaudiod` e escuta humana são verificações manuais. A HAL falsa cobre perda e retorno da fonte e do BlackHole. As transições de estado do motor ficam no log unificado, na categoria `engine`: aplicar, por exemplo, `log show --last 5m --info --predicate 'subsystem == "io.github.vittau.MicBoost"'` depois de um teste manual.
 
 ### Interface e ciclo de vida do app

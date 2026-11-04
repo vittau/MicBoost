@@ -79,6 +79,7 @@ Limitador de pico sem lookahead, com ataque instantâneo:
 - Ganho do limitador `g`: se `target < g`, então `g = target` (ataque instantâneo, garante |y| ≤ teto). Caso contrário, `g` volta para 1 com liberação exponencial τ = 150 ms.
 - Ligado entre canais (mesmo `g` em L e R).
 - Clamp final a ±1,0 só como guarda numérica. Com o limitador correto, ele nunca deve atuar.
+- É o último estágio da cadeia: depois dele não há resampler, mixagem ou conversão de formato no motor. O resampler de drift do agregado roda na fonte, antes do EQ ([audio-engine.md](audio-engine.md#decisão-dispositivo-agregado-privado-com-um-único-ioproc)), então o teto de −1 dBFS vale nas amostras que os apps leem do BlackHole. Medido com palmas a +24 dB no fifine e 60 s de captura do BlackHole: pico 0,8910 e nenhuma amostra acima de −1 dBFS; com o resampler na saída, o mesmo teste dava pico 1,0700 e 752 amostras acima ([testing.md](testing.md#resultados-registrados)). A única ressalva é o próprio leitor do BlackHole, que pode interpolar na reprodução; isso está fora do sinal entregue.
 - Indicação: redução de ganho (GR) em dB publicada nos medidores. A UI mostra "Limitador ativo" quando o GR passa de 1 dB nos últimos 300 ms.
 
 A distorção de transientes, consequência de não haver lookahead, é aceita na v1.

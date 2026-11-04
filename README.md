@@ -53,11 +53,13 @@ the settings window.
 Microphone → 3-band EQ → gain → peak protection → BlackHole 2ch → apps
 ```
 
-The engine creates a **private aggregate device** with two sub-devices: the chosen source as the
-clock master and BlackHole 2ch with drift compensation. A single C IOProc receives the source
+The engine creates a **private aggregate device** with two sub-devices: the chosen source with
+drift compensation and BlackHole 2ch as the clock master. A single C IOProc receives the source
 input and writes the BlackHole output in the same cycle, so nothing is queued between callbacks.
 The added latency is bounded by the buffer and the device safety offsets, and the drift between
-the two clocks is handled by Core Audio's drift resampler instead of a ring buffer that grows.
+the two clocks is handled by Core Audio's drift resampler on the input, before the DSP chain:
+the limiter is the last stage, so BlackHole receives exactly what the engine wrote and the
+−1 dBFS ceiling holds at its output.
 The aggregate is private: other apps never see it, and it disappears with the process.
 
 Gain, mute and the EQ change instantly, without restarting the audio. Peak protection holds the
@@ -193,9 +195,9 @@ Full results and conditions: [docs/testing.md](docs/testing.md#resultados-regist
 - **Digital gain amplifies noise too**, and it cannot recover audio that was already clipped at
   the source. If your microphone has a hardware gain knob, or you can speak closer to it, use that
   first.
-- **Very loud transients can still overshoot −1 dBFS** on the way into BlackHole: the clock
-  correction between the microphone and BlackHole runs after the limiter. A fix that moves it
-  before the limiter is being measured.
+- **Very loud transients stay at or below −1 dBFS at BlackHole**, including the inter-sample
+  peaks a clock-correction resampler would create after the limiter: corrected for by placing
+  the resampler on the microphone input instead of the BlackHole output.
 - **MicBoost changes the sample rate of the selected microphone** to the working rate it shares
   with BlackHole (48 kHz when both support it). Other apps that read that microphone directly
   adapt to the change, and the previous rate is restored when you quit or switch microphones.

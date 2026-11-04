@@ -32,6 +32,21 @@ public protocol EngineHardware: AudioHardware {
 }
 public struct AggregateBuilder {
     public static let uid = "io.github.vittau.MicBoost.engine"
+    /// BlackHole owns the aggregate clock and the source is resampled to it, so the
+    /// drift resampler sits before the DSP chain and the limiter stays the last stage.
+    public static func description(source: String, destination: String) -> [String: Any] {
+        [
+            kAudioAggregateDeviceNameKey: "MicBoost Engine",
+            kAudioAggregateDeviceUIDKey: uid,
+            kAudioAggregateDeviceIsPrivateKey: 1,
+            kAudioAggregateDeviceIsStackedKey: 0,
+            kAudioAggregateDeviceMainSubDeviceKey: destination,
+            kAudioAggregateDeviceSubDeviceListKey: [
+                [kAudioSubDeviceUIDKey: source, kAudioSubDeviceDriftCompensationKey: 1],
+                [kAudioSubDeviceUIDKey: destination],
+            ],
+        ]
+    }
     public static func routing(source: StreamLayout, destination: StreamLayout) throws -> mb_routing {
         let count = source.inputs.reduce(0, +)
         guard count > 0, count <= 64, destination.outputs.reduce(0, +) == 2 else {
@@ -117,17 +132,11 @@ extension CoreAudioHardware: EngineHardware {
         try write(.init(device, kAudioDevicePropertyNominalSampleRate), value: rate)
     }
     public func createAggregate(source: String, destination: String) throws -> AudioObjectID {
-        let description: [String: Any] = [
-            kAudioAggregateDeviceNameKey: "MicBoost Engine", kAudioAggregateDeviceUIDKey: AggregateBuilder.uid,
-            kAudioAggregateDeviceIsPrivateKey: 1, kAudioAggregateDeviceIsStackedKey: 0,
-            kAudioAggregateDeviceMainSubDeviceKey: source,
-            kAudioAggregateDeviceSubDeviceListKey: [
-                [kAudioSubDeviceUIDKey: source],
-                [kAudioSubDeviceUIDKey: destination, kAudioSubDeviceDriftCompensationKey: 1],
-            ],
-        ]
         var id: AudioObjectID = 0
-        try checkHAL(AudioHardwareCreateAggregateDevice(description as CFDictionary, &id), "Create aggregate")
+        try checkHAL(
+            AudioHardwareCreateAggregateDevice(
+                AggregateBuilder.description(source: source, destination: destination) as CFDictionary, &id),
+            "Create aggregate")
         return id
     }
     public func destroyAggregate(_ device: AudioObjectID) throws {
