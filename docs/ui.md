@@ -25,7 +25,7 @@ arredondadas à direita. O sistema define a cor conforme a barra de menus. Estad
 
 `NSMenu` padrão do AppKit, sem seta, com `PanelView` hospedada na `view` de um `NSMenuItem`:
 - moldura, material, transparência, sombra e cantos desenhados pelo próprio menu, sem camadas de fundo adicionais;
-- conteúdo SwiftUI de 320 pt, com padding de conteúdo e sem herdar safe areas da janela interna do menu; mudanças de tamanho atualizam o frame da view do item;
+- conteúdo SwiftUI de 320 pt, com margens de 14 pt nas laterais, 8 pt no topo e rodapé e intervalo de 6 pt entre elementos; linhas de ação têm 5 pt de padding vertical e texto alinhado aos títulos; sem herdar safe areas da janela interna do menu; mudanças de tamanho atualizam o frame da view do item;
 - aberto sob o `NSStatusBarButton`, alinhado à direita e limitado à tela pelo AppKit;
 - fechamento e navegação do menu gerenciados pelo AppKit, inclusive Escape e clique fora;
 - o delegate inicia os medidores ao abrir e os cancela ao fechar;

@@ -8,7 +8,7 @@ import SwiftUI
     @State private var editing = false
     public init(model: AppModel) { self.model = model }
     public var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text("MicBoost").font(.headline)
                 Spacer()
@@ -150,7 +150,8 @@ import SwiftUI
                 Button(localized("Quit MicBoost"), action: model.onQuit)
                     .accessibilityLabel(localized("Quit MicBoost"))
             }.buttonStyle(PanelMenuItemStyle())
-        }.padding(16).frame(width: 320).fixedSize(horizontal: false, vertical: true)
+        }.padding(.horizontal, 14).padding(.vertical, 8)
+            .frame(width: 320).fixedSize(horizontal: false, vertical: true)
             .animation(nil, value: model.expanded)
     }
     private func sourceSymbol(_ device: AudioDevice) -> String {
@@ -375,7 +376,6 @@ private struct PanelMenuItemStyle: ButtonStyle {
         configuration.label
             .font(.body)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 6)
             .padding(.vertical, 5)
             .foregroundStyle(
                 highlighted ? Color(nsColor: .selectedMenuItemTextColor) : Color.primary
