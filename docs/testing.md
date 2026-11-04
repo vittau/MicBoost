@@ -163,6 +163,22 @@ Preparação para todos os itens: app aberto com processamento ligado, microfone
 
 ## Resultados registrados
 
+### Monitor em campo, 0.2.1 — 04/11/2026
+
+Mac do mantenedor (não o de referência), release 0.2.1, fonte fifine USB (só 48 kHz, 2 canais, inteiro de 16 bits), saída OpenMove by Shokz em Bluetooth (A2DP a 44,1 kHz; anuncia 16 e 44,1 kHz), motor a 48 kHz, buffer 256, relatório de "Copiar relatório" com o monitor ligado:
+
+| Medida | Valor |
+|---|---|
+| Monitor | funcionou: voz ouvida no Shokz, sem taxa em comum com a fonte |
+| Latência adicionada (diagnóstico) | 54,2 ms (meta < 20 ms: **reprovada**) |
+| Latência total estimada | ≈ 288 ms ("atraso alto"; dominada pelo Bluetooth) |
+| `monitor_fill` | 786 frames (16,4 ms) |
+| Correção da Varispeed | −1527 ppm |
+| `monitor_underruns` / `monitor_overruns` | 0 / 27 |
+| Overloads / `input_missing` / `nonfinite_resets` | 0 / 0 / 0 |
+
+Pendências abertas pela medição: a fórmula da latência adicionada pode contar o buffer de saída duas vezes; os 27 overruns indicam reinícios da fila com a saída Bluetooth puxando blocos grandes ou irregulares. Fone com fio, microfone do próprio Shokz, ligar/desligar durante uma chamada e o ensaio de 60 s ainda não foram verificados.
+
 ### Fila e conversão do monitor — 04/11/2026
 
 Verificação **offline**, sem dispositivo de saída, pela cadeia C → Varispeed → AUConverter,
