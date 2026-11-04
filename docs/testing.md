@@ -127,6 +127,22 @@ Preparação para todos os itens: app aberto com processamento ligado, microfone
 
 ## Resultados registrados
 
+### Testes manuais com o mantenedor (2026-11-03/04)
+
+fifine USB a 48 kHz, Mono 1, buffer 256, EQ no padrão de voz, voz falada na distância de uso. Níveis medidos com `micboost-diag capture --device BlackHole2ch_UID` (10 s, RMS em janelas de 100 ms):
+
+| Ganho | Voz (mediana / p90) | Pico | Ruído de fundo |
+|---|---|---|---|
+| 0 dB | −46,2 / −42,0 dBFS | −23,4 dBFS | −63,4 dBFS |
+| +18 dB | −28,9 / −24,6 dBFS | −6,1 dBFS | −51,1 dBFS |
+| +24 dB | −20,4 / −17,3 dBFS | −1,6 dBFS | −42,6 dBFS |
+
+- Calibração: com esse microfone, a voz chega ao nível de chamada (≈ −20 dBFS) só no máximo de +24 dB; a faixa atual é necessária e suficiente.
+- Proteção de pico: palmas a +24 dB acionaram "Limitador ativo", mas o BlackHole recebeu picos de até 1,1845 (+1,47 dBFS), com 118 amostras acima do teto de 0,891; as amostras alternam de sinal quase a cada amostra. O DSP limita a 0,891 e corta em ±1, então o excesso vem do resampler de drift do agregado, aplicado ao BlackHole depois do limitador. Correção em andamento: BlackHole como relógio principal e compensação de drift na fonte ([roadmap.md](roadmap.md#decisões-em-aberto)).
+- Recuperação aprovada no app real: desconectar e reconectar o microfone USB; `killall coreaudiod` (o áudio volta sozinho; as faixas de dispositivo ausente durante o reinício foram eliminadas pela carência de 1,5 s); permissão de microfone negada e concedida (o macOS oferece "Encerrar e Reabrir" ao mudar a permissão com o app aberto; depois de reaberto, o áudio volta); troca manual da entrada padrão com "Usar MicBoost" (sem disputa); mudança de taxa do BlackHole no Configuração de Áudio e MIDI.
+- Menu nativo aprovado: sliders soltos fora do menu, campos de frequência, faixa traduzida, botão de apoio, alinhamento sem coluna de marca.
+- Pendentes: BlackHole ausente (remoção do driver), suspensão e retomada, restauração da entrada ao sair depois de divergir e usar "Usar MicBoost" duas vezes (correção na HAL falsa, falta o app real), medidores somente leitura e ganho sem campo no app real, VoiceOver e preferências de acessibilidade.
+
 
 Validação de ganho e EQ (2026-11-03): C920 USB, 16 kHz, buffer 256, canal automático (primeiro canal copiado para L/R). Capturas simultâneas da fonte e do BlackHole de 3 s após 2 s de assentamento, usando o sinal ambiente; picos variam com o alinhamento e com o resampler de drift.
 

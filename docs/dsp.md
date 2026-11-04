@@ -63,7 +63,7 @@ Os valores padrão formam o "padrão de voz": um realce discreto de fala para mi
 
 ## Ganho
 
-- Faixa do controle: **−12 dB a +24 dB** (6,3% a 1.585%), passo de 0,5 dB, padrão 0 dB. O máximo de +24 dB é mantido: os testes confirmam o teto do limitador nessa faixa. A calibração com voz humana permanece uma verificação manual pendente.
+- Faixa do controle: **−12 dB a +24 dB** (6,3% a 1.585%), passo de 0,5 dB, padrão 0 dB. O máximo de +24 dB é necessário: com um microfone USB comum na distância de uso, a voz só chega a ≈ −20 dBFS no máximo ([testing.md](testing.md#testes-manuais-com-o-mantenedor-2026-11-0304)).
 - Exibição: `398% (+12,0dB)`, com percentual = 100 · 10^(dB/20) arredondado ao inteiro. 0 dB = 100%, +6,02 dB ≈ 200%.
 - O percentual é de amplitude, não de volume percebido, e a proteção de pico pode reduzir o ganho efetivo.
 - Aplicação: ganho linear por amostra, suavizado por filtro de um polo com τ = 20 ms rumo a `10^(dB/20)`, ou a 0 com mute.
