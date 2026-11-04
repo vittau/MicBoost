@@ -51,7 +51,7 @@ A fonte em camadas está em `Resources/AppIcon.icon`, com SVGs e variantes clara
 5. Verifica, e falha se não passar: `lipo -archs` do executável com `arm64` e `x86_64`; `codesign --verify --strict --deep`; assinatura ad hoc (`Signature=adhoc` em `codesign -dv`); `LC_BUILD_VERSION` com minos igual a `LSMinimumSystemVersion` (14.0) nos dois slices; `CFBundleShortVersionString` igual à versão pedida.
 6. Imprime o tamanho do `.zip`, o checksum e o cask preenchido por `scripts/print-cask.sh`, lido de `packaging/homebrew/micboost.rb`.
 
-Publicação (com `gh release create`, mediante confirmação do mantenedor): anexar `.zip` + `.sha256`. As notas de release seguem o modelo de `packaging/release-notes.md`, renderizado por `scripts/render-release-notes.sh <versão>`, que troca `X.Y.Z` e o marcador do checksum: instruções de instalação, aviso **"não notarizado"**, instalação do BlackHole, primeira abertura, licença GPL-3.0 com link para `LICENSE` e o checksum da versão. O `.zip` contém só o app; a licença fica no repositório.
+Publicação (com `gh release create`, mediante confirmação do mantenedor): anexar `.zip` + `.sha256`. As notas de release seguem o modelo de `packaging/release-notes.md`, renderizado por `scripts/render-release-notes.sh <versão>`, que troca `X.Y.Z` e o marcador do checksum: instruções de instalação, aviso **"não notarizado"**, instalação do BlackHole, primeira abertura, licença GPL-3.0 com link para `LICENSE` e o checksum da versão. O `.zip` contém só o app; a licença fica no repositório. A seção de instalação pelo Homebrew só entra no modelo depois que o tap existir e for validado.
 
 ## Integração contínua e release automática
 
@@ -153,7 +153,7 @@ Interpretação: a rejeição vem da falta de notarização e de Developer ID, n
 
 ## README do repositório
 
-`README.md` na raiz, em inglês, é a página pública do projeto. Ele combina a clareza de seções do [README do VirtuMic](https://github.com/ShotgunZZ/VirtuMic) com a riqueza visual do [README do Doom-Deck-Launcher](https://github.com/vittau/Doom-Deck-Launcher), sem copiar texto de nenhum dos dois.
+`README.md` na raiz, em inglês, é a página pública do projeto. Ele segue a clareza de seções do [README do VirtuMic](https://github.com/ShotgunZZ/VirtuMic), com cabeçalho e capturas visuais, sem copiar texto dele.
 
 Estrutura, nesta ordem:
 1. **Cabeçalho:** imagem centralizada com o ícone e o nome "MicBoost", nas variantes clara e escura (`<picture>` com `prefers-color-scheme`), em `docs/design/readme/header-{light,dark}.png`. As imagens são geradas por script a partir de `Resources/AppIcon.icon` (ou das prévias em `design/icon/previews/`), não desenhadas à mão.

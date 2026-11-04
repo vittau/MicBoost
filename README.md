@@ -281,9 +281,8 @@ their source code available.
 - **[VirtuMic](https://github.com/ShotgunZZ/VirtuMic)** and **LitLink** — products evaluated
   before building MicBoost, whose limitations motivated it. MicBoost is an independent
   implementation and reuses no code or assets from either.
-- The section structure of this README was inspired by the VirtuMic README, and its presentation
-  by the [Doom-Deck-Launcher](https://github.com/vittau/Doom-Deck-Launcher) README. No text was
-  copied from either.
+- The section structure of this README was inspired by the VirtuMic README. No text was copied
+  from it.
 - The icon and the header images are original artwork for this project.
 
 MicBoost is not affiliated with, endorsed by or sponsored by Apple Inc. or Existential Audio.

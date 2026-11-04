@@ -34,17 +34,6 @@ Later launches show no warning. A new binary may repeat the flow. On macOS 15 an
 Control-click → Open no longer bypasses the block; use step 2. MicBoost never disables Gatekeeper
 or SIP and never removes the quarantine flag, and neither should you.
 
-## Install with Homebrew
-
-```sh
-brew tap vittau/micboost
-brew install --cask micboost
-```
-
-The cask installs BlackHole 2ch as a dependency, so it may ask for an administrator password and
-may need `coreaudiod` restarted. `brew uninstall --cask micboost` removes the app and keeps
-BlackHole, because other apps may use it.
-
 ## Changes
 
 - <user-facing change>
