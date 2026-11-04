@@ -110,7 +110,7 @@ Status: implementação disponível; medições com monitor silencioso e valida�
 manual pendentes de sessão com o mantenedor. Ensaios destinados aos alto-falantes
 do Mac, mesmo silenciosos, exigem sua presença e pedido explícito.
 
-Entregas: [modo monitor](audio-engine.md#modo-monitor) em caminho próprio (fila SPSC, resampler adaptativo e IOProc na saída padrão), `MonitorStatus`, linha do monitor no painel e no diagnóstico ([ui.md](ui.md#painel)), testes com a HAL falsa e de UI, `micboost-diag monitor-latency` e README atualizado.
+Entregas: [modo monitor](audio-engine.md#modo-monitor) em caminho próprio (fila SPSC, Varispeed e AUHAL do sistema na saída padrão), `MonitorStatus`, linha do monitor no painel e no diagnóstico ([ui.md](ui.md#painel)), testes com a HAL falsa e de UI, `micboost-diag monitor-latency` e README atualizado.
 
 Condições de conclusão:
 - `swift build` e `swift test` verdes, com os testes de [testing.md](testing.md#micboostcoretests-com-fakeaudiohardware);

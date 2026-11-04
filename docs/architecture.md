@@ -15,7 +15,7 @@
                 │ setters atômicos (C)                      │ leituras atômicas (medidores/contadores)
 ┌───────────────▼──────────── MicBoostDSP (C, tempo real) ──────────────────┐
 │ mb_ioproc → mapa de canais → EQ → ganho → limitador → BlackHole (+fila)   │
-│ mb_monitor_ioproc (saída padrão) ← resampler adaptativo ← fila SPSC        │
+│ AUHAL (saída padrão) ← Varispeed ← mb_monitor_render ← fila SPSC          │
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -93,7 +93,7 @@ stopped ──start──▶ starting ──ok──▶ running
 - `error(.blackHoleMissing)` e `error(.sourceUnavailable)` saem sozinhos quando o dispositivo aparece. `microphonePermissionDenied` é reavaliado quando o app volta a ficar ativo.
 - `stop` faz uma rampa de saída para zero (τ = 3 ms, atingindo −90 dB em aproximadamente 31 ms; espera de 40 ms com limite de 50 ms), `AudioDeviceStop`, destrói o IOProc, destrói o agregado, devolve as taxas que o MicBoost mudou e restaura a entrada padrão conforme a política.
 - Ganho, mute, EQ, bypass, modo de canais e o [monitor](audio-engine.md#modo-monitor) **nunca** reiniciam o motor. Mudar a fonte ou o tamanho de buffer reconstrói o motor (stop → start), com rampa.
-- `EngineController.setMonitorEnabled(_:)` guarda o desejo do usuário em memória (não persistido) e inicia ou para só o IOProc de monitor, com o motor em `running`; a saída de monitor é resolvida a cada início do monitor.
+- `EngineController.setMonitorEnabled(_:)` guarda o desejo do usuário em memória (não persistido) e inicia ou para só a cadeia do monitor (AUHAL + Varispeed), com o motor em `running`; a saída de monitor é resolvida a cada início do monitor.
 - O controller expõe um observador de estado na fila `engine`. `micboost-diag run` o usa para imprimir cada transição com o instante; os testes o usam para verificar o caminho percorrido.
 
 ## Modelo de domínio (MicBoostCore)

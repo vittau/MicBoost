@@ -24,13 +24,16 @@ Em 16, 44,1, 48 e 96 kHz:
 - **Blocos grandes:** `frames > max_frames` é processado em blocos sem estourar memória.
 - **Sem alocação:** `mb_engine_process` é verificado por revisão. Opcionalmente, com um `malloc` interposto no teste, contar chamadas durante o processo, que devem ser 0.
 
-### Fila e resampler do monitor (`MicBoostDSPTests`)
+### Fila do monitor (`MicBoostDSPTests`)
 
-- Conversão 48 → 44,1 kHz e 44,1 → 48 kHz (e 48 → 16 kHz) de senoide de 1 kHz: frequência correta e THD+N ≤ −60 dB; atraso de grupo ≤ 1 ms.
-- Drift simulado de ±200 ppm e ±0,3 % entre produtor e consumidor por 60 s de áudio simulado: ocupação converge ao alvo e fica limitada, sem underrun nem overrun após o assentamento.
 - Fila vazia → silêncio e `monitor_underruns`; produtor rápido demais → descarte e `monitor_overruns`; reinício ao se afastar do alvo.
-- Fade-in e fade-out de 10 ms sem saltos acima do limite; o modo silencioso zera a saída sem alterar ocupação nem timing.
-- Saída de 1, 2 e 8 canais, intercalada e não intercalada; a latência calculada a partir de host times sintéticos bate com o esperado.
+- Fade-in e fade-out de 10 ms sem saltos acima do limite; o modo silencioso entrega zeros sem alterar ocupação nem timing.
+- Mistura para saída de um canal; a latência calculada a partir de host times sintéticos bate com o esperado.
+- Controlador de ocupação (função pura): com drift simulado de ±200 ppm e ±0,3 % entre produtor e consumidor, a ocupação converge ao alvo e fica limitada, com a correção dentro de ±0,5 %.
+
+### Fila e conversão do monitor (`MicBoostCoreTests`)
+
+Renderização offline da cadeia do sistema, sem dispositivo: `mb_monitor_render` → Varispeed → `AUConverter` (`kAudioUnitSubType_AUConverter`, o mesmo conversor da AUHAL) de 48 para 44,1 kHz e de 44,1 para 48 kHz, puxando com `AudioUnitRender`. Senoide de 1 kHz sai na frequência certa, com THD+N ≤ −60 dB, e com a Varispeed a ±0,5 % sem descontinuidades. A latência reportada pelas unidades é lida e registrada.
 
 ### `MicBoostCoreTests` (com `FakeAudioHardware`)
 
