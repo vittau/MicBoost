@@ -87,7 +87,9 @@ int mb_engine_configure(mb_engine *e, const mb_routing *r) {
 void mb_engine_set_gain_db(mb_engine *e, float db) {
     atomic_store(&e->gain, isfinite(db) ? fmaxf(-12, fminf(24, db)) : 0);
 }
-mb_ring *mb_engine_ring(mb_engine *e) { return e->monitor_ring; }
+mb_ring *mb_engine_ring(mb_engine *e) {
+    return e->monitor_ring;
+}
 void mb_engine_set_monitor_enabled(mb_engine *e, bool enabled) {
     mb_ring_enable(e->monitor_ring, enabled);
 }

@@ -32,7 +32,9 @@ static void advance(_Atomic uint64_t *index, uint64_t value) {
 }
 mb_ring *mb_ring_create(double rate) {
     mb_ring *r = calloc(1, sizeof(*r));
-    if (!r) { return NULL; }
+    if (!r) {
+        return NULL;
+    }
     if (!atomic_is_lock_free(&r->frames[0].left)
         || !atomic_is_lock_free(&r->write)
         || !atomic_is_lock_free(&r->writers) || !atomic_is_lock_free(&r->enabled)) {
@@ -45,16 +47,22 @@ mb_ring *mb_ring_create(double rate) {
     r->ticks = 1e9 * time.denom / time.numer / rate;
     return r;
 }
-double mb_ring_ticks(mb_ring *r) { return r->ticks; }
+double mb_ring_ticks(mb_ring *r) {
+    return r->ticks;
+}
 void mb_ring_destroy(mb_ring *r) {
     // Only the engine queue releases owners; callbacks never release or free storage.
-    if (atomic_fetch_sub(&r->owners, 1) == 1) { free(r); }
+    if (atomic_fetch_sub(&r->owners, 1) == 1) {
+        free(r);
+    }
 }
 void mb_ring_enable(mb_ring *r, bool enabled) {
     atomic_store_explicit(&r->enabled, enabled, memory_order_release);
     // Called on the engine queue, never by an audio callback.
     if (!enabled) {
-        while (atomic_load_explicit(&r->writers, memory_order_acquire)) { sched_yield(); }
+        while (atomic_load_explicit(&r->writers, memory_order_acquire)) {
+            sched_yield();
+        }
     }
 }
 void mb_ring_push(mb_ring *r, const float *left, const float *right,
@@ -101,7 +109,9 @@ mb_monitor *mb_monitor_create(mb_engine *engine, double rate, uint32_t target) {
         return NULL;
     }
     mb_monitor *m = calloc(1, sizeof(*m));
-    if (!m) { return NULL; }
+    if (!m) {
+        return NULL;
+    }
     m->ring = mb_engine_ring(engine);
     atomic_fetch_add(&m->ring->owners, 1);
     m->rate = rate;
@@ -123,8 +133,12 @@ void mb_monitor_destroy(mb_monitor *m) {
     mb_ring_destroy(m->ring);
     free(m);
 }
-void mb_monitor_set_silent(mb_monitor *m, bool silent) { atomic_store(&m->silent, silent); }
-void mb_monitor_fade_out(mb_monitor *m) { atomic_store(&m->fading, true); }
+void mb_monitor_set_silent(mb_monitor *m, bool silent) {
+    atomic_store(&m->silent, silent);
+}
+void mb_monitor_fade_out(mb_monitor *m) {
+    atomic_store(&m->fading, true);
+}
 void mb_monitor_read(const mb_monitor *m, mb_monitor_stats *stats) {
     uint64_t write = atomic_load_explicit(&m->ring->write, memory_order_acquire);
     uint64_t read = atomic_load_explicit(&m->ring->read, memory_order_acquire);
@@ -136,7 +150,9 @@ void mb_monitor_read(const mb_monitor *m, mb_monitor_stats *stats) {
     stats->correction = 0;
 }
 double mb_monitor_pi_update(mb_monitor_pi *pi, double error, double rate, double seconds) {
-    if (!isfinite(error) || !isfinite(rate) || rate <= 0 || seconds <= 0) { return 0; }
+    if (!isfinite(error) || !isfinite(rate) || rate <= 0 || seconds <= 0) {
+        return 0;
+    }
     pi->integral = fmax(-0.005, fmin(0.005, pi->integral + error / rate * seconds));
     return fmax(-0.005, fmin(0.005, error / rate + pi->integral));
 }
@@ -145,13 +161,17 @@ OSStatus mb_monitor_render(void *context, AudioUnitRenderActionFlags *flags,
                           AudioBufferList *out) {
     (void)flags;
     (void)bus;
-    if (!out) { return noErr; }
+    if (!out) {
+        return noErr;
+    }
     for (unsigned b = 0; b < out->mNumberBuffers; b++) {
         if (out->mBuffers[b].mData) {
             memset(out->mBuffers[b].mData, 0, out->mBuffers[b].mDataByteSize);
         }
     }
-    if (!context) { return noErr; }
+    if (!context) {
+        return noErr;
+    }
     mb_monitor *m = context;
     mb_ring *r = m->ring;
     uint64_t read = atomic_load_explicit(&r->read, memory_order_acquire);
@@ -192,7 +212,9 @@ OSStatus mb_monitor_render(void *context, AudioUnitRenderActionFlags *flags,
                 atomic_store(&m->latency, old ? (uint64_t)(old * 0.9 + delta * 0.1) : delta);
             }
             read++;
-        } else { missing = true; }
+        } else {
+            missing = true;
+        }
         if (real_frame || fading) {
             m->gain = fmax(0, fmin(1, m->gain + (fading ? -1 : 1) / (m->rate * 0.010)));
         }
@@ -215,6 +237,8 @@ OSStatus mb_monitor_render(void *context, AudioUnitRenderActionFlags *flags,
         }
     }
     advance(&r->read, read);
-    if (missing) { atomic_fetch_add(&m->underruns, 1); }
+    if (missing) {
+        atomic_fetch_add(&m->underruns, 1);
+    }
     return noErr;
 }

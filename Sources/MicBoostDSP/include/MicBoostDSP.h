@@ -36,9 +36,20 @@ OSStatus mb_capture_ioproc(
 );
 
 typedef struct mb_engine mb_engine;
-typedef enum { MB_AUTO, MB_MONO, MB_MONO_MIX, MB_STEREO } mb_channel_mode;
-typedef enum { MB_LOW, MB_MID, MB_HIGH } mb_band;
-typedef struct { uint32_t buffer, channel; } mb_channel;
+typedef enum {
+    MB_AUTO,
+    MB_MONO,
+    MB_MONO_MIX,
+    MB_STEREO,
+} mb_channel_mode;
+typedef enum {
+    MB_LOW,
+    MB_MID,
+    MB_HIGH,
+} mb_band;
+typedef struct {
+    uint32_t buffer, channel;
+} mb_channel;
 typedef struct {
     uint32_t input_count;
     mb_channel inputs[64];
@@ -61,7 +72,9 @@ typedef struct {
     uint32_t fill, target;
     double correction;
 } mb_monitor_stats;
-typedef struct { double integral; } mb_monitor_pi;
+typedef struct {
+    double integral;
+} mb_monitor_pi;
 double mb_monitor_pi_update(mb_monitor_pi * _Nonnull pi, double error, double rate,
                             double seconds);
 mb_monitor * _Nullable mb_monitor_create(mb_engine * _Nonnull engine, double rate,
