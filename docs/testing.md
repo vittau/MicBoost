@@ -62,7 +62,7 @@ CLI para verificar o hardware. `run` e `latency` aceitam `--gain-db N`, `--mute`
 | `micboost-diag run --input <uid> [--buffer N] [--seconds N] [--monitor --monitor-silent]` | Roda o motor sem UI (mesmo `EngineController` do app), imprimindo estado e contadores a cada segundo e cada transição de estado com o instante. Não altera a entrada ou saída padrão; integração com a política de entrada padrão fica para o app |
 | `micboost-diag capture --device <uid> --seconds N --out file.wav` | Grava a entrada bruta de um dispositivo |
 | `micboost-diag latency --input <uid> [--trials N]` | Mede a latência adicional (método abaixo) |
-| `micboost-diag monitor-latency --input <uid> [--output <uid>] [--buffer N] [--trials N]` | Estima silenciosamente a latência do monitor: fonte → BlackHole medida mais parcelas de saída da HAL, [método abaixo](#medição-de-latência-do-monitor). Sem `--output`, usa a saída padrão; exige mantenedor presente se a saída forem os alto-falantes do Mac |
+| `micboost-diag monitor-latency --input <uid> [--output <uid>] [--buffer N] [--trials N]` | Estima silenciosamente a latência do monitor: parcelas de entrada da HAL + fonte → BlackHole medida + parcelas de saída da HAL, [método abaixo](#medição-de-latência-do-monitor). Sem `--output`, usa a saída padrão; exige mantenedor presente se a saída forem os alto-falantes do Mac |
 | `micboost-diag soak --input <uid> [--minutes N]` (padrão 20) | Ensaio de estabilidade (abaixo) |
 
 `set-rate` limita a taxa às `AvailableNominalSampleRates` do dispositivo, escreve `kAudioDevicePropertyNominalSampleRate` e espera até 1 s pelo valor aplicado, porque a HAL aplica a mudança de forma assíncrona. Se o dispositivo mantiver outra taxa (por exemplo, enquanto é subdispositivo de um agregado em uso), imprime o valor real e sai com erro. `run` imprime uma linha `event state=… t_ms=…` por transição, o que dá o tempo de retorno a `running`.
@@ -98,10 +98,14 @@ usa a saída indicada ou, sem `--output`, a saída padrão, sem alterá-la.
 2. A correlação cruzada existente mede fonte → BlackHole usando apenas o som ambiente,
    sem gerar sinal. Correlação inferior a 0,5 falha explicitamente e orienta estalar os
    dedos perto do microfone antes de repetir.
-3. A estimativa do monitor soma à medição fonte → BlackHole a latência de saída do
-   dispositivo, seu safety offset e a maior latência dos streams de saída, lidos da HAL.
-   A ferramenta imprime cada parcela em frames, a soma em ms e a latência reportada
-   completa do monitor. A parcela de saída é **reportada pela HAL**, não medida fisicamente.
+3. A estimativa do monitor soma três parcelas: latência de entrada da fonte (dispositivo,
+   safety offset e maior latência dos streams de entrada, HAL no escopo de entrada),
+   medição fonte → BlackHole e latência da saída (dispositivo, safety offset e maior
+   latência dos streams de saída, HAL no escopo de saída). A medição da ponte cancela
+   a latência física de entrada, comum às duas capturas, por isso ela é acrescentada
+   explicitamente. A ferramenta imprime todos os termos em frames, os subtotais em ms,
+   a soma e a latência reportada completa do monitor. As parcelas físicas de entrada e
+   saída são **reportadas pela HAL**, não medidas fisicamente.
 4. Repete N tentativas (padrão 10), com mediana, mínimo e máximo da soma em ms e frames.
 
 Aceitação: mediana < 50 ms com buffer 256 a 48 kHz, fonte interna ou USB e saída
@@ -175,7 +179,8 @@ A fórmula reportada soma cada termo uma vez: `(1513 + 542 + 512) / 48 = 53,479 
 Não há dupla contagem identificada; omitir os streams produziria 14,646 ms e esconderia
 38,833 ms. Teste unitário usa esses valores para impedir regressão.
 
-O registro acústico de 55,792 ms não é uma medição aceita: inclui a propagação no ar e
+O registro acústico de 55,792 ms foi obtido antes da regra que proíbe ensaios
+nos alto-falantes sem o mantenedor e não é evidência de aceitação: inclui a propagação no ar e
 uma segunda captura do eco pelo microfone. A diferença para os ~15,1 ms do caminho
 fonte → BlackHole é compatível principalmente com a latência de captura física
 (31,521 ms) e a saída (11,292 ms), com ressalva de que timestamps e resampling tornam
@@ -193,16 +198,21 @@ aproximadamente 1,917 ms aparece também no timing do IOProc, muito menor que os
 As condições não foram repetidas com monitor e a comparação não é ensaio controlado.
 
 `swift build` e `swift format lint --strict --recursive Sources Tests Package.swift`
-aprovados; `swift test`: 137 testes (53 UI em 1,244 s, 12 DSP em 0,131 s,
-72 Core em 0,929 s, incluindo um caso conhecido da HAL falsa), total dos targets
-2,304 s sem compilação. Capturas do painel regeneradas com monitor desligado.
+aprovados; `swift test`: 137 testes (53 UI em 1,245 s, 12 DSP em 0,122 s,
+72 Core em 0,934 s, incluindo um caso conhecido da HAL falsa), total dos targets
+2,301 s sem compilação. Capturas do painel regeneradas com monitor desligado.
 Entrada e saída padrão conferidas ao encerrar: `BuiltInMicrophoneDevice` e
 `BuiltInSpeakerDevice`. Nenhum processo de diagnóstico permaneceu em execução.
 
 Para confirmar com o mantenedor: comparar fonte → BlackHole com e sem subdispositivo
 de monitor nos buffers 256 e 128; obter a soma silenciosa por tentativa e os componentes
 HAL durante cada start. Se 256 não atingir a meta, medir 128 e 64, sem mudar o padrão.
-A soma ilustrativa `15,104 + 11,292 = 26,396 ms` não substitui esse ensaio.
+A estimativa ilustrativa completa usa os termos de entrada que a correlação da ponte
+cancela: `31,5208 + 13,1875 + 11,2917 = 56,0000 ms`, próxima dos 55,792 ms do
+registro acústico anterior à regra. Esse cruzamento explica a ordem de grandeza da
+anomalia; não substitui medição com monitor presente nem prova aceitação. Com a ponte
+registrada no ensaio antigo com monitor (15,1042 ms), a soma seria 57,9167 ms; as
+condições diferentes e a instabilidade acústica impedem comparação de precisão.
 
 Pendentes:
 - `swift run micboost-diag monitor-latency --input BuiltInMicrophoneDevice --trials 10 --buffer 256`

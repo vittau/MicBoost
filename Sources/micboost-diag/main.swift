@@ -126,12 +126,15 @@ do {
                     guard case .active(let output, let reported) = status.monitor else {
                         throw EngineError.invalidArgument("Monitor unavailable: \(status.monitor)")
                     }
+                    let input = try hardware.latencyComponents(source.id, scope: kAudioObjectPropertyScopeInput)
+                    let inputMs = Double(input.total) * 1000 / status.sampleRate
                     let parts = try hardware.latencyComponents(output.id, scope: kAudioObjectPropertyScopeOutput)
                     let outputMs = Double(parts.total) * 1000 / status.sampleRate
                     measured = LatencyMeasurement.monitorMilliseconds(
-                        sourceToBlackHole: result.milliseconds, output: parts, sampleRate: status.sampleRate)
+                        sourceToBlackHole: result.milliseconds, input: input, output: parts,
+                        sampleRate: status.sampleRate)
                     report(
-                        "source_to_BlackHole_ms=\(result.milliseconds) output_device_frames=\(parts.device) output_safety_frames=\(parts.safety) output_stream_frames=\(parts.stream) output_ms=\(outputMs) monitor_sum_ms=\(measured) monitor_reported_ms=\(reported)"
+                        "input_device_frames=\(input.device) input_safety_frames=\(input.safety) input_stream_frames=\(input.stream) input_ms=\(inputMs) source_to_BlackHole_ms=\(result.milliseconds) output_device_frames=\(parts.device) output_safety_frames=\(parts.safety) output_stream_frames=\(parts.stream) output_ms=\(outputMs) monitor_sum_ms=\(measured) monitor_reported_ms=\(reported)"
                     )
                 }
                 values.append(measured)

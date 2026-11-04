@@ -137,9 +137,13 @@ private func monitorHardware() -> FakeAudioHardware {
     #expect(abs((latency - withoutStreams) - Double(1439 + 425) / 48) < 0.000001)
 }
 
-@Test func silentMonitorEstimateAddsOutputTermsOnly() {
+@Test func silentMonitorEstimateIncludesInputBridgeAndOutput() {
     let output = HardwareLatency(device: 69, safety: 48, stream: 425)
+    let input = HardwareLatency(device: 26, safety: 48, stream: 1439)
     let sum = LatencyMeasurement.monitorMilliseconds(
-        sourceToBlackHole: 15.1041666667, output: output, sampleRate: 48000)
-    #expect(abs(sum - 26.3958333334) < 0.000001)
+        sourceToBlackHole: 13.1875, input: input, output: output, sampleRate: 48000)
+    #expect(abs(sum - 56.0) < 0.000001)
+    let zeroInput = LatencyMeasurement.monitorMilliseconds(
+        sourceToBlackHole: 13.1875, input: .init(device: 0, safety: 0, stream: 0), output: output, sampleRate: 48000)
+    #expect(abs((sum - zeroInput) - Double(input.total) / 48) < 0.000001)
 }

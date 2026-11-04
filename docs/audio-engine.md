@@ -147,7 +147,7 @@ Com o monitor ligado, a voz processada sai também na saída padrão do sistema,
 
 `MonitorStatus` (em `EngineStatus.monitor`): `off` (desligado ou motor parado), `active(output: AudioDevice, reportedLatencyMs: Double)` ou `unavailable(reason, outputName: String?)`, com `reason` `noOutput` (sem saída padrão ou sem canais de saída), `outputIsLoopback` (BlackHole, agregado com BlackHole ou o agregado do MicBoost) e `formatUnsupported`.
 
-O diagnóstico usa um atômico de monitor silencioso, definido antes do start e lido uma vez por ciclo: o agregado e os streams são idênticos, mas os canais de monitor recebem zero. O app nunca ativa esse modo. A medição silenciosa soma fonte → BlackHole medida e os componentes de saída reportados pela HAL ([testing.md](testing.md#medição-de-latência-do-monitor)).
+O diagnóstico usa um atômico de monitor silencioso, definido antes do start e lido uma vez por ciclo: o agregado e os streams são idênticos, mas os canais de monitor recebem zero. O app nunca ativa esse modo. A medição silenciosa soma os componentes de entrada da fonte reportados pela HAL, fonte → BlackHole medida e os componentes de saída reportados pela HAL ([testing.md](testing.md#medição-de-latência-do-monitor)).
 
 **Latência reportada do monitor:** latência e safety offset de entrada da fonte e do stream de entrada, mais dois buffers do agregado, mais latência e safety offset de saída da saída de monitor e do stream de saída. Como a latência do motor, serve de referência; o valor oficial é o medido. Em saídas Bluetooth, a latência de saída do próprio dispositivo costuma passar de 100 ms, e a meta de 50 ms não é alcançável.
 

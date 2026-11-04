@@ -5,10 +5,12 @@ import Foundation
 import MicBoostDSP
 
 public struct LatencyMeasurement: Sendable {
-    public static func monitorMilliseconds(sourceToBlackHole: Double, output: HardwareLatency, sampleRate: Double)
+    public static func monitorMilliseconds(
+        sourceToBlackHole: Double, input: HardwareLatency, output: HardwareLatency, sampleRate: Double
+    )
         -> Double
     {
-        sourceToBlackHole + Double(output.total) * 1000 / sampleRate
+        sourceToBlackHole + (Double(input.total) + Double(output.total)) * 1000 / sampleRate
     }
     public let milliseconds: Double
     public let correlation: Double
