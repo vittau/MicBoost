@@ -64,6 +64,12 @@ import SwiftUI
     public var onQuit: () -> Void = {}
     public var onClose: () -> Void = {}
     public var onUpdate: () -> Void = {}
+    /// Called after every meter sample, so the open panel repaints at the poller rate.
+    public var onMeters: () -> Void = {}
+    /// Number format of the panel rows when the screenshot renderer pins a language.
+    public static var formatLocaleOverride: Locale?
+    /// Locale the AppKit rows format numbers with.
+    public static var formatLocale: Locale { formatLocaleOverride ?? .current }
     /// Microphone authorization source; replaced in tests to simulate the TCC state.
     @ObservationIgnored public var authorization: @MainActor () -> AVAuthorizationStatus = {
         AVCaptureDevice.authorizationStatus(for: .audio)
@@ -87,7 +93,7 @@ import SwiftUI
         self.statusGrace = statusGrace
         engine = EngineController(settings: store)
     }
-    public static func gainLabel(_ db: Double, locale: Locale = .current) -> String {
+    public static func gainLabel(_ db: Double, locale: Locale = AppModel.formatLocale) -> String {
         let number = db.formatted(.number.locale(locale).precision(.fractionLength(1)))
         return "\(Int((100 * pow(10, db / 20)).rounded()))% (\(db >= 0 ? "+" : "")\(number)dB)"
     }
@@ -461,6 +467,7 @@ import SwiftUI
                 inputDB = direct ? input : max(input, inputDB - decay)
                 outputDB = direct ? output : max(output, outputDB - decay)
                 if meter.gainReductionDB > 1 { limitingUntil = now.addingTimeInterval(0.3) }
+                onMeters()
                 try? await Task.sleep(for: .milliseconds(50))
             }
         }

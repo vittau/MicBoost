@@ -61,6 +61,8 @@
 "Paste" = "Colar";
 "Select All" = "Selecionar Tudo";
 "MicBoost Settings" = "Ajustes do MicBoost";
+"MicBoost" = "MicBoost";
+"Support on Buy Me a Coffee" = "Apoiar no Buy Me a Coffee";
 
 "Buffer (frames)" = "Buffer (quadros)";
 "Smaller buffers reduce latency. Increase this if audio cuts out or crackles; keep the default if audio is stable." = "Buffers menores reduzem o atraso. Aumente se ouvir cortes ou estalos; mantenha o padrão se o áudio estiver estável.";
