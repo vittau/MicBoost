@@ -15,6 +15,17 @@ public struct StreamLayout: Sendable, Equatable {
         self.outputStreams = outputStreams ?? outputs.count
     }
 }
+public struct HardwareLatency: Sendable, Equatable {
+    public var device: UInt32
+    public var safety: UInt32
+    public var stream: UInt32
+    public var total: UInt32 { device + safety + stream }
+    public init(device: UInt32, safety: UInt32, stream: UInt32) {
+        self.device = device
+        self.safety = safety
+        self.stream = stream
+    }
+}
 public protocol EngineHardware: AudioHardware {
     var microphoneAuthorized: Bool { get }
     func layout(_ device: AudioObjectID) throws -> StreamLayout
@@ -140,12 +151,15 @@ extension CoreAudioHardware: EngineHardware {
         return max(buffer, try scalar(.init(device, kAudioDevicePropertyUsesVariableBufferFrameSizes), as: UInt32.self))
     }
     public func latencyFrames(_ device: AudioObjectID, scope: AudioObjectPropertyScope) throws -> UInt32 {
+        try latencyComponents(device, scope: scope).total
+    }
+    public func latencyComponents(_ device: AudioObjectID, scope: AudioObjectPropertyScope) throws -> HardwareLatency {
         let latency = try scalar(.init(device, kAudioDevicePropertyLatency, scope), as: UInt32.self)
         let safety = try scalar(.init(device, kAudioDevicePropertySafetyOffset, scope), as: UInt32.self)
         let streams = try values(.init(device, kAudioDevicePropertyStreams, scope), as: AudioStreamID.self)
         let streamLatency =
             try streams.map { try scalar(.init($0, kAudioStreamPropertyLatency), as: UInt32.self) }.max() ?? 0
-        return latency + safety + streamLatency
+        return HardwareLatency(device: latency, safety: safety, stream: streamLatency)
     }
     public func setRate(_ device: AudioObjectID, rate: Double) throws {
         try write(.init(device, kAudioDevicePropertyNominalSampleRate), value: rate)

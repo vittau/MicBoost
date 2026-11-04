@@ -101,6 +101,7 @@ public actor EngineController {
     private lazy var routingManager = DefaultInputManager(hardware: hardware, settings: settings)
     private var channelSelection: ChannelSelection = .mono(channel: 1)
     private var monitorEnabled = false
+    private var diagnosticMonitorSilent = false
     private var monitorOutputUID: String?
     private var monitorStatus: MonitorStatus = .off
     private var monitorOutput: AudioDevice?
@@ -220,6 +221,13 @@ public actor EngineController {
         }
     }
     /// Diagnostic override; never changes the system default output.
+    public static func reportedMonitorLatency(
+        inputFrames: UInt32, outputFrames: UInt32, bufferFrames: UInt32, sampleRate: Double
+    ) -> Double {
+        guard sampleRate > 0 else { return 0 }
+        return (Double(inputFrames) + Double(outputFrames) + 2 * Double(bufferFrames)) * 1000 / sampleRate
+    }
+    public func setDiagnosticMonitorSilent(_ silent: Bool) { diagnosticMonitorSilent = silent }
     public func setMonitorOutput(uid: String?) { monitorOutputUID = uid }
     public func setMonitorEnabled(_ enabled: Bool) async throws {
         guard monitorEnabled != enabled else { return }
@@ -333,6 +341,7 @@ public actor EngineController {
             guard let context = mb_engine_create(try hardware.maximumFrames(id, buffer: buffer), source.sampleRate)
             else { throw EngineError.formatUnsupported }
             engine = context
+            mb_engine_set_monitor_silent(context, diagnosticMonitorSilent)
             guard mb_engine_configure(context, &routing) == 0 else { throw EngineError.formatUnsupported }
             setChannelSelection(channelSelection)
             applyControls()
@@ -381,10 +390,11 @@ public actor EngineController {
                 + hardware.latencyFrames(blackHole.id, scope: kAudioObjectPropertyScopeOutput)
                 + hardware.latencyFrames(id, scope: kAudioObjectPropertyScopeInput) + buffer
             if let monitor {
-                let frames =
-                    try hardware.latencyFrames(source.id, scope: kAudioObjectPropertyScopeInput)
-                    + hardware.latencyFrames(monitor.id, scope: kAudioObjectPropertyScopeOutput) + 2 * buffer
-                monitorStatus = .active(output: monitor, reportedLatencyMs: Double(frames) * 1000 / working)
+                let latency = try Self.reportedMonitorLatency(
+                    inputFrames: hardware.latencyFrames(source.id, scope: kAudioObjectPropertyScopeInput),
+                    outputFrames: hardware.latencyFrames(monitor.id, scope: kAudioObjectPropertyScopeOutput),
+                    bufferFrames: buffer, sampleRate: working)
+                monitorStatus = .active(output: monitor, reportedLatencyMs: latency)
             }
             hasRun = true
             setState(.running)

@@ -13,8 +13,16 @@ import Testing
 final class FakeAudioHardware: AudioHardware, @unchecked Sendable {
     private let lock = NSLock()
     private var storedDevices: [AudioDevice] = []
-    var output: AudioObjectID = 0
-    var failMonitorStart = false
+    private var storedOutput: AudioObjectID = 0
+    private var storedFailMonitorStart = false
+    var output: AudioObjectID {
+        get { lock.withLock { storedOutput } }
+        set { lock.withLock { storedOutput = newValue } }
+    }
+    var failMonitorStart: Bool {
+        get { lock.withLock { storedFailMonitorStart } }
+        set { lock.withLock { storedFailMonitorStart = newValue } }
+    }
     private var storedInput: AudioObjectID = 0
     private var registrations: [UUID: (HardwareProperty, DispatchQueue, @Sendable () -> Void)] = [:]
     private var storedFailure: EngineError?

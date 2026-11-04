@@ -124,3 +124,22 @@ private func monitorHardware() -> FakeAudioHardware {
     #expect(await engine.status().monitor == .unavailable(reason: .formatUnsupported, outputName: "Output"))
     try await engine.stop()
 }
+
+@Test func reportedMonitorLatencyCountsEachDeviceStreamAndBufferOnce() {
+    let input = HardwareLatency(device: 26, safety: 48, stream: 1439)
+    let output = HardwareLatency(device: 69, safety: 48, stream: 425)
+    let latency = EngineController.reportedMonitorLatency(
+        inputFrames: input.total, outputFrames: output.total, bufferFrames: 256, sampleRate: 48000)
+    #expect(abs(latency - 53.4791666667) < 0.000001)
+    let withoutStreams = EngineController.reportedMonitorLatency(
+        inputFrames: 74, outputFrames: 117, bufferFrames: 256, sampleRate: 48000)
+    #expect(abs(withoutStreams - 14.6458333333) < 0.000001)
+    #expect(abs((latency - withoutStreams) - Double(1439 + 425) / 48) < 0.000001)
+}
+
+@Test func silentMonitorEstimateAddsOutputTermsOnly() {
+    let output = HardwareLatency(device: 69, safety: 48, stream: 425)
+    let sum = LatencyMeasurement.monitorMilliseconds(
+        sourceToBlackHole: 15.1041666667, output: output, sampleRate: 48000)
+    #expect(abs(sum - 26.3958333334) < 0.000001)
+}

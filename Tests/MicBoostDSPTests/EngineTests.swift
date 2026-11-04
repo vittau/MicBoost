@@ -143,7 +143,8 @@ func process(_ engine: OpaquePointer, _ channels: [[Float]]) -> [[Float]] {
         var source: [Float] = Array(repeating: [Float(0.2), -0.1], count: 16).flatMap { $0 }
         var monitor = Array(repeating: Float(1), count: 48)
         var blackHole = Array(repeating: Float(1), count: 32)
-        for muted in [false, true] {
+        for (muted, silent) in [(false, false), (true, false), (false, true)] {
+            mb_engine_set_monitor_silent(engine, silent)
             mb_engine_set_muted(engine, muted)
             source.withUnsafeMutableBytes { inputBytes in
                 monitor.withUnsafeMutableBytes { outputBytes in
@@ -169,10 +170,12 @@ func process(_ engine: OpaquePointer, _ channels: [[Float]]) -> [[Float]] {
                     }
                 }
             }
+            if silent { #expect(blackHole.contains { $0 != 0 }) }
             for i in 0..<16 {
                 #expect(
-                    monitor[i * 3] == (count == 1 ? (blackHole[i * 2] + blackHole[i * 2 + 1]) / 2 : blackHole[i * 2]))
-                #expect(monitor[i * 3 + 1] == (count == 1 ? 0 : blackHole[i * 2 + 1]))
+                    monitor[i * 3]
+                        == (silent ? 0 : count == 1 ? (blackHole[i * 2] + blackHole[i * 2 + 1]) / 2 : blackHole[i * 2]))
+                #expect(monitor[i * 3 + 1] == (silent || count == 1 ? 0 : blackHole[i * 2 + 1]))
                 #expect(monitor[i * 3 + 2] == 0)
             }
         }
