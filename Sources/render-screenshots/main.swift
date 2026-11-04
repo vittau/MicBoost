@@ -112,9 +112,8 @@ enum CaptureError: Error { case noMenuWindow, emptyCapture }
         configuration.width = Int(target.frame.width * scale)
         configuration.height = Int(target.frame.height * scale)
         configuration.showsCursor = false
-        // The menu hands the keyboard to its first text field, which would be captured with a
-        // focus ring and selected text; no field is left as first responder (docs/ui.md
-        // "Renderização e verificação").
+        // A control with the keyboard focus would be captured with a focus ring; the menu is
+        // left without a first responder (docs/ui.md "Renderização e verificação").
         popup.makeFirstResponder(nil)
         window.makeFirstResponder(nil)
         let image = try await SCScreenshotManager.captureImage(

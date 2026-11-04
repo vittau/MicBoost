@@ -4,7 +4,7 @@
 
 - Terminologia: a UI chama a entrada processada de "MicBoost". O nome "BlackHole 2ch" só aparece onde o usuário precisa reconhecê-lo: ao escolher o microfone dentro de um app que não segue a entrada do sistema, e quando o driver está ausente.
 
-- A aparência e o comportamento nativos são a diretriz para toda a interface: usar o componente nativo sempre que existir um que atenda, com métricas e cores do sistema; nada desenhado ou imitado. Personalização só onde não há equivalente nativo, com o motivo registrado aqui. No menu da barra, ações e listas são `NSMenuItem` reais e os controles dentro de views de item são AppKit; nenhum controle SwiftUI vive dentro do menu. Ações de menu ficam em texto, switches usam o estilo do sistema e campos mantêm os comandos padrão de edição.
+- A aparência e o comportamento nativos são a diretriz para toda a interface: usar o componente nativo sempre que existir um que atenda, com métricas e cores do sistema; nada desenhado ou imitado. Personalização só onde não há equivalente nativo, com o motivo registrado aqui. No menu da barra, ações e listas são `NSMenuItem` reais e os controles dentro de views de item são AppKit; nenhum controle SwiftUI vive dentro do menu. Ações de menu ficam em texto, switches usam o estilo do sistema e sliders mantêm as marcas e o passo de teclado nativos.
 - Parecer parte do sistema: materiais, tipografia (fonte do sistema, tamanhos de controle `.regular`/`.small`), espaçamento e cantos dos módulos de Som/Bluetooth da Central de Controle; ícones SF Symbols; sliders, switches e listas nativos.
 - Sem aparência de mixer de estúdio e sem animações contínuas. Os medidores são o único elemento atualizado periodicamente, e só com o painel visível.
 - Toda a UI vem do `AppModel` (`@Observable`, `@MainActor`), que reflete o `EngineStatus` e encaminha comandos ao `EngineController`. A UI nunca chama a HAL.
@@ -33,7 +33,7 @@ arredondadas à direita. O sistema define a cor conforme a barra de menus. Estad
 - entrada no tracking pelo run loop para não manter um job de concorrência Swift ocupado;
 - o menu não reserva a coluna de marcação (`showsStateColumn = false`): nenhuma linha começa num vão vazio, e as linhas de view começam na mesma coluna do título de um item nativo;
 - items de view: a view preenche a largura do menu (`autoresizingMask = .width`) e o conteúdo começa e termina nas mesmas insets do título de um `NSMenuItem` padrão. Essas insets são medidas do próprio menu na primeira abertura (o `x` do título de um item sem imagem e a coluna do atalho) e ficam guardadas em `UserDefaults.menuRowInsets`, para o painel abrir já alinhado nas execuções seguintes. Um item de view não recebe a ação do menu ao ser clicado: a linha de microfone trata o `mouseUp`, fecha o menu e chama `performActionForItem(at:)`, como um item nativo;
-- os sliders são `NSSlider`: o controle conduz o próprio laço de arrasto e continua respondendo dentro do tracking do menu, enquanto o gesto do `Slider` do SwiftUI perde o mouse-up fora da view hospedada e deixa o slider preso no estado pressionado. As atualizações são contínuas durante o arrasto, sem marcas de passo, e o knob só acompanha valores externos (campo numérico, teclado, persistência) quando não há arrasto.
+- os sliders são `NSSlider`: o controle conduz o próprio laço de arrasto e continua respondendo dentro do tracking do menu, enquanto o gesto do `Slider` do SwiftUI perde o mouse-up fora da view hospedada e deixa o slider preso no estado pressionado. As atualizações são contínuas durante o arrasto, sem marcas de passo, e o knob só acompanha valores externos (teclado, persistência) quando não há arrasto.
 
 **Fechar o painel nunca afeta o motor.** Aparência e preferências de acessibilidade
 são herdadas do sistema. Não alterar o fundo, recorte ou opacidade da janela do menu.
@@ -57,12 +57,13 @@ Itens, de cima para baixo:
 8. **Microfone:** um `NSMenuItem` com view por fonte elegível, no desenho das listas de dispositivos dos menus de Wi-Fi e Bluetooth: o símbolo SF do transporte em um selo circular de 18 pt, preenchido com a cor de destaque quando a fonte está selecionada e neutro nas demais, seguido do nome. O destaque de hover, a seleção por setas e o VoiceOver são os do menu; a linha não pinta fundo nem cria cor de hover, só acompanha o item destacado trocando o texto para a cor de seleção do sistema. Selecionar troca a fonte (reconstrução do motor com rampa). Sem microfone escolhido (primeira abertura), o app escolhe a entrada padrão do sistema se ela for uma fonte elegível, senão o microfone interno, senão a primeira fonte, e grava a escolha; só sem nenhuma fonte elegível aparece a faixa "Escolha um microfone na lista.". Uma fonte persistida que não está conectada aparece como um item desabilitado "<nome> (desconectado)" com o último nome conhecido daquele UID, guardado em `Settings.knownSourceNames` para sobreviver a um relançamento com o dispositivo ausente; se o nome nunca foi visto, a linha mostra "Microfone desconectado". O UID do dispositivo nunca aparece na interface.
 9. **Separador** nativo.
 10. **Equalizador (duas views):** o cabeçalho é um `NSButton` de disclosure nativo (triângulo) com o título "Equalizador" e um `NSSwitch` "Ativar EQ" sempre visível à direita, independente da expansão. O estado de expansão persiste (`eqExpanded`); clicar no triângulo ou no título alterna, e alternar o switch não expande nem recolhe os ajustes. Apenas as bandas e ações ficam na área recolhível:
-    - Graves: slider de ganho (dB) + campo de frequência (Hz);
-    - Médios: slider de ganho + campo de frequência + slider "Largura" com o valor de Q mostrado (Q maior = banda mais estreita);
-    - Agudos: slider de ganho + campo de frequência;
+    - Graves: slider de ganho (dB) + slider de frequência em escala logarítmica, com o valor em Hz mostrado como rótulo somente leitura;
+    - Médios: slider de ganho + slider de frequência + slider "Largura" com o valor de Q mostrado (Q maior = banda mais estreita);
+    - Agudos: slider de ganho + slider de frequência;
     - ações "Padrão de voz" e "Zerar EQ" em `NSButton` arredondado do sistema, na mesma linha. Botões em vez de itens de menu porque agem sobre a seção que está aberta, sem fechar o painel, como as ações dentro dos painéis de Som do macOS; itens de menu fechariam o menu e esconderiam o resultado.
-    - Cada banda é um bloco separado por espaçamento e por um separador `NSBox`, com título em negrito e marcação de cabeçalho para acessibilidade. O controle de largura fica dentro do bloco de Médios. O ganho de cada banda aparece numericamente junto ao título; campos de frequência têm largura compacta e alinhamento numérico à direita.
-    - Valores editáveis, validados e limitados às faixas de [dsp.md](dsp.md#equalizador). Sem gráfico de resposta.
+    - A frequência fica na mesma coluna do slider de ganho. Ela usa uma escala logarítmica entre os limites da banda, com o máximo efetivo de 0,45 · fs, e o valor é quantizado na grade de [dsp.md](dsp.md#equalizador): degraus de 10 Hz abaixo de 200 Hz, 100 Hz de 200 a 999 Hz, 500 Hz de 1000 a 9999 Hz e 1000 Hz de 10000 Hz em diante. O valor do modelo é sempre o da grade depois de um arrasto ou de uma seta; um valor persistido fora da grade aparece como está até o slider se mover.
+    - Cada banda é um bloco separado por espaçamento e por um separador `NSBox`, com título em negrito e marcação de cabeçalho para acessibilidade. O controle de largura fica dentro do bloco de Médios. O ganho e a frequência de cada banda aparecem numericamente como rótulos somente leitura, alinhados à direita.
+    - Valores limitados às faixas de [dsp.md](dsp.md#equalizador). Sem gráfico de resposta.
 11. **Separador** nativo.
 12. **"Ajustes…"** (⌘,) e **"Sair do MicBoost"** (⌘Q): `NSMenuItem` reais, em texto puro como "Settings…" nos menus da Apple, com atalho, hover e destaque do menu. O macOS 27 desenha ícones automáticos nesses itens; `preferredImageVisibility = .hidden` mantém o texto puro. Abrir os ajustes fecha o painel.
 
@@ -109,9 +110,8 @@ Cada elemento do menu e da janela de ajustes, e o que o desenha:
 | Cabeçalho do painel (título + switch) | view AppKit: `NSTextField` + `NSSwitch` |
 | Faixa de estado (texto, ação) | view AppKit: `NSBox`, `NSTextField`, `NSButton` |
 | Mute, "Usar MicBoost", disclosure, "Padrão de voz", "Zerar EQ" | `NSButton` nativo |
-| Sliders de ganho, EQ e largura | `NSSlider` (`MenuSliderControl`, só para o passo de teclado) |
-| Valor de ganho | `NSTextField` somente leitura (rótulo) |
-| Campos de frequência | `NSTextField` editável (borda arredondada do sistema) |
+| Sliders de ganho, frequência e largura | `NSSlider` (`MenuSliderControl`, só para o passo de teclado) |
+| Valor de ganho e valor de frequência | `NSTextField` somente leitura (rótulo) |
 | Selo do limitador e fundo da faixa | `NSBox` com preenchimento do sistema |
 | Medidores de entrada e saída | `NSLevelIndicator` (`continuousCapacity`, `.small`) |
 | Lista de microfones | `NSMenuItem` com view AppKit: selo circular (camada com `controlAccentColor`) e `NSTextField` |
@@ -124,12 +124,12 @@ Não há nenhum controle desenhado ou imitado: todos os elementos usam controles
 ## Teclado e acessibilidade
 
 - O menu navega como qualquer menu do sistema: setas e seleção por digitação vão de item a item, e os itens de view recebem o destaque do AppKit.
-- Sliders e campos de view de item recebem o teclado quando clicados: as setas ajustam o slider (ganho em passos de 0,5 dB, 1 dB com ⌥; EQ em 0,5 dB; largura em 0,1 de Q) e o campo de frequência anda 1/12 de oitava.
-- ⌘Q encerra o app e ⌘, abre os ajustes; campos de texto usam Recortar/Copiar/Colar/Selecionar Tudo do menu Editar nativo. Abrir os ajustes fecha o painel.
+- Sliders de view de item recebem o teclado quando clicados: as setas ajustam o slider (ganho em passos de 0,5 dB, 1 dB com ⌥; ganho do EQ em 0,5 dB; largura em 0,1 de Q) e o slider de frequência vai ao próximo valor da grade.
+- ⌘Q encerra o app e ⌘, abre os ajustes. Abrir os ajustes fecha o painel.
 - Com o painel aberto: `M` alterna o mute (item de menu oculto com atalho sem modificador, e o mesmo tratamento em `performKeyEquivalent`, para não depender do tracking), `Esc` fecha, ⌘, abre os ajustes.
-- Um campo de frequência mantém o texto digitado como está, inclusive vazio ou parcial ("-" ou "1,"): não há formatter validando a cada tecla. Selecionar tudo ao entrar em edição permite substituir o valor. Return ou Tab confirmam, perder o foco confirma, Esc cancela: no commit o texto é lido com o separador decimal do locale (vírgula ou ponto), limitado e quantizado pelo `AppModel`, e o campo mostra o valor formatado. Texto vazio ou inválido volta ao valor atual sem mudar nada.
+- O valor aplicado é sempre o que o modelo aceita: o arrasto converte a posição logarítmica em Hz, quantiza na grade e limita à faixa da banda; o rótulo mostra o resultado. As setas andam para o valor seguinte ou anterior da grade e param nos limites.
 - VoiceOver:
-  - sliders com `accessibilityLabel` ("Ganho", "Graves, ganho"…) e `accessibilityValue` em dB e percentual;
+  - sliders com `accessibilityLabel` ("Ganho", "Graves, ganho"…) e `accessibilityValue` em dB e percentual; os de frequência têm o rótulo "Graves, Hz" e o valor em Hz;
   - medidores com papel de indicador de nível e valor em dBFS;
   - estados ("Limitador ativo", divergência) anunciados como valor ou dica, não só como cor;
   - cada linha de microfone é um elemento de menu com o nome como rótulo, marcada como selecionada e com o valor "Selecionado" quando é a fonte atual.
@@ -155,7 +155,7 @@ O painel é um menu de verdade, então a imagem que importa é a que o WindowSer
 
 A janela de ajustes continua renderizada fora da tela com `NSHostingView.cacheDisplay`, porque não há menu a compor e os controles SwiftUI são AppKit por baixo. `ImageRenderer` não rasteriza controles AppKit.
 
-O menu real é capturado como o sistema o desenha, incluindo material, cantos, títulos, marcações e atalhos. Antes da captura o auxiliar solta o foco de qualquer campo do menu (`makeFirstResponder(nil)`), para nenhum campo aparecer com anel de foco e texto selecionado. O auxiliar roda dentro do laço do app, com janela key e app ativo, para que os controles nativos (switch, sliders) sejam desenhados no estado ativo; a captura acontece a partir do laço de tracking do menu, que é o único momento em que a janela existe. O executável do auxiliar fixa o locale a partir do idioma resolvido pelo catálogo (`UILanguage.locale`: en → `en_US`, pt-BR → `pt_BR`), para que os números das capturas acompanhem o texto; as views AppKit formatam números com `AppModel.formatLocale`, que o auxiliar fixa no mesmo locale.
+O menu real é capturado como o sistema o desenha, incluindo material, cantos, títulos, marcações e atalhos. Antes da captura o auxiliar solta o foco (`makeFirstResponder(nil)`), para nenhum controle aparecer com anel de foco. O auxiliar roda dentro do laço do app, com janela key e app ativo, para que os controles nativos (switch, sliders) sejam desenhados no estado ativo; a captura acontece a partir do laço de tracking do menu, que é o único momento em que a janela existe. O executável do auxiliar fixa o locale a partir do idioma resolvido pelo catálogo (`UILanguage.locale`: en → `en_US`, pt-BR → `pt_BR`), para que os números das capturas acompanhem o texto; as views AppKit formatam números com `AppModel.formatLocale`, que o auxiliar fixa no mesmo locale.
 
 O app consulta snapshots de estado a 1 Hz; os medidores têm tarefa separada de 20 Hz, cancelada ao fechar o painel. A expansão do EQ fica em `UserDefaults.eqExpanded`. A validação manual de VoiceOver, contraste e preferências de acessibilidade está pendente.
 

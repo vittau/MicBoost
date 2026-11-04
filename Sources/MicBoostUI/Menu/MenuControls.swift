@@ -6,6 +6,10 @@ import AppKit
 @MainActor final class MenuSliderControl: NSSlider {
     var step = 0.5
     var optionStep = 1.0
+    /// Arrow-key step of a control whose values are not evenly spaced (the logarithmic
+    /// frequency sliders): returns the value the knob should take for a direction, instead of
+    /// adding `step` to the current value.
+    var steppedValue: ((_ direction: Int, _ option: Bool) -> Double)?
     /// Set for the duration of a drag; tests set it to cover the drag path.
     var isTrackingKnob = false
 
@@ -22,16 +26,22 @@ import AppKit
     }
 
     override func keyDown(with event: NSEvent) {
-        let delta = event.modifierFlags.contains(.option) ? optionStep : step
         switch event.keyCode {
-        case 123, 125: adjust(-delta)  // left and down
-        case 124, 126: adjust(delta)  // right and up
+        case 123, 125: adjust(-1, event)  // left and down
+        case 124, 126: adjust(1, event)  // right and up
         default: super.keyDown(with: event)
         }
     }
 
-    private func adjust(_ delta: Double) {
-        doubleValue = min(maxValue, max(minValue, doubleValue + delta))
+    private func adjust(_ direction: Int, _ event: NSEvent) {
+        let option = event.modifierFlags.contains(.option)
+        let next: Double
+        if let steppedValue {
+            next = steppedValue(direction, option)
+        } else {
+            next = doubleValue + Double(direction) * (option ? optionStep : step)
+        }
+        doubleValue = min(maxValue, max(minValue, next))
         sendAction(action, to: target)
     }
 }
@@ -93,112 +103,5 @@ import AppKit
         if doubleValue != amplitude { doubleValue = amplitude }
         let level = db.isFinite ? min(0, max(-60, db)) : -60
         setAccessibilityValue("\(Int(level.rounded())) dBFS")
-    }
-}
-
-/// Numeric field of a menu row. The typed text is kept as it is until the user commits with
-/// Return, Tab, focus loss or the menu closing: empty or partial input stays visible and is
-/// never rejected by a formatter, so a value can be cleared and replaced (docs/ui.md
-/// "Teclado e acessibilidade").
-@MainActor final class MenuNumberField: NSTextField, NSTextFieldDelegate {
-    var onCommit: ((Double) -> Void)?
-    var onArrowStep: ((Int) -> Void)?
-    var onCancel: (() -> Void)?
-    private var shownValue: Double?
-    private var fractionDigits = 1
-    /// The field editor holds the text; model updates must not overwrite it.
-    var isEditingText = false
-
-    init(width: CGFloat) {
-        super.init(frame: NSRect(x: 0, y: 0, width: width, height: 22))
-        isBordered = true
-        isBezeled = true
-        bezelStyle = .roundedBezel
-        controlSize = .small
-        font = .menuFont(ofSize: 0)
-        alignment = .right
-        delegate = self
-        target = self
-        action = #selector(commitAction)
-        translatesAutoresizingMaskIntoConstraints = false
-        widthAnchor.constraint(equalToConstant: width).isActive = true
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
-
-    /// Comma or dot decimal, whichever the user typed (docs/ui.md "Teclado e acessibilidade").
-    nonisolated static func parse(_ text: String, locale: Locale) -> Double? {
-        var normalized = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: " ", with: "")
-        guard !normalized.isEmpty else { return nil }
-        if locale.decimalSeparator == "," {
-            normalized = normalized.replacingOccurrences(of: ",", with: ".")
-        }
-        normalized = normalized.replacingOccurrences(of: ",", with: ".")
-        guard let value = Double(normalized), value.isFinite else { return nil }
-        return value
-    }
-
-    nonisolated static func format(_ value: Double, fractionDigits: Int, locale: Locale) -> String {
-        value.formatted(.number.locale(locale).precision(.fractionLength(0...fractionDigits)).grouping(.never))
-    }
-
-    func show(_ value: Double, fractionDigits: Int) {
-        shownValue = value
-        self.fractionDigits = fractionDigits
-        guard !isEditingText else { return }
-        stringValue = Self.format(value, fractionDigits: fractionDigits, locale: .current)
-    }
-
-    override func becomeFirstResponder() -> Bool {
-        let accepted = super.becomeFirstResponder()
-        guard accepted else { return false }
-        isEditingText = true
-        selectText(nil)
-        if let editor = currentEditor() as? NSTextView {
-            editor.selectAll(nil)
-        }
-        return accepted
-    }
-
-    @objc private func commitAction() { commit() }
-
-    private func commit() {
-        guard isEditingText else { return }
-        isEditingText = false
-        guard let value = Self.parse(stringValue, locale: .current) else {
-            restoreShownValue()
-            return
-        }
-        onCommit?(value)
-    }
-
-    private func cancel() {
-        guard isEditingText else { return }
-        isEditingText = false
-        restoreShownValue()
-        onCancel?()
-    }
-
-    private func restoreShownValue() {
-        guard let shownValue else { return }
-        stringValue = Self.format(shownValue, fractionDigits: fractionDigits, locale: .current)
-    }
-
-    func controlTextDidEndEditing(_ notification: Notification) { commit() }
-
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-        switch selector {
-        case #selector(NSResponder.moveUp(_:)):
-            onArrowStep?(1)
-            return true
-        case #selector(NSResponder.moveDown(_:)):
-            onArrowStep?(-1)
-            return true
-        case #selector(NSResponder.cancelOperation(_:)):
-            cancel()
-            return true
-        default:
-            return false
-        }
     }
 }

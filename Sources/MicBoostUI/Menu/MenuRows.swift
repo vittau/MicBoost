@@ -606,17 +606,23 @@ import MicBoostCore
     }
 }
 
-/// Controls of a single band: gain, frequency and, for the mid band, width.
+/// Controls of a single band: gain, frequency and, for the mid band, width. The frequency is a
+/// logarithmic slider over the range of the band, and its value is read-only text like the
+/// gain (docs/ui.md "Painel", item 10).
 @MainActor final class PanelBandRow: PanelMenuRow {
     let band: EQBand
     private let gainValue = PanelMenuRow.label(
         "", font: .monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular))
     private let slider = MenuSliderControl(frame: .zero)
-    private let frequency = MenuNumberField(width: 78)
+    private let frequencyValue = PanelMenuRow.label(
+        "", font: .monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular))
+    private let frequencySlider = MenuSliderControl(frame: .zero)
     private let widthValue = PanelMenuRow.label(
         "", font: .monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular))
     private let width = MenuSliderControl(frame: .zero)
     private var maximum = 20000.0
+    private var frequencyRange = EQSettings.lowFrequencyRange
+    private var currentFrequency = 0.0
 
     var onGain: ((Double) -> Void)?
     var onFrequency: ((Double) -> Void)?
@@ -636,16 +642,25 @@ import MicBoostCore
         slider.action = #selector(bandGainChanged)
         slider.translatesAutoresizingMaskIntoConstraints = false
         slider.setAccessibilityLabel("\(Self.title(band)), \(localized("Gain"))")
-        frequency.onCommit = { [weak self] hz in self?.commitFrequency(hz) }
-        frequency.onArrowStep = { [weak self] direction in self?.stepFrequency(direction) }
-        frequency.setAccessibilityLabel("\(Self.title(band)), Hz")
+        frequencySlider.isContinuous = true
+        frequencySlider.minValue = 0
+        frequencySlider.maxValue = 1
+        frequencySlider.target = self
+        frequencySlider.action = #selector(frequencyChanged)
+        frequencySlider.translatesAutoresizingMaskIntoConstraints = false
+        frequencySlider.setAccessibilityLabel("\(Self.title(band)), Hz")
+        frequencySlider.steppedValue = { [weak self] direction, _ in
+            guard let self else { return 0 }
+            let next = EQFrequencyScale.stepped(from: currentFrequency, by: direction, in: frequencyRange)
+            return EQFrequencyScale.position(of: next, in: frequencyRange)
+        }
         addRow(PanelMenuRow.horizontal([title, PanelMenuRow.spacer(), gainValue]))
         addRow(slider)
         addRow(
             PanelMenuRow.horizontal([
-                PanelMenuRow.label(localized("Frequency")), PanelMenuRow.spacer(), frequency,
-                PanelMenuRow.label("Hz"),
+                PanelMenuRow.label(localized("Frequency")), PanelMenuRow.spacer(), frequencyValue,
             ]))
+        addRow(frequencySlider)
         if band == .mid {
             width.isContinuous = true
             width.minValue = EQSettings.midQRange.lowerBound
@@ -695,33 +710,32 @@ import MicBoostCore
         onWidth?(value)
     }
 
-    private func commitFrequency(_ hz: Double) {
-        let value = min(maximum, max(Self.range(band).lowerBound, hz))
-        frequency.show(value, fractionDigits: 0)
-        onFrequency?(value)
+    @objc private func frequencyChanged() {
+        let hz = EQFrequencyScale.frequency(at: frequencySlider.doubleValue, in: frequencyRange)
+        applyFrequency(EQFrequencyScale.quantized(hz))
     }
 
-    private func stepFrequency(_ direction: Int) {
-        let range = Self.range(band)
-        let value = min(maximum, max(range.lowerBound, frequencyValue() * pow(2, Double(direction) / 12)))
-        frequency.show(value, fractionDigits: 0)
+    /// Shows the frequency the model accepted, clamped to the effective range of the band.
+    private func applyFrequency(_ hz: Double) {
+        let value = min(frequencyRange.upperBound, max(frequencyRange.lowerBound, hz))
+        currentFrequency = value
+        frequencyValue.stringValue = Self.frequencyText(value)
+        frequencySlider.setAccessibilityValue(frequencyValue.stringValue)
         onFrequency?(value)
-    }
-
-    private func frequencyValue() -> Double {
-        let formatter = NumberFormatter()
-        formatter.locale = .current
-        formatter.numberStyle = .decimal
-        return formatter.number(from: frequency.stringValue)?.doubleValue ?? Self.range(band).lowerBound
     }
 
     func update(gainDB: Double, frequency hz: Double, maximum sampleRate: Double, q: Double = 0.7) {
         // A frequency above 45% of the sample rate cannot be represented.
         maximum = min(Self.range(band).upperBound, max(Self.range(band).lowerBound, sampleRate * 0.45))
+        frequencyRange = Self.range(band).lowerBound...maximum
         gainValue.stringValue = Self.gainText(gainDB)
         slider.reflect(gainDB)
         slider.setAccessibilityValue(gainValue.stringValue)
-        self.frequency.show(min(maximum, max(Self.range(band).lowerBound, hz)), fractionDigits: 0)
+        let value = min(maximum, max(Self.range(band).lowerBound, hz))
+        currentFrequency = value
+        frequencyValue.stringValue = Self.frequencyText(value)
+        frequencySlider.setAccessibilityValue(frequencyValue.stringValue)
+        frequencySlider.reflect(EQFrequencyScale.position(of: value, in: frequencyRange))
         if band == .mid {
             widthValue.stringValue = Self.qText(q)
             width.reflect(q)
@@ -733,6 +747,12 @@ import MicBoostCore
         let number = db.formatted(
             .number.locale(AppModel.formatLocale).precision(.fractionLength(1)).sign(strategy: .always()))
         return "\(number) dB"
+    }
+
+    private static func frequencyText(_ hz: Double) -> String {
+        let number = hz.formatted(
+            .number.locale(AppModel.formatLocale).precision(.fractionLength(0)).grouping(.never))
+        return "\(number) Hz"
     }
 
     private static func qText(_ q: Double) -> String {
