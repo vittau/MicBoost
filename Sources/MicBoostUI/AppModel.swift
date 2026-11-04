@@ -44,8 +44,8 @@ public func localized(_ key: String) -> String {
         return min(1, pow(10, db / 20))
     }
     public var icon: String {
-        if error != nil || status?.defaultInput.divergedByUser == true { return "exclamationmark.triangle.fill" }
         if !controls.processingEnabled { return "mic" }
+        if error != nil || status?.defaultInput.divergedByUser == true { return "exclamationmark.triangle.fill" }
         return controls.muted ? "mic.slash.fill" : "mic.fill"
     }
     public var message: String? {

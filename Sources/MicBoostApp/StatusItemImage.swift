@@ -28,6 +28,23 @@ import AppKit
                         xRadius: 1, yRadius: 1
                     ).fill()
                 }
+                if symbol == "mic", let context = NSGraphicsContext.current?.cgContext {
+                    let slash = CGMutablePath()
+                    slash.move(to: CGPoint(x: 15.3, y: 4.5))
+                    slash.addLine(to: CGPoint(x: 23.2, y: 15.1))
+                    context.saveGState()
+                    context.setLineCap(.round)
+                    context.setBlendMode(.clear)
+                    context.setLineWidth(3.5)
+                    context.addPath(slash)
+                    context.strokePath()
+                    context.setBlendMode(.normal)
+                    context.setStrokeColor(NSColor.black.cgColor)
+                    context.setLineWidth(1.3)
+                    context.addPath(slash)
+                    context.strokePath()
+                    context.restoreGState()
+                }
             }
             return true
         }

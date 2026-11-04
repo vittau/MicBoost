@@ -23,6 +23,8 @@ import Testing
         model.error = .blackHoleMissing
         #expect(model.icon == "exclamationmark.triangle.fill")
         #expect(model.message != nil)
+        model.controls.processingEnabled = false
+        #expect(model.icon == "mic")
     }
 }
 
