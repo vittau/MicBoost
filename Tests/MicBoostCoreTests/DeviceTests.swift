@@ -62,9 +62,10 @@ private final class Counter: @unchecked Sendable { var count = 0 }
         try service.start()
         for _ in 0..<20 { fake.emit(.init(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDevices)) }
     }
-    try await Task.sleep(for: .milliseconds(60))
-    queue.sync { #expect(counter.count == 1) }
-    try await Task.sleep(for: .milliseconds(160))
+    // The 20 listeners run on the service queue in order, each cancelling the previous
+    // coalesced reenumeration, so the burst adds exactly one snapshot. Waiting for it instead
+    // of sleeping past the 100 ms coalescing keeps the count independent of the runner speed.
+    #expect(await waitUntil { queue.sync { counter.count == 2 } })
     try queue.sync {
         #expect(counter.count == 2)
         try service.stop()

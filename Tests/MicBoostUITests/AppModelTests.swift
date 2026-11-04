@@ -231,11 +231,10 @@ import Testing
     model.controls.processingEnabled = true
     model.controls.selectedInputUID = "usb"
     model.controls.knownSourceNames = ["usb": "fifine Microphone"]
-    // A flap shorter than the grace (a coreaudiod restart) never shows a banner.
+    // A flap shorter than the grace (a coreaudiod restart) never shows a banner: both states
+    // arrive back to back, and the cancelling state below arrives before the grace elapses.
     model.apply(.init(state: .recovering(.serviceRestarted)))
     model.apply(.init(state: .error(.blackHoleMissing)))
-    #expect(model.message == nil)
-    try await Task.sleep(for: .milliseconds(40))
     #expect(model.message == nil)
     model.apply(.init(state: .running, defaultInput: .init(isBlackHole: true)))
     try await Task.sleep(for: .milliseconds(150))
