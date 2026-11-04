@@ -36,7 +36,7 @@ public func localized(_ key: String) -> String {
     }
     public static func gainLabel(_ db: Double, locale: Locale = .current) -> String {
         let number = db.formatted(.number.locale(locale).precision(.fractionLength(1)))
-        return "\(db >= 0 ? "+" : "")\(number) dB · \(Int((100 * pow(10, db / 20)).rounded()))%"
+        return "\(Int((100 * pow(10, db / 20)).rounded()))% (\(db >= 0 ? "+" : "")\(number)dB)"
     }
     public static func gainStep(option: Bool) -> Double { option ? 1 : 0.5 }
     public static func meterFraction(_ db: Double) -> Double {

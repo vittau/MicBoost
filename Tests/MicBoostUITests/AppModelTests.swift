@@ -8,7 +8,8 @@ import Testing
 
 @MainActor struct AppModelTests {
     @Test func gainFormatting() {
-        #expect(AppModel.gainLabel(12, locale: .init(identifier: "pt_BR")) == "+12,0 dB · 398%")
+        #expect(AppModel.gainLabel(12, locale: .init(identifier: "pt_BR")) == "398% (+12,0dB)")
+        #expect(AppModel.gainLabel(2, locale: .init(identifier: "pt_BR")) == "126% (+2,0dB)")
         #expect(AppModel.gainStep(option: false) == 0.5)
         #expect(AppModel.gainStep(option: true) == 1)
     }

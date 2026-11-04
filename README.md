@@ -69,6 +69,7 @@ Available today:
   lid closed, for example — produces silence in BlackHole, not noise.
 
 - **Standard macOS menu surface**, with system-managed appearance and dismissal, without a popover arrow.
+- **Gain readout** shows the percentage first, followed by decibels, for example `126% (+2.0dB)`.
 - **Slim level meters**, matching the gain slider track, refresh about 20 times per second
   with gradual peak decay. Their rounded native slider tracks
   show each new peak directly; the stable **Limiter active** indicator shows
