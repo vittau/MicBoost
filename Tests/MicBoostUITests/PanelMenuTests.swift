@@ -90,6 +90,15 @@ import Testing
         #expect(model.controls.selectedInputUID == "built-in")
     }
 
+    @Test func firstLaunchPicksTheDefaultThenBuiltInThenFirst() {
+        let usb = Self.device("usb", "USB Microphone", usb: true)
+        let internalMic = Self.device("built-in", "MacBook Microphone")
+        #expect(AppModel.initialSource(in: [usb, internalMic], defaultUID: "usb")?.uid == "usb")
+        #expect(AppModel.initialSource(in: [usb, internalMic], defaultUID: "BlackHole2ch_UID")?.uid == "built-in")
+        #expect(AppModel.initialSource(in: [usb], defaultUID: nil)?.uid == "usb")
+        #expect(AppModel.initialSource(in: [], defaultUID: "usb") == nil)
+    }
+
     @Test func noSourceSelectedAsksToChooseOne() {
         let model = AppModel(statusGrace: .zero)
         model.controls.processingEnabled = true

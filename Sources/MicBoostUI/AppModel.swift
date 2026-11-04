@@ -1,5 +1,6 @@
 import AVFoundation
 import AppKit
+import CoreAudio
 import MicBoostCore
 import Observation
 import SwiftUI
@@ -300,11 +301,27 @@ import SwiftUI
         case nil: return nil
         }
     }
+    /// UID of the system default input, as Core Audio reports it.
+    public var systemDefaultInputUID: () -> String? = { AVCaptureDevice.default(for: .audio)?.uniqueID }
+    /// The microphone a first launch starts with: the system default input when it is an
+    /// eligible source, otherwise the built-in microphone, otherwise the first source
+    /// (docs/ui.md "Painel", item 8).
+    public static func initialSource(in sources: [AudioDevice], defaultUID: String?) -> AudioDevice? {
+        sources.first { $0.uid == defaultUID }
+            ?? sources.first { $0.transport == kAudioDeviceTransportTypeBuiltIn }
+            ?? sources.first
+    }
     public func launch() async {
         controls = await store.current
         await refresh()
         if authorization() == .notDetermined {
             _ = await AVCaptureDevice.requestAccess(for: .audio)
+        }
+        if controls.selectedInputUID == nil,
+            let device = Self.initialSource(in: sources, defaultUID: systemDefaultInputUID())
+        {
+            controls.selectedInputUID = device.uid
+            await store.update { $0.selectedInputUID = device.uid }
         }
         if controls.processingEnabled { await start() }
         monitor = Task { [weak self] in
