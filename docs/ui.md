@@ -69,10 +69,12 @@ Uma faixa no topo do conteúdo, abaixo do cabeçalho, mostra uma mensagem por ve
 |---|---|---|
 | `microphonePermissionDenied` | "O MicBoost não tem acesso ao microfone." | "Abrir Ajustes de Privacidade" → `x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone` |
 | `blackHoleMissing` | "BlackHole 2ch não encontrado." | "Como instalar" (abre a documentação de instalação) |
-| `sourceUnavailable` / `recovering(.sourceLost)` | "<nome> desconectado. O áudio volta quando ele for reconectado." | escolher outro microfone na lista |
-| `formatUnsupported` | "Formato do <nome> não suportado." | escolher outro microfone |
-| `halFailure` | "Falha no áudio do sistema." | "Tentar novamente" |
+| `sourceUnavailable` / `recovering(.sourceLost)` | "<nome> desconectado. O áudio volta quando ele for reconectado." | escolher outro microfone na lista (sem botão) |
+| `formatUnsupported` | "Formato do <nome> não suportado." | escolher outro microfone (sem botão) |
+| `halFailure` / `recovering(.wakeFailed)` | "Falha no áudio do sistema." | "Tentar novamente" |
 | divergência da entrada padrão | (na linha de roteamento) | "Usar MicBoost" |
+
+`recovering(.formatChanged)`, `recovering(.serviceRestarted)` e `recovering(.sleep)` são transitórios e não mostram faixa. A mensagem de fonte desconectada usa o nome do microfone quando ele é conhecido. A permissão de microfone é reavaliada sempre que o app volta a ficar ativo: se ela foi concedida nesse meio-tempo, o app limpa a mensagem e tenta iniciar de novo; se foi negada com o processamento ligado, a mensagem aparece.
 
 ### Medidores na UI
 
@@ -88,7 +90,7 @@ As seções seguem o estilo dos Ajustes do Sistema: cartões agrupados nativos,
 controles com tamanho padrão do sistema, switch nativo à direita com explicação secundária
 junto ao rótulo e linhas de diagnóstico/sobre com rótulo à esquerda e valor à direita.
 
-- **Áudio:** chave "Usar MicBoost como entrada do sistema automaticamente" (`manageDefaultInput`, ligada por padrão), com uma frase explicando que, desligada, cada app precisa selecionar o microfone "BlackHole 2ch" por conta própria; "Buffer (quadros)" (64/128/256/512/1024, só os valores suportados), com descrição abaixo explicando que valores menores reduzem o atraso e valores maiores podem evitar cortes ou estalos; manter o padrão se o áudio estiver estável e modo de canais da fonte atual ([audio-engine.md](audio-engine.md#canais)), com uma linha de legenda para cada opção disponível: Mono 1 (padrão), Mono 2 e demais canais mono em ordem crescente, Misturar e Estéreo. Mono N usa o canal N nos dois lados; Misturar combina todos; Estéreo separa os canais 1 e 2 em esquerda e direita. A lista e as legendas seguem essa ordem; Estéreo só aparece com dois ou mais canais.
+- **Áudio:** chave "Usar MicBoost como entrada do sistema automaticamente" (`manageDefaultInput`, ligada por padrão), com uma frase explicando que, desligada, cada app precisa selecionar o microfone "BlackHole 2ch" por conta própria; "Buffer (quadros)" (64/128/256/512/1024, só os valores suportados), com descrição abaixo explicando que valores menores reduzem o atraso e valores maiores podem evitar cortes ou estalos; manter o padrão se o áudio estiver estável e modo de canais da fonte atual ([audio-engine.md](audio-engine.md#canais)), com uma linha de legenda para cada opção disponível: Mono 1 (padrão), Mono 2 e demais canais mono em ordem crescente, Misturar e Estéreo. Mono N usa o canal N nos dois lados; Misturar combina todos; Estéreo separa os canais 1 e 2 em esquerda e direita. A lista e as legendas seguem essa ordem; Estéreo só aparece com dois ou mais canais. A lista de buffers mantém todas as opções quando a fonte não informa a faixa de buffer, e uma seleção persistida que o dispositivo não oferece aparece como a opção mais próxima. Um canal persistido acima da contagem da fonte aparece como o último canal, e Estéreo em fonte de um canal aparece como Mono 1. Nenhuma das duas listas fica com o seletor vazio.
 - **Diagnóstico** (somente leitura, atualização a 1 Hz com a janela visível): taxa de amostragem, buffer, latência reportada, overloads, `input_missing`, `nonfinite_resets`. Botão "Copiar relatório" (texto para a área de transferência).
 - **Sobre:** versão, link do projeto e licença (GPL-3.0).
 
@@ -116,13 +118,17 @@ junto ao rótulo e linhas de diagnóstico/sobre com rótulo à esquerda e valor 
 `render-screenshots`, fora do produto do app. `scripts/render-screenshots.sh` usa
 `NSHostingView.cacheDisplay` numa janela fora da tela para incluir controles AppKit
 nativos, em ambas as aparências; `ImageRenderer` não rasteriza esses controles.
+O executável do auxiliar fixa o locale a partir do idioma resolvido pelo catálogo
+(`UILanguage.locale`: en → `en_US`, pt-BR → `pt_BR`), para que os números das capturas
+acompanhem o texto; as views formatam números com o locale do ambiente.
 O app consulta snapshots de estado a 1 Hz; os medidores têm tarefa separada de 20 Hz,
 cancelada ao fechar o painel. A expansão do EQ fica em `UserDefaults.eqExpanded`.
 A validação manual de VoiceOver, contraste e preferências de acessibilidade está pendente.
 
 As capturas fora da tela documentam o conteúdo SwiftUI, não a composição do menu
 com o desktop. Moldura e transparência exigem conferir o menu real composto pelo
-WindowServer.
+WindowServer. O auxiliar roda dentro do laço do app, com janela key e app ativo, para
+que os controles nativos (o switch) sejam desenhados no estado ativo.
 
 O executável do app e o auxiliar de capturas registram o SDK real de compilação
 separadamente do mínimo macOS 14. O AppKit assim escolhe os controles da geração

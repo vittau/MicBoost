@@ -4,7 +4,7 @@ import Foundation
 import MicBoostCore
 
 let usage =
-    "Usage: micboost-diag devices [--json] | permission | capture --device UID --seconds N --out file.wav | run --input UID [--buffer N] [--seconds N] | latency --input UID [--trials N] [--buffer N] | soak --input UID [--minutes N] [--buffer N]; effects: --gain-db N --mute --eq-low F:G --eq-mid F:G:Q --eq-high F:G --eq-off"
+    "Usage: micboost-diag devices [--json] | permission | set-rate --device UID --rate HZ | capture --device UID --seconds N --out file.wav | run --input UID [--buffer N] [--seconds N] | latency --input UID [--trials N] [--buffer N] | soak --input UID [--minutes N] [--buffer N]; effects: --gain-db N --mute --eq-low F:G --eq-mid F:G:Q --eq-high F:G --eq-off"
 do {
     let rawArgs = Array(CommandLine.arguments.dropFirst())
     var args: [String] = []
@@ -134,6 +134,11 @@ do {
         }
         let controller = try await diagnosticController(effects: effects)
         do {
+            let startedAt = Date()
+            await controller.observe { state in
+                let elapsed = Date().timeIntervalSince(startedAt) * 1000
+                report("event state=\(state) t_ms=\(String(format: "%.1f", elapsed))")
+            }
             try await controller.start(inputUID: uid, bufferFrames: buffer)
             let deadline = Date().addingTimeInterval(seconds)
             repeat {
@@ -151,6 +156,33 @@ do {
         } catch {
             try await controller.stop()
             throw error
+        }
+    case "set-rate":
+        guard args.count == 5, args[1] == "--device", args[3] == "--rate" else {
+            throw EngineError.invalidArgument(usage)
+        }
+        let uid = args[2]
+        guard let requested = Double(args[4]), requested.isFinite, requested > 0 else {
+            throw EngineError.invalidArgument("Invalid rate: \(args[4])\n" + usage)
+        }
+        guard let device = try hardware.devices().first(where: { $0.uid == uid }) else {
+            throw EngineError.invalidArgument("Device not found: \(uid)")
+        }
+        guard device.supportedRates.contains(where: { $0.minimum <= requested && requested <= $0.maximum }) else {
+            throw EngineError.invalidArgument("\(number(requested)) Hz is not available for \(uid)")
+        }
+        try hardware.setRate(device.id, rate: requested)
+        // The HAL applies the new rate asynchronously; give it up to a second.
+        let deadline = Date().addingTimeInterval(1)
+        var actual = device.sampleRate
+        repeat {
+            actual = (try? hardware.devices().first(where: { $0.uid == uid })?.sampleRate) ?? actual
+            if actual == requested { break }
+            try? await Task.sleep(for: .milliseconds(50))
+        } while Date() < deadline
+        print("rate uid=\(uid) before=\(number(device.sampleRate)) after=\(number(actual))")
+        guard actual == requested else {
+            throw EngineError.invalidArgument("Device kept \(number(actual)) Hz instead of \(number(requested)) Hz")
         }
     case "capture":
         guard args.count == 7 else { throw EngineError.invalidArgument(usage) }

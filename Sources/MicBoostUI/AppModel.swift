@@ -4,8 +4,26 @@ import MicBoostCore
 import Observation
 import SwiftUI
 
-public func localized(_ key: String) -> String {
-    NSLocalizedString(key, bundle: .module, comment: "")
+@MainActor public func localized(_ key: String) -> String {
+    if let language = UILanguage.override, let path = Bundle.module.path(forResource: language, ofType: "lproj"),
+        let bundle = Bundle(path: path)
+    {
+        return bundle.localizedString(forKey: key, value: key, table: nil)
+    }
+    return NSLocalizedString(key, bundle: .module, comment: "")
+}
+
+/// Language and number format the string catalog resolved to.
+@MainActor public enum UILanguage {
+    /// Pins the language of `localized(_:)`; `nil` follows the system. The screenshot
+    /// renderer pins English so the English README keeps consistent images.
+    public static var override: String?
+    /// `"en"` or `"pt-BR"`.
+    public static var current: String { override ?? Bundle.module.preferredLocalizations.first ?? "en" }
+    /// Number locale matching the resolved language, for renders and previews.
+    public static var locale: Locale {
+        Locale(identifier: current == "pt-BR" ? "pt_BR" : "en_US")
+    }
 }
 
 @MainActor @Observable public final class AppModel {
@@ -25,6 +43,10 @@ public func localized(_ key: String) -> String {
     public var onQuit: () -> Void = {}
     public var onClose: () -> Void = {}
     public var onUpdate: () -> Void = {}
+    /// Microphone authorization source; replaced in tests to simulate the TCC state.
+    @ObservationIgnored public var authorization: @MainActor () -> AVAuthorizationStatus = {
+        AVCaptureDevice.authorizationStatus(for: .audio)
+    }
     public let store: SettingsStore
     public let engine: EngineController
     private var meterTask: Task<Void, Never>?
@@ -43,40 +65,99 @@ public func localized(_ key: String) -> String {
         guard db.isFinite, db > -60 else { return 0 }
         return min(1, pow(10, db / 20))
     }
+    /// Values and selection of a settings picker. The selection is always one of the
+    /// values, so a picker can never show an empty value.
+    public struct PickerValues: Equatable, Sendable {
+        public var values: [Int]
+        public var selection: Int
+    }
+    /// Buffer sizes offered for a source: the allowed sizes it supports, or all of them when
+    /// the source does not report a usable range. A persisted size outside the list selects
+    /// the closest offered size.
+    public static func bufferPicker(sourceBufferRange: AudioRange?, current: Int) -> PickerValues {
+        var values = Settings.allowedBufferFrames
+        if let range = sourceBufferRange, range.maximum > 0, range.minimum <= range.maximum {
+            let supported = values.filter { Double($0) >= range.minimum && Double($0) <= range.maximum }
+            if !supported.isEmpty { values = supported }
+        }
+        let selection =
+            values.contains(current) ? current : values.min { abs($0 - current) < abs($1 - current) } ?? current
+        return PickerValues(values: values, selection: selection)
+    }
+    /// Channel options for a source with `channelCount` input channels, and the value that
+    /// represents the persisted selection. Mono channels are one-based, `-1` is Mix and `-2`
+    /// is Stereo; a channel above the source count maps to the last channel and Stereo maps to
+    /// Mono 1 on a single-channel source.
+    public static func channelPicker(selection: ChannelSelection, channelCount: Int) -> PickerValues {
+        let count = max(1, channelCount)
+        var values = Array(1...count)
+        values.append(-1)
+        if count >= 2 { values.append(-2) }
+        let preferred: Int
+        switch selection {
+        case .auto: preferred = 1
+        case .mono(let channel): preferred = min(max(channel, 1), count)
+        case .monoMix: preferred = -1
+        case .stereo: preferred = count >= 2 ? -2 : 1
+        }
+        return PickerValues(values: values, selection: preferred)
+    }
     public var icon: String {
         if !controls.processingEnabled { return "mic" }
         if error != nil || status?.defaultInput.divergedByUser == true { return "exclamationmark.triangle.fill" }
         return controls.muted ? "mic.slash.fill" : "mic.fill"
     }
-    public var message: String? {
-        switch error {
-        case .microphonePermissionDenied: return localized("Microphone access denied.")
-        case .blackHoleMissing: return localized("BlackHole 2ch not found.")
-        case .sourceUnavailable, .noSourceSelected:
-            return localized("Microphone disconnected. Audio resumes when reconnected.")
-        case .formatUnsupported: return localized("Microphone format unsupported.")
-        case .some: return localized("System audio failed.")
-        case .none:
-            if case .recovering = status?.state {
-                return localized("Microphone disconnected. Audio resumes when reconnected.")
+    /// One banner at a time, in the priority order of docs/ui.md "Mensagens de estado".
+    public enum StatusMessage: Equatable, Sendable {
+        case permissionDenied, blackHoleMissing
+        case sourceLost(String?)
+        case formatUnsupported, systemFailure
+
+        public enum Action: Equatable, Sendable {
+            case privacySettings, install, retry, noAction
+        }
+        public var action: Action {
+            switch self {
+            case .permissionDenied: return .privacySettings
+            case .blackHoleMissing: return .install
+            case .sourceLost, .formatUnsupported: return .noAction
+            case .systemFailure: return .retry
             }
-            return nil
+        }
+    }
+    public var statusMessage: StatusMessage? {
+        if case .recovering(.sourceLost) = status?.state { return .sourceLost(status?.source?.name) }
+        if case .recovering(.wakeFailed) = status?.state { return .systemFailure }
+        if case .recovering = status?.state { return nil }
+        switch error {
+        case .microphonePermissionDenied: return .permissionDenied
+        case .blackHoleMissing: return .blackHoleMissing
+        case .sourceUnavailable, .noSourceSelected: return .sourceLost(status?.source?.name)
+        case .formatUnsupported: return .formatUnsupported
+        case .some: return .systemFailure
+        case .none: return nil
+        }
+    }
+    public var message: String? {
+        switch statusMessage {
+        case .permissionDenied: return localized("Microphone access denied.")
+        case .blackHoleMissing: return localized("BlackHole 2ch not found.")
+        case .sourceLost(let name?):
+            return String.localizedStringWithFormat(
+                localized("%@ disconnected. Audio resumes when it is reconnected."), name)
+        case .sourceLost(nil): return localized("Microphone disconnected. Audio resumes when reconnected.")
+        case .formatUnsupported: return localized("Microphone format unsupported.")
+        case .systemFailure: return localized("System audio failed.")
+        case nil: return nil
         }
     }
     public func launch() async {
         controls = await store.current
         await refresh()
-        if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
+        if authorization() == .notDetermined {
             _ = await AVCaptureDevice.requestAccess(for: .audio)
         }
-        if controls.processingEnabled {
-            await start()
-            if AVCaptureDevice.authorizationStatus(for: .audio) != .authorized {
-                error = .microphonePermissionDenied
-            } else if !devices.contains(where: { $0.isBlackHole2ch && $0.alive }) {
-                error = .blackHoleMissing
-            }
-        }
+        if controls.processingEnabled { await start() }
         monitor = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.refresh()
@@ -84,11 +165,33 @@ public func localized(_ key: String) -> String {
             }
         }
     }
+    /// The microphone permission can change while the app is in the background, so the
+    /// authorization is re-checked every time the app becomes active.
+    public func applicationDidBecomeActive() {
+        let status = authorization()
+        if status == .denied || status == .restricted {
+            error = controls.processingEnabled ? .microphonePermissionDenied : nil
+            return
+        }
+        guard error == .microphonePermissionDenied else { return }
+        error = nil
+        retry()
+    }
     public func refresh() async {
-        status = await engine.status()
+        apply(await engine.status())
         devices = (try? await engine.availableDevices()) ?? []
-        if case .error(let value) = status?.state { error = value } else if status?.state == .running { error = nil }
         onUpdate()
+    }
+    /// Applies an engine snapshot; also used by tests and by the screenshot renderer.
+    public func apply(_ snapshot: EngineStatus) {
+        status = snapshot
+        if case .error(let value) = snapshot.state {
+            error = value
+        } else if snapshot.state == .running {
+            error = nil
+        } else if snapshot.state == .stopped, !controls.processingEnabled {
+            error = nil
+        }
     }
     public var sources: [AudioDevice] { devices.filter { $0.alive && $0.isEligible(in: devices) } }
     private func start() async {
@@ -168,7 +271,11 @@ public func localized(_ key: String) -> String {
     }
     public func retry() {
         guard controls.processingEnabled else { return }
-        Task { await start() }
+        let previous = command
+        command = Task {
+            await previous?.value
+            await start()
+        }
     }
     public func setPanelVisible(_ visible: Bool) {
         panelVisible = visible

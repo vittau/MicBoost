@@ -28,18 +28,18 @@ Para agregados, a lista completa de UIDs (`kAudioAggregateDevicePropertyFullSubD
 Uma fonte é elegível se tiver ≥ 1 canal de entrada, **não** for BlackHole (nenhuma variante), **não** for o agregado do próprio MicBoost e **não** for um agregado que contenha BlackHole.
 
 Listeners (na fila `engine`):
-- sistema: `kAudioHardwarePropertyDevices`, `kAudioHardwarePropertyDefaultInputDevice`;
+- sistema: `kAudioHardwarePropertyDevices`, `kAudioHardwarePropertyServiceRestarted`, `kAudioHardwarePropertyDefaultInputDevice`;
 - fonte e BlackHole ativos: `kAudioDevicePropertyDeviceIsAlive`, `kAudioDevicePropertyNominalSampleRate`, `kAudioDevicePropertyStreamConfiguration`;
 - agregado: `kAudioDeviceProcessorOverload`, que incrementa o contador de overloads.
 
-Mudanças chegam em rajadas. O controller agrupa eventos com 100 ms de coalescência antes de reconfigurar.
+Mudanças chegam em rajadas. O controller agrupa eventos com 100 ms de coalescência antes de reconfigurar. Eventos de formato (taxa e streams) nos 300 ms seguintes a um start são do próprio motor e são ignorados; notificações de taxa escritas pelo MicBoost também. A comparação que decide reconstruir usa UID, ID, estado vivo, taxa e canais: faixa de buffer, latências e safety offsets mudam quando o agregado entra em uso e não são mudança de formato.
 
 ## Identificação do BlackHole
 
 - Primária: UID `BlackHole2ch_UID` (UID padrão do build upstream de 2 canais, confirmado na máquina de referência).
 - Alternativa: fabricante contendo "Existential Audio" e nome contendo "BlackHole", com exatamente 2 canais de saída.
 - Qualquer dispositivo cujo UID ou nome comece com "BlackHole" é excluído como fonte, seja qual for a contagem de canais.
-- Propriedades observadas no BlackHole 2ch instalado: fabricante "Existential Audio Inc.", transporte `virtual`, 2 canais de entrada e 2 de saída, taxas de 8 kHz a 768 kHz, latência e safety offset 0 nos dois escopos, buffer de 15 a 4096 frames.
+- Propriedades observadas no BlackHole 2ch instalado: fabricante "Existential Audio Inc.", transporte `virtual`, 2 canais de entrada e 2 de saída, taxas nominais 8000, 16000, 24000, 44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600 e 768000 Hz (não anuncia 32000 Hz), latência e safety offset 0 nos dois escopos, buffer de 15 a 4096 frames.
 
 ## Construção do agregado
 
@@ -64,8 +64,8 @@ A qualidade do resampler de drift permanece no padrão do sistema (a chave de qu
 
 - **Taxa de trabalho:** a cada start (inclusive ao trocar de fonte e ao reconstruir após recuperação), escolher entre as taxas suportadas pela fonte e pelo BlackHole: 48 kHz, se houver; senão, a maior taxa abaixo de 48 kHz; senão, a menor acima de 48 kHz. Taxas acima de 48 kHz não trazem ganho para voz e só aumentam CPU, por isso 48 kHz é o teto preferido. Se não houver taxa em comum, `error(.formatUnsupported)`.
 - Antes de criar o agregado, definir a taxa nominal da fonte e a do BlackHole com a taxa de trabalho, quando forem diferentes. Mudar a taxa da fonte afeta outros apps que a leem diretamente, que se adaptam. Dispositivos cuja taxa é imposta pelo próprio perfil (por exemplo, Bluetooth em HFP) simplesmente não oferecem outras taxas.
-- **Restauração:** ao parar voluntariamente (sair, desligar o processamento, trocar de fonte), devolver a taxa anterior de cada dispositivo que o MicBoost alterou, somente se a taxa atual ainda for a que o MicBoost definiu e o dispositivo existir. Erros do motor não restauram. As taxas anteriores ficam em memória durante a sessão; após um crash, não há restauração.
-- Mudanças de taxa feitas pelo próprio MicBoost não contam como mudança externa de formato.
+- **Restauração:** ao parar voluntariamente (sair, desligar o processamento, trocar de fonte), devolver a taxa anterior de cada dispositivo que o MicBoost alterou, somente se a taxa atual ainda for a que o MicBoost definiu e o dispositivo existir. Erros do motor não restauram. As taxas anteriores ficam em memória durante a sessão, indexadas por UID; após um crash, não há restauração. A restauração acontece depois de destruir o agregado e é melhor esforço: uma falha nela não impede o stop.
+- Mudanças de taxa feitas pelo próprio MicBoost não contam como mudança externa de formato. A HAL pode recusar ou reverter uma taxa imposta de fora enquanto o agregado privado está em uso; a notificação que chega mesmo assim leva a `recovering(.formatChanged)` e o motor reaplica a taxa de trabalho.
 - O IOProc trabalha com o formato virtual dos streams do agregado. Exigir Float32 linear PCM nativo (`kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked`), intercalado ou não. Se o formato virtual não for Float32, tentar `kAudioStreamPropertyVirtualFormat` Float32 na mesma taxa. Se falhar, `error(.formatUnsupported)`.
 - Uma mudança de taxa ou de configuração de streams, na fonte ou no BlackHole, com o motor em `running`, leva a `recovering` → reconstrução.
 
@@ -151,15 +151,19 @@ Invariantes: nunca definir uma fonte física como padrão, exceto na restauraç�
 
 ## Recuperação
 
+`EngineState.recovering` carrega o motivo: `sourceLost`, `formatChanged`, `serviceRestarted`, `sleep` ou `wakeFailed`. O app usa o motivo para decidir a mensagem ([ui.md](ui.md#mensagens-de-estado)).
+
 | Evento | Detecção | Ação |
 |---|---|---|
-| Fonte desconectada | `DeviceIsAlive` = 0 ou some de `Devices` | stop interno → `recovering(.sourceLost)`. Quando o mesmo UID voltar, reconstruir. Não trocar de fonte sozinho. |
-| BlackHole removido | some de `Devices` | `error(.blackHoleMissing)`; sai ao reaparecer |
-| Taxa/streams mudaram | listeners de formato | `recovering(.formatChanged)` → reconstruir |
-| Suspensão/retomada | `NSWorkspace.willSleepNotification` / `didWakeNotification`, encaminhados pelo app ao controller | antes de dormir, stop com rampa; ao acordar, start com 1 s de atraso; se falhar, `recovering` |
-| Permissão negada | `AVCaptureDevice.authorizationStatus(for: .audio)` antes do start e ao reativar o app | `error(.microphonePermissionDenied)` |
-| Overload de IO | `kAudioDeviceProcessorOverload` | incrementar contador, sem mudar estado |
-| Serviço de áudio reiniciado (`coreaudiod`) | todos os objetos inválidos / `Devices` muda por completo | descartar IDs em cache, reenumerar por UID e reconstruir |
+| Fonte desconectada | `DeviceIsAlive` = 0 ou some de `Devices` | stop interno com rampa → `recovering(.sourceLost)`. Quando o mesmo UID voltar, reconstruir. Não trocar de fonte sozinho. |
+| BlackHole removido | some de `Devices` ou `DeviceIsAlive` = 0 | `error(.blackHoleMissing)`; destrói o agregado. Sai ao reaparecer, com uma reconstrução. |
+| Taxa/streams mudaram | listeners de formato na fonte e no BlackHole | `recovering(.formatChanged)` → reconstruir e reaplicar a taxa de trabalho. |
+| Suspensão/retomada | `NSWorkspace.willSleepNotification` / `didWakeNotification`, encaminhados pelo app ao controller | antes de dormir, stop com rampa em `recovering(.sleep)`; ao acordar, uma única tentativa de start 1 s depois. Falha de HAL ou formato na tentativa → `recovering(.wakeFailed)`; dispositivo ausente ou permissão negada mantêm o `error` correspondente. |
+| Permissão negada | `AVCaptureDevice.authorizationStatus(for: .audio)` antes do start e quando o app volta a ficar ativo | `error(.microphonePermissionDenied)`; concedida a permissão, o app tenta iniciar de novo. |
+| Overload de IO | `kAudioDeviceProcessorOverload` | incrementar contador, sem mudar estado. |
+| Serviço de áudio reiniciado (`coreaudiod`) | `kAudioHardwarePropertyServiceRestarted` (e `Devices` mudando por completo) | `recovering(.serviceRestarted)`: descartar IDs em cache, reenumerar por UID e reconstruir. |
+
+Em `recovering` e nos `error` de dispositivo não há polling: a próxima mudança em `Devices` (ou no formato) tenta de novo. A única exceção é a tentativa única depois do wake. Erros do motor nunca restauram a entrada padrão nem as taxas dos dispositivos: um stop voluntário posterior ainda restaura.
 
 Uma fonte que entrega apenas zeros mantém o motor em `running`; não há detecção automática de fonte silenciosa na v1.
 

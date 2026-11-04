@@ -102,11 +102,17 @@ Available today:
 - **Voice preset** for rumble reduction and gentle presence, plus a flat EQ reset.
 - **Processing switch** releases the microphone; quitting restores the previous system input
   when MicBoost still manages it.
+- **Recovery without intervention**: unplugging and plugging the microphone back in,
+  sleep/wake, a missing BlackHole driver, a rate or stream change made by another app, a
+  restart of the Core Audio service and granting the microphone permission later all bring
+  the bridge back on the same microphone, showing one short message in the panel when the
+  user needs to act.
+- **One working rate for both ends**: MicBoost runs source and BlackHole at 48 kHz when both
+  support it, otherwise at the best rate they share, and gives the previous rates back when
+  you quit or switch microphones.
 
 Planned for v1:
 
-- **Recovery** from a disconnected source, sleep/wake, format changes and a missing BlackHole
-  (stage 5).
 - **Homebrew tap and `.zip` release** (stage 6).
 
 ## Requirements
@@ -190,8 +196,11 @@ that is why the low-rate source is slower.
   latency, with no overloads, no missing input, stable memory (about 13 MB) and about 0.5% of one
   CPU core.
 - **Recovery:** unplugging the USB microphone during a run moves the engine to "recovering", with
-  silence in BlackHole; plugging it back in resumes the bridge on its own.
-- **Still pending:** built-in microphone and Bluetooth measurements.
+  silence in BlackHole; plugging it back in resumes the bridge on its own. Changing the working
+  rate of either end returns to `running` in 0.4–1.3 s.
+- **Still pending:** built-in microphone and Bluetooth measurements. Recovery paths that need a
+  person (sleep/wake notifications, TCC changes, removing the driver, restarting the real
+  `coreaudiod`) are listed in the manual checklist.
 
 Full results and conditions: [docs/testing.md](docs/testing.md#resultados-registrados).
 
@@ -208,6 +217,12 @@ Full results and conditions: [docs/testing.md](docs/testing.md#resultados-regist
   capture audio in that state.
 - **Digital gain amplifies noise too**, and it cannot recover audio that was already clipped at
   the source.
+- **MicBoost changes the sample rate of the selected microphone** to the working rate it shares
+  with BlackHole (48 kHz when both support it). Other apps that read that microphone directly
+  adapt to the change, and the previous rate is restored when you quit or switch microphones.
+- **Changing a rate while MicBoost runs** pauses the bridge for about half a second to a second
+  while the engine rebuilds at the working rate. The BlackHole driver may ignore the external
+  write while MicBoost holds it.
 
 ## Troubleshooting
 
@@ -215,11 +230,19 @@ Full results and conditions: [docs/testing.md](docs/testing.md#resultados-regist
 [First launch](#first-launch). Do not remove the quarantine flag.
 
 **No microphone audio.** Check System Settings → Privacy & Security → Microphone. When running
-the CLI, the permission belongs to the terminal application, not to MicBoost.
+the CLI, the permission belongs to the terminal application, not to MicBoost. If you granted the
+permission while MicBoost was in the background, click back into the app or its menu; the
+permission is re-checked when the app becomes active.
 
 **BlackHole 2ch is not found.** Install it with `brew install --cask blackhole-2ch` and run
 `swift run micboost-diag devices`; the second line of the output reports the detected BlackHole.
-MicBoost does not install or bundle the driver.
+MicBoost does not install or bundle the driver. Once the driver appears, the message clears on its
+own and the bridge starts again.
+
+**The audio stops for a moment and comes back.** That is the automatic recovery: the microphone
+was disconnected, the Mac slept, another app changed the rate, or the Core Audio service
+restarted. MicBoost rebuilds the bridge on the same microphone and keeps the system input on
+BlackHole, so apps listening to it do not switch microphones.
 
 **The other app hears silence.** Make sure it is listening to **BlackHole 2ch** or **System
 Default**, and that System Settings → Sound → Input is set to BlackHole 2ch. Apps with their own

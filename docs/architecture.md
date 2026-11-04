@@ -74,7 +74,7 @@ Frameworks linkados: CoreAudio, AudioToolbox, AVFoundation (só para `AVCaptureD
 
 ## Ciclo de vida do motor
 
-Estados (`EngineState`): `stopped`, `starting`, `running`, `recovering(reason)`, `error(EngineError)`.
+Estados (`EngineState`): `stopped`, `starting`, `running`, `recovering(RecoveryReason)`, `error(EngineError)`. `RecoveryReason` é `sourceLost`, `formatChanged`, `serviceRestarted`, `sleep` ou `wakeFailed`.
 
 ```text
 stopped ──start──▶ starting ──ok──▶ running
@@ -84,11 +84,12 @@ stopped ──start──▶ starting ──ok──▶ running
 ```
 
 - `EngineError`: `blackHoleMissing`, `microphonePermissionDenied`, `sourceUnavailable(uid)`, `noSourceSelected`, `formatUnsupported`, `halFailure(OSStatus, operation)`.
-- `start` verifica, nesta ordem: permissão de microfone → BlackHole presente → fonte presente → constrói o agregado → configura formato/buffer → cria o IOProc → `AudioDeviceStart` → aplica a política de entrada padrão.
-- Em `recovering`, o controller observa a lista de dispositivos e tenta de novo quando a condição muda. Não há polling. Exceção: depois do wake, uma única tentativa com atraso de 1 s.
+- `start` verifica, nesta ordem: permissão de microfone → BlackHole presente → fonte presente → taxa de trabalho comum aos dois → define as taxas → constrói o agregado → configura formato/buffer → cria o IOProc → `AudioDeviceStart` → aplica a política de entrada padrão.
+- Em `recovering`, o controller observa a lista de dispositivos e tenta de novo quando a condição muda. Não há polling. Exceção: depois do wake, uma única tentativa com atraso de 1 s; se ela falhar por HAL ou formato, o estado fica `recovering(.wakeFailed)`.
 - `error(.blackHoleMissing)` e `error(.sourceUnavailable)` saem sozinhos quando o dispositivo aparece. `microphonePermissionDenied` é reavaliado quando o app volta a ficar ativo.
-- `stop` faz uma rampa de saída para zero (τ = 3 ms, atingindo −90 dB em aproximadamente 31 ms; espera de 40 ms com limite de 50 ms), `AudioDeviceStop`, destrói o IOProc, destrói o agregado e restaura a entrada padrão conforme a política.
+- `stop` faz uma rampa de saída para zero (τ = 3 ms, atingindo −90 dB em aproximadamente 31 ms; espera de 40 ms com limite de 50 ms), `AudioDeviceStop`, destrói o IOProc, destrói o agregado, devolve as taxas que o MicBoost mudou e restaura a entrada padrão conforme a política.
 - Ganho, mute, EQ, bypass e modo de canais **nunca** reiniciam o motor. Mudar a fonte ou o tamanho de buffer reconstrói o motor (stop → start), com rampa.
+- O controller expõe um observador de estado na fila `engine`. `micboost-diag run` o usa para imprimir cada transição com o instante; os testes o usam para verificar o caminho percorrido.
 
 ## Modelo de domínio (MicBoostCore)
 

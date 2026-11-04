@@ -9,7 +9,7 @@ Status: `não iniciado` · `em andamento` · `concluído`. Uma etapa só é conc
 | 2 | Ganho e proteção de pico | em andamento |
 | 3 | Equalizador | concluído |
 | 4 | Interface | em andamento |
-| 5 | Recuperação | não iniciado |
+| 5 | Recuperação | em andamento |
 | 6 | Distribuição | em andamento |
 | 7 | Entrega | não iniciado |
 
@@ -70,7 +70,9 @@ Condições de conclusão:
 
 ## 5 — Recuperação
 
-Condições de conclusão: cada linha da tabela de [audio-engine.md](audio-engine.md#recuperação) verificada manualmente (desconexão, suspensão e retomada, mudança de formato, permissão negada, BlackHole ausente, mudança manual da entrada padrão, reinício do `coreaudiod`).
+Entregas implementadas: motivos tipados de recuperação (`sourceLost`, `formatChanged`, `serviceRestarted`, `sleep`, `wakeFailed`); reconstrução por UID depois do `coreaudiod`; tentativa única 1 s após o wake; permissão reavaliada ao ativar o app; mensagens de estado por motivo; taxa de trabalho comum à fonte e ao BlackHole, com restauração no stop voluntário e na troca de fonte; `micboost-diag set-rate`; roteiro manual de recuperação em [testing.md](testing.md#recuperação-etapa-5).
+
+Condições de conclusão: cada linha da tabela de [audio-engine.md](audio-engine.md#recuperação) verificada manualmente (desconexão, suspensão e retomada, mudança de formato, permissão negada, BlackHole ausente, mudança manual da entrada padrão, reinício do `coreaudiod`). A HAL falsa cobre a lógica e as medições com hardware cobrem a mudança de taxa; os itens que precisam de interação humana estão pendentes no roteiro manual.
 
 ## 6 — Distribuição
 
