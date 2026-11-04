@@ -80,7 +80,7 @@ Available today:
   length with flat EQ and no limiting. The protected −1 dBFS output reaches about 89.1% of the bar. This visual decay does not delay the audio.
 - **Menu bar panel** with gain, meters, routing status, microphones and EQ, plus settings for
   buffer, channels, automatic system input switching and diagnostics, using native grouped
-  sections and switches.
+  sections and switches. Buffer sizes are labeled in frames, with guidance on latency and audio stability.
 - **Voice preset** for rumble reduction and gentle presence, plus a flat EQ reset.
 - **Processing switch** releases the microphone; quitting restores the previous system input
   when MicBoost still manages it.

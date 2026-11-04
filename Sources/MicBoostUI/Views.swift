@@ -262,20 +262,30 @@ import SwiftUI
                     let enabled = model.controls.manageDefaultInput
                     Task { await model.engine.setDefaultInputManagement(enabled) }
                 }
-                Picker(localized("Buffer"), selection: $model.controls.bufferFrames) {
-                    ForEach(
-                        Settings.allowedBufferFrames.filter { frames in
-                            guard let source = model.status?.source else { return true }
-                            return Double(frames) >= source.bufferRange.minimum
-                                && Double(frames) <= source.bufferRange.maximum
-                        }, id: \.self
-                    ) { Text("\($0)").tag($0) }
-                }.onChange(of: model.controls.bufferFrames) {
-                    let frames = model.controls.bufferFrames
-                    Task {
-                        await model.store.update { $0.bufferFrames = frames }
-                        model.retry()
+                VStack(alignment: .leading, spacing: 4) {
+                    Picker(localized("Buffer (frames)"), selection: $model.controls.bufferFrames) {
+                        ForEach(
+                            Settings.allowedBufferFrames.filter { frames in
+                                guard let source = model.status?.source else { return true }
+                                return Double(frames) >= source.bufferRange.minimum
+                                    && Double(frames) <= source.bufferRange.maximum
+                            }, id: \.self
+                        ) { Text("\($0)").tag($0) }
+                    }.onChange(of: model.controls.bufferFrames) {
+                        let frames = model.controls.bufferFrames
+                        Task {
+                            await model.store.update { $0.bufferFrames = frames }
+                            model.retry()
+                        }
                     }
+                    Text(
+                        localized(
+                            "Smaller buffers reduce latency. Increase this if audio cuts out or crackles; keep the default if audio is stable."
+                        )
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
                 Picker(localized("Channels"), selection: Binding(get: { channel }, set: setChannel)) {
                     Text(localized("Automatic")).tag(0)

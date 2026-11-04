@@ -61,3 +61,6 @@
 "Paste" = "Paste";
 "Select All" = "Select All";
 "MicBoost Settings" = "MicBoost Settings";
+
+"Buffer (frames)" = "Buffer (frames)";
+"Smaller buffers reduce latency. Increase this if audio cuts out or crackles; keep the default if audio is stable." = "Smaller buffers reduce latency. Increase this if audio cuts out or crackles; keep the default if audio is stable.";
