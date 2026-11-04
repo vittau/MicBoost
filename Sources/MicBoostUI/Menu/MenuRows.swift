@@ -188,6 +188,14 @@ import MicBoostCore
         super.draw(dirtyRect)
     }
 
+    /// A view-based menu item gets no action from the menu on a click, so the row performs
+    /// its item's action itself and closes the menu, as a native item does.
+    override func mouseUp(with event: NSEvent) {
+        guard let item = enclosingMenuItem, item.isEnabled, let menu = item.menu else { return }
+        menu.cancelTracking()
+        menu.performActionForItem(at: menu.index(of: item))
+    }
+
     private func textColor() {
         let highlighted = enclosingMenuItem?.isHighlighted ?? false
         name.textColor = highlighted ? .selectedMenuItemTextColor : .labelColor

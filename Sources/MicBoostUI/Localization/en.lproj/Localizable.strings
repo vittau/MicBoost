@@ -71,3 +71,4 @@
 "Mono %lld: uses channel %lld on both sides." = "Mono %lld: uses channel %lld on both sides.";
 "Stereo: channel 1 on the left, channel 2 on the right." = "Stereo: channel 1 on the left, channel 2 on the right.";
 "Stereo" = "Stereo";
+"Choose a microphone in the list." = "Choose a microphone in the list.";

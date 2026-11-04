@@ -76,6 +76,28 @@ import Testing
         #expect(updated[1].isAccessibilitySelected() == true)
     }
 
+    @Test func clickingAMicrophoneRowSelectsIt() throws {
+        let model = Self.model()
+        model.controls.processingEnabled = false
+        let panel = PanelMenuController(model: model)
+        let item = try #require(panel.menu.items.first { $0.representedObject as? String == "built-in" })
+        let row = try #require(item.view as? PanelMicrophoneRow)
+        let event = try #require(
+            NSEvent.mouseEvent(
+                with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                context: nil, eventNumber: 0, clickCount: 1, pressure: 0))
+        row.mouseUp(with: event)
+        #expect(model.controls.selectedInputUID == "built-in")
+    }
+
+    @Test func noSourceSelectedAsksToChooseOne() {
+        let model = AppModel(statusGrace: .zero)
+        model.controls.processingEnabled = true
+        model.error = .noSourceSelected
+        #expect(model.statusMessage == .noSourceSelected)
+        #expect(model.message == localized("Choose a microphone in the list."))
+    }
+
     @Test func transportSymbols() {
         #expect(PanelMenuController.symbol(for: Self.device("usb", "USB", usb: true)) == "mic.fill")
         var bluetooth = Self.device("bt", "Headset")

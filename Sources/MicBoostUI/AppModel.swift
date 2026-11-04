@@ -146,7 +146,7 @@ import SwiftUI
     }
     /// One banner at a time, in the priority order of docs/ui.md "Mensagens de estado".
     public enum StatusMessage: Equatable, Sendable {
-        case permissionDenied, blackHoleMissing
+        case permissionDenied, blackHoleMissing, noSourceSelected
         case sourceLost(String?)
         case formatUnsupported, systemFailure
 
@@ -157,7 +157,7 @@ import SwiftUI
             switch self {
             case .permissionDenied: return .privacySettings
             case .blackHoleMissing: return .install
-            case .sourceLost, .formatUnsupported: return .noAction
+            case .sourceLost, .formatUnsupported, .noSourceSelected: return .noAction
             case .systemFailure: return .retry
             }
         }
@@ -165,7 +165,7 @@ import SwiftUI
         var waitsForTheGrace: Bool {
             switch self {
             case .blackHoleMissing, .sourceLost: return true
-            case .permissionDenied, .formatUnsupported, .systemFailure: return false
+            case .permissionDenied, .formatUnsupported, .systemFailure, .noSourceSelected: return false
             }
         }
     }
@@ -200,7 +200,8 @@ import SwiftUI
         switch error {
         case .microphonePermissionDenied: return .permissionDenied
         case .blackHoleMissing: return .blackHoleMissing
-        case .sourceUnavailable, .noSourceSelected: return .sourceLost(selectedSourceName)
+        case .sourceUnavailable: return .sourceLost(selectedSourceName)
+        case .noSourceSelected: return .noSourceSelected
         case .formatUnsupported: return .formatUnsupported
         case .halFailure, .invalidArgument: return .systemFailure
         case .none: return nil
@@ -289,6 +290,7 @@ import SwiftUI
         switch statusMessage {
         case .permissionDenied: return localized("Microphone access denied.")
         case .blackHoleMissing: return localized("BlackHole 2ch not found.")
+        case .noSourceSelected: return localized("Choose a microphone in the list.")
         case .sourceLost(let name?):
             return String.localizedStringWithFormat(
                 localized("%@ disconnected. Audio resumes when it is reconnected."), name)

@@ -32,7 +32,7 @@ arredondadas à direita. O sistema define a cor conforme a barra de menus. Estad
 - o delegate inicia os medidores ao abrir e os cancela ao fechar;
 - entrada no tracking pelo run loop para não manter um job de concorrência Swift ocupado;
 - o menu não reserva a coluna de marcação (`showsStateColumn = false`): nenhuma linha começa num vão vazio, e as linhas de view começam na mesma coluna do título de um item nativo;
-- items de view: a view preenche a largura do menu (`autoresizingMask = .width`) e o conteúdo começa e termina nas mesmas insets do título de um `NSMenuItem` padrão. Essas insets são medidas do próprio menu na primeira abertura (o `x` do título de um item sem imagem e a coluna do atalho) e ficam guardadas em `UserDefaults.menuRowInsets`, para o painel abrir já alinhado nas execuções seguintes;
+- items de view: a view preenche a largura do menu (`autoresizingMask = .width`) e o conteúdo começa e termina nas mesmas insets do título de um `NSMenuItem` padrão. Essas insets são medidas do próprio menu na primeira abertura (o `x` do título de um item sem imagem e a coluna do atalho) e ficam guardadas em `UserDefaults.menuRowInsets`, para o painel abrir já alinhado nas execuções seguintes. Um item de view não recebe a ação do menu ao ser clicado: a linha de microfone trata o `mouseUp`, fecha o menu e chama `performActionForItem(at:)`, como um item nativo;
 - os sliders são `NSSlider`: o controle conduz o próprio laço de arrasto e continua respondendo dentro do tracking do menu, enquanto o gesto do `Slider` do SwiftUI perde o mouse-up fora da view hospedada e deixa o slider preso no estado pressionado. As atualizações são contínuas durante o arrasto, sem marcas de passo, e o knob só acompanha valores externos (campo numérico, teclado, persistência) quando não há arrasto.
 
 **Fechar o painel nunca afeta o motor.** Aparência e preferências de acessibilidade
@@ -77,6 +77,7 @@ Uma faixa no topo do conteúdo, abaixo do cabeçalho, mostra uma mensagem por ve
 | `microphonePermissionDenied` | "O MicBoost não tem acesso ao microfone." | "Abrir Ajustes de Privacidade" → `x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone` |
 | `blackHoleMissing` | "BlackHole 2ch não encontrado." | "Como instalar" (abre a documentação de instalação) |
 | `sourceUnavailable` / `recovering(.sourceLost)` | "<nome> desconectado. O áudio volta quando ele for reconectado." | escolher outro microfone na lista (sem botão) |
+| `noSourceSelected` | "Escolha um microfone na lista." | escolher um microfone na lista (sem botão) |
 | `formatUnsupported` | "Formato do <nome> não suportado." | escolher outro microfone (sem botão) |
 | `halFailure` / `recovering(.wakeFailed)` | "Falha no áudio do sistema." | "Tentar novamente" |
 | divergência da entrada padrão | (na linha de roteamento) | "Usar MicBoost" |
