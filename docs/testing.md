@@ -99,7 +99,7 @@ Complementar com uma escuta humana de uma gravação de voz de 20 min via BlackH
 ## Roteiro manual (antes de cada release)
 
 1. Instalação limpa (Homebrew e `.zip`) em um Mac sem BlackHole e em um Mac com BlackHole já instalado ([distribution.md](distribution.md)).
-2. Primeira abertura: permissão de microfone, mensagem sem BlackHole, painel abrindo automaticamente.
+2. Primeira abertura com ajustes zerados (`defaults delete io.github.vittau.MicBoost`) no build da release: permissão de microfone, microfone escolhido automaticamente, troca de microfone clicando na lista, mensagem sem BlackHole, painel abrindo automaticamente.
 3. Microfone interno e um USB ou interface: voz amplificada em um app de chamada (FaceTime ou Zoom) e em um gravador (QuickTime ou Voice Memos), com o app em "padrão do sistema" e em "BlackHole 2ch".
 4. Ganho acima de +6 dB com "Limitando" visível ao gritar; mute; EQ nos extremos; bypass; "Zerar EQ"; nenhum clique perceptível ao mexer nos controles com voz.
 5. Fechar e abrir o painel durante uma chamada: o áudio não é interrompido.

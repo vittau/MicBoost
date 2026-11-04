@@ -60,6 +60,7 @@ Controles:
 Interface:
 - Componente nativo sempre que existir um que atenda: AppKit/SwiftUI do sistema, sem controle desenhado ou imitado. Personalização só quando não há equivalente nativo, com o motivo em `docs/ui.md`.
 - Dentro do `NSMenu`, itens de menu (lista de microfones, ações como "Ajustes…" e "Sair") são `NSMenuItem` reais, e controles interativos em views de item são AppKit (`NSSlider`, `NSSwitch`, `NSTextField`, `NSButton`), não controles SwiftUI, cujo tratamento de eventos falha no laço de acompanhamento do menu.
+- Toda linha de menu com view própria que tenha ação tem um teste que simula o clique (`mouseUp`) e verifica o efeito no `AppModel`.
 
 ## Convenções de código
 
