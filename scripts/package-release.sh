@@ -50,7 +50,8 @@ for arch in arm64 x86_64; do
     fi
 done
 codesign --verify --strict --deep "$app" || fail "codesign --verify --strict --deep failed"
-if ! codesign -dv --verbose=4 "$app" 2>&1 | grep -qx 'Signature=adhoc'; then
+signature=$(codesign -dv --verbose=4 "$app" 2>&1)
+if ! grep -qx 'Signature=adhoc' <<< "$signature"; then
     fail "the signature is not ad hoc"
 fi
 minimum_macos=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$app/Contents/Info.plist")
@@ -73,8 +74,5 @@ echo "checksum:  $sha256"
 echo "archs:     $archs"
 echo "minos:     $minimum_macos (arm64 and x86_64)"
 echo "signature: ad hoc, not notarized"
-echo
 echo "==> Cask for the tap (packaging/homebrew/micboost.rb)"
-sed -e "s/^  version \".*\"\$/  version \"$version\"/" \
-    -e "s/^  sha256 \".*\"\$/  sha256 \"$sha256\"/" \
-    packaging/homebrew/micboost.rb
+scripts/print-cask.sh "$version" "$sha256"
