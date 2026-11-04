@@ -5,6 +5,7 @@ import SwiftUI
 
 @MainActor public struct PanelView: View {
     @Bindable var model: AppModel
+    @Environment(\.locale) private var locale
     @State private var editing = false
     public init(model: AppModel) { self.model = model }
     public var body: some View {
@@ -23,17 +24,20 @@ import SwiftUI
             if let message = model.message {
                 VStack(alignment: .leading) {
                     Label(message, systemImage: "exclamationmark.triangle.fill")
-                    if model.error == .microphonePermissionDenied {
+                    switch model.statusMessage?.action ?? .noAction {
+                    case .privacySettings:
                         Link(
                             localized("Open Privacy Settings"),
                             destination: URL(
                                 string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!)
-                    } else if model.error == .blackHoleMissing {
+                    case .install:
                         Link(
                             localized("How to install"),
                             destination: URL(string: "https://github.com/vittau/MicBoost#requirements")!)
-                    } else {
+                    case .retry:
                         Button(localized("Try again"), action: model.retry)
+                    case .noAction:
+                        EmptyView()
                     }
                 }.font(.caption).padding(8).background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
             }
@@ -50,7 +54,8 @@ import SwiftUI
                 Slider(
                     value: Binding(get: { model.controls.gainDB }, set: model.gain), in: Settings.gainRange
                 )
-                .accessibilityLabel(localized("Gain")).accessibilityValue(AppModel.gainLabel(model.controls.gainDB))
+                .accessibilityLabel(localized("Gain"))
+                .accessibilityValue(AppModel.gainLabel(model.controls.gainDB, locale: locale))
                 .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { press in
                     let direction = press.key == .leftArrow || press.key == .downArrow ? -1.0 : 1.0
                     model.gain(
@@ -63,12 +68,14 @@ import SwiftUI
                 if editing {
                     TextField(
                         localized("Gain"), value: Binding(get: { model.controls.gainDB }, set: model.gain),
-                        format: .number
+                        format: .number.locale(locale)
                     )
                     .onSubmit { editing = false }
                 } else {
-                    Button(AppModel.gainLabel(model.controls.gainDB)) { editing = true }.buttonStyle(.plain)
-                        .monospacedDigit()
+                    Button(AppModel.gainLabel(model.controls.gainDB, locale: locale)) { editing = true }.buttonStyle(
+                        .plain
+                    )
+                    .monospacedDigit()
                 }
                 Spacer(minLength: 8)
                 Text(localized("Limiter active"))
@@ -179,7 +186,8 @@ import SwiftUI
                 Text(localized(title)).font(.headline).accessibilityAddTraits(.isHeader)
                 Spacer()
                 Text(
-                    gain.wrappedValue.formatted(.number.precision(.fractionLength(1)).sign(strategy: .always())) + " dB"
+                    gain.wrappedValue.formatted(
+                        .number.locale(locale).precision(.fractionLength(1)).sign(strategy: .always())) + " dB"
                 )
                 .font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
@@ -204,7 +212,7 @@ import SwiftUI
             HStack {
                 Text(localized("Frequency"))
                 Spacer()
-                TextField("Hz", value: frequency, format: .number)
+                TextField("Hz", value: frequency, format: .number.locale(locale))
                     .textFieldStyle(.roundedBorder)
                     .multilineTextAlignment(.trailing)
                     .frame(width: 80)
@@ -242,6 +250,7 @@ import SwiftUI
 
 @MainActor public struct SettingsView: View {
     @Bindable var model: AppModel
+    @Environment(\.locale) private var locale
     public init(model: AppModel) { self.model = model }
     public var body: some View {
         Form {
@@ -314,12 +323,15 @@ import SwiftUI
                 }
             }
             Section(localized("Diagnostics")) {
-                LabeledContent(localized("Sample rate"), value: "\((model.status?.sampleRate ?? 0).formatted()) Hz")
+                LabeledContent(
+                    localized("Sample rate"),
+                    value: "\((model.status?.sampleRate ?? 0).formatted(.number.locale(locale))) Hz")
                 LabeledContent(localized("Buffer"), value: "\(model.status?.bufferFrames ?? 0) \(localized("frames"))")
                 LabeledContent(
                     localized("Reported latency"),
                     value:
-                        "\((model.status?.reportedLatencyMs ?? 0).formatted(.number.precision(.fractionLength(1)))) ms")
+                        "\((model.status?.reportedLatencyMs ?? 0).formatted(.number.locale(locale).precision(.fractionLength(1)))) ms"
+                )
                 LabeledContent(localized("Audio overloads"), value: "\(model.status?.overloads ?? 0)")
                 LabeledContent(localized("Missing input cycles"), value: "\(model.status?.inputMissing ?? 0)")
                 LabeledContent(localized("Numerical resets"), value: "\(model.status?.nonfiniteResets ?? 0)")

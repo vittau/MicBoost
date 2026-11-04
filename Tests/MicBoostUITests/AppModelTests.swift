@@ -42,6 +42,93 @@ import Testing
     try await model.shutdown()
 }
 
+@MainActor @Test func statusMessageMapping() {
+    let model = AppModel()
+    model.controls.processingEnabled = true
+    var source = AudioDevice(id: 1, uid: "usb", name: "USB Microphone")
+    source.inputChannels = 1
+
+    model.apply(.init(state: .error(.microphonePermissionDenied)))
+    #expect(model.statusMessage == .permissionDenied)
+    #expect(model.statusMessage?.action == .privacySettings)
+    #expect(model.message == localized("Microphone access denied."))
+
+    model.apply(.init(state: .error(.blackHoleMissing)))
+    #expect(model.statusMessage == .blackHoleMissing)
+    #expect(model.statusMessage?.action == .install)
+    #expect(model.message == localized("BlackHole 2ch not found."))
+
+    model.apply(.init(state: .error(.sourceUnavailable("usb")), source: source))
+    #expect(model.statusMessage == .sourceLost("USB Microphone"))
+    #expect(model.statusMessage?.action == .noAction)
+    #expect(model.message == "USB Microphone disconnected. Audio resumes when it is reconnected.")
+
+    model.apply(.init(state: .recovering(.sourceLost), source: source))
+    #expect(model.statusMessage == .sourceLost("USB Microphone"))
+    #expect(model.message != nil)
+
+    model.apply(.init(state: .error(.formatUnsupported)))
+    #expect(model.statusMessage == .formatUnsupported)
+    #expect(model.statusMessage?.action == .noAction)
+
+    model.apply(.init(state: .error(.halFailure(-1, "Start"))))
+    #expect(model.statusMessage == .systemFailure)
+    #expect(model.statusMessage?.action == .retry)
+    #expect(model.message == localized("System audio failed."))
+
+    model.apply(.init(state: .recovering(.wakeFailed)))
+    #expect(model.statusMessage == .systemFailure)
+    #expect(model.statusMessage?.action == .retry)
+
+    for state: EngineState in [.recovering(.formatChanged), .recovering(.serviceRestarted), .recovering(.sleep)] {
+        model.apply(.init(state: state))
+        #expect(model.statusMessage == nil)
+        #expect(model.message == nil)
+    }
+
+    model.apply(.init(state: .running, source: source, defaultInput: .init(isBlackHole: true)))
+    #expect(model.statusMessage == nil)
+    #expect(model.error == nil)
+}
+
+@MainActor @Test func blackHoleReturnClearsTheMessageByItself() {
+    let model = AppModel()
+    model.controls.processingEnabled = true
+    model.apply(.init(state: .error(.blackHoleMissing)))
+    #expect(model.message != nil)
+    // Reappearing BlackHole: the engine rebuilds and reports running.
+    model.apply(.init(state: .recovering(.formatChanged)))
+    model.apply(.init(state: .running, defaultInput: .init(isBlackHole: true)))
+    #expect(model.error == nil)
+    #expect(model.message == nil)
+    #expect(model.icon == "mic.fill")
+}
+
+@MainActor @Test func permissionGrantedOnActivationRestartsProcessing() async {
+    let model = AppModel()
+    model.controls.processingEnabled = true
+    model.controls.selectedInputUID = nil
+    model.authorization = { .denied }
+    model.error = .microphonePermissionDenied
+    model.applicationDidBecomeActive()
+    #expect(model.statusMessage == .permissionDenied)
+    model.authorization = { .authorized }
+    model.applicationDidBecomeActive()
+    await model.finishCommands()
+    // No microphone is selected, so the retried start stops before touching the HAL.
+    #expect(model.error == .noSourceSelected)
+    #expect(model.statusMessage != .permissionDenied)
+}
+
+@MainActor @Test func permissionGrantedOnActivationClearsBannerWhenProcessingIsOff() async {
+    let model = AppModel()
+    model.controls.processingEnabled = false
+    model.authorization = { .denied }
+    model.error = .microphonePermissionDenied
+    model.applicationDidBecomeActive()
+    #expect(model.statusMessage == nil)
+}
+
 @MainActor @Test func limiterBadgeKeepsPanelSize() {
     let quiet = AppModel()
     quiet.limitingUntil = .distantPast

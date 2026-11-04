@@ -49,6 +49,8 @@ import SwiftUI
         let center = NSWorkspace.shared.notificationCenter
         center.addObserver(self, selector: #selector(sleep), name: NSWorkspace.willSleepNotification, object: nil)
         center.addObserver(self, selector: #selector(wake), name: NSWorkspace.didWakeNotification, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(activated), name: NSApplication.didBecomeActiveNotification, object: nil)
         Task {
             await model.launch()
             update()
@@ -124,6 +126,7 @@ import SwiftUI
     func windowWillClose(_ notification: Notification) { model.settingsVisible = false }
     @objc private func sleep() { Task { try? await model.engine.willSleep() } }
     @objc private func wake() { Task { await model.engine.didWake() } }
+    @objc private func activated() { model.applicationDidBecomeActive() }
     func applicationWillTerminate(_ notification: Notification) {
         if let optionClickMonitor { NSEvent.removeMonitor(optionClickMonitor) }
     }

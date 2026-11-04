@@ -30,8 +30,16 @@ Em 16, 44,1, 48 e 96 kHz:
 - Nunca chama a escrita da saída padrão. A fake falha o teste se isso acontecer.
 - Elegibilidade de fontes: exclui as variantes de BlackHole, o próprio agregado e agregados com BlackHole.
 - Máquina de estados: transições de [architecture.md](architecture.md#ciclo-de-vida-do-motor) para cada evento de recuperação.
+- Recuperação, uma por linha da tabela de [audio-engine.md](audio-engine.md#recuperação): fonte perdida e devolvida; BlackHole removido e devolvido; taxa da fonte e do BlackHole alterada de fora; permissão negada e concedida; suspensão e retomada com sucesso e com falha; `coreaudiod` reiniciado com IDs novos; overload só incrementando o contador; notificação da própria escrita de taxa e mudança de latência/faixa de buffer sem reconstrução. O caminho percorrido é verificado pelo observador de estado, não por polling do estado final.
+- Taxa de trabalho: seleção com 48 kHz disponível, só 16/24/32 kHz (picks 32 kHz quando o destino os oferece), só 88,2/96 kHz e sem taxa em comum; aplicação nas duas pontas; restauração no stop voluntário e na troca de fonte; nada restaurado após mudança externa, nem em erro do motor.
 - Mapa de canais: fontes com 1, 2 e 8 canais, streams intercalados e não intercalados, fonte com saídas próprias.
 - Settings: valores padrão, round-trip (incluindo todas as `ChannelSelection`), esquema desconhecido e dados corrompidos → padrões, campos ausentes mantendo o padrão, valores fora de faixa limitados, debounce de 300 ms coalescendo várias mudanças numa gravação e gravação imediata dos campos de entrada padrão.
+
+### `MicBoostUITests`
+
+- Mapeamento de `AppModel` para cada linha de [ui.md](ui.md#mensagens-de-estado): estado do motor → mensagem, ação da faixa e ícone; a mensagem de BlackHole ausente some sozinha quando o motor volta a `running`.
+- Permissão reavaliada ao ativar o app: negada mantém a faixa, concedida limpa e tenta iniciar de novo.
+- Formatação de ganho e escala dos medidores.
 
 ## Ferramenta de diagnóstico (`micboost-diag`)
 
@@ -42,10 +50,13 @@ CLI para verificar o hardware. `run` e `latency` aceitam `--gain-db N`, `--mute`
 | Comando | Função |
 |---|---|
 | `micboost-diag devices [--json]` | Lista dispositivos com UID, transporte, canais, taxas, faixa de buffer, latências, safety offsets e elegibilidade; mostra o BlackHole detectado e a entrada padrão |
-| `micboost-diag run --input <uid> [--buffer N] [--seconds N]` | Roda o motor sem UI (mesmo `EngineController` do app), imprimindo estado e contadores a cada segundo. Não altera a entrada ou saída padrão; integração com a política de entrada padrão fica para o app |
+| `micboost-diag set-rate --device <uid> --rate <hz>` | Define a taxa nominal de um dispositivo e confirma o valor aplicado; usado no teste de mudança de formato e para devolver o BlackHole a 48000 Hz. Não altera entradas ou saídas padrão |
+| `micboost-diag run --input <uid> [--buffer N] [--seconds N]` | Roda o motor sem UI (mesmo `EngineController` do app), imprimindo estado e contadores a cada segundo e cada transição de estado com o instante. Não altera a entrada ou saída padrão; integração com a política de entrada padrão fica para o app |
 | `micboost-diag capture --device <uid> --seconds N --out file.wav` | Grava a entrada bruta de um dispositivo |
 | `micboost-diag latency --input <uid> [--trials N]` | Mede a latência adicional (método abaixo) |
 | `micboost-diag soak --input <uid> [--minutes N]` (padrão 20) | Ensaio de estabilidade (abaixo) |
+
+`set-rate` limita a taxa às `AvailableNominalSampleRates` do dispositivo, escreve `kAudioDevicePropertyNominalSampleRate` e espera até 1 s pelo valor aplicado, porque a HAL aplica a mudança de forma assíncrona. Se o dispositivo mantiver outra taxa (por exemplo, enquanto é subdispositivo de um agregado em uso), imprime o valor real e sai com erro. `run` imprime uma linha `event state=… t_ms=…` por transição, o que dá o tempo de retorno a `running`.
 
 A CLI usa parsing manual, sem dependências externas. `devices` exibe transporte por nome, taxas como lista simples em Hz (intervalos quando aplicável), latências e safety offsets em frames e milissegundos na taxa nominal. O JSON preserva os valores numéricos do `DeviceSnapshot` (`devices` e `defaultInputUID`); elegibilidade e BlackHole são derivados dos campos.
 
@@ -88,11 +99,27 @@ Complementar com uma escuta humana de uma gravação de voz de 20 min via BlackH
 3. Microfone interno e um USB ou interface: voz amplificada em um app de chamada (FaceTime ou Zoom) e em um gravador (QuickTime ou Voice Memos), com o app em "padrão do sistema" e em "BlackHole 2ch".
 4. Ganho acima de +6 dB com "Limitando" visível ao gritar; mute; EQ nos extremos; bypass; "Zerar EQ"; nenhum clique perceptível ao mexer nos controles com voz.
 5. Fechar e abrir o painel durante uma chamada: o áudio não é interrompido.
-6. Desconectar e reconectar o USB; suspender e retomar; mudar a taxa da fonte no Configuração de Áudio e MIDI; mudar a entrada padrão manualmente e usar "Usar BlackHole".
+6. Recuperação, item a item, conforme a seção abaixo.
 7. Sair do app: a entrada anterior é restaurada (e não é restaurada se o usuário tiver mudado manualmente).
 8. Bluetooth (AirPods ou similar): registrar taxa, latência medida e degradação da saída do fone.
 9. VoiceOver, navegação por teclado, aparência clara/escura, Reduzir transparência e Reduzir movimento.
 10. Persistência: reabrir o app e conferir ganho, mute, EQ, fonte e canais.
+
+### Recuperação (etapa 5)
+
+Preparação para todos os itens: app aberto com processamento ligado, microfone USB escolhido, BlackHole 2ch como entrada padrão e um app de chamada ouvindo BlackHole (para ouvir o silêncio e a volta). Antes de cada item, anotar a entrada padrão com
+`swift run micboost-diag devices` (primeira linha) e a taxa do BlackHole.
+
+| # | Passos | Mensagem esperada no painel | Entrada padrão esperada |
+|---|---|---|---|
+| 1 | Com o áudio tocando, desconectar o microfone USB; esperar 5 s; reconectar | "<nome> desconectado. O áudio volta quando ele for reconectado." durante a ausência; a faixa some quando ele volta, sem escolher outro microfone | continua BlackHole 2ch; volta a tocar no mesmo microfone |
+| 2 | Suspender o Mac (menu Apple → Suspender) e acordar | nenhuma durante o sono; ícone volta a "ativo" cerca de 1 s depois de acordar. Se a tentativa falhar, a faixa "Falha no áudio do sistema." aparece com "Tentar novamente" | continua BlackHole 2ch |
+| 3 | `sudo killall coreaudiod` com o áudio tocando; esperar 10 s | nenhuma faixa (ou a de falha por um instante), áudio volta sozinho | continua BlackHole 2ch |
+| 4 | Ajustes do Sistema → Privacidade e Segurança → Microfone: desligar o MicBoost; voltar ao app; religar a permissão e voltar ao app | com a permissão desligada, "O MicBoost não tem acesso ao microfone." com "Abrir Ajustes de Privacidade"; ao religar e voltar ao app a faixa some e o áudio volta | continua BlackHole 2ch |
+| 5 | Com o áudio tocando: `sudo mv /Library/Audio/Plug-Ins/HAL/BlackHole2ch.driver /tmp/` e `sudo killall coreaudiod`. Depois: `sudo mv /tmp/BlackHole2ch.driver /Library/Audio/Plug-Ins/HAL/` e `sudo killall coreaudiod` | "BlackHole 2ch não encontrado." com "Como instalar" enquanto o driver está ausente; a faixa some sozinha quando ele volta | continua a entrada que estava em uso; nada é escrito enquanto falta o BlackHole |
+| 6 | Em Ajustes do Sistema → Som → Entrada, escolher outro microfone; no painel, clicar em "Usar MicBoost" | linha "Entrada do sistema: <nome>" com "Usar MicBoost"; depois "Entrada do sistema: MicBoost" com marcação. Trocar a entrada de novo deve marcar divergência sem reverter sozinho | volta a BlackHole 2ch só depois do clique no botão |
+| 7 | Mudar a taxa do microfone e do BlackHole em Configuração de Áudio e MIDI com o áudio tocando | nenhuma faixa; o áudio volta em ~1 s (o motor reaplica a taxa de trabalho: 48 kHz ou a melhor comum) | continua BlackHole 2ch |
+| 8 | Sair do app (Sair do MicBoost) | — | a entrada anterior é restaurada e as taxas que o MicBoost mudou voltam às originais |
 
 ## Resultados registrados
 

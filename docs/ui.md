@@ -69,10 +69,12 @@ Uma faixa no topo do conteúdo, abaixo do cabeçalho, mostra uma mensagem por ve
 |---|---|---|
 | `microphonePermissionDenied` | "O MicBoost não tem acesso ao microfone." | "Abrir Ajustes de Privacidade" → `x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone` |
 | `blackHoleMissing` | "BlackHole 2ch não encontrado." | "Como instalar" (abre a documentação de instalação) |
-| `sourceUnavailable` / `recovering(.sourceLost)` | "<nome> desconectado. O áudio volta quando ele for reconectado." | escolher outro microfone na lista |
-| `formatUnsupported` | "Formato do <nome> não suportado." | escolher outro microfone |
-| `halFailure` | "Falha no áudio do sistema." | "Tentar novamente" |
+| `sourceUnavailable` / `recovering(.sourceLost)` | "<nome> desconectado. O áudio volta quando ele for reconectado." | escolher outro microfone na lista (sem botão) |
+| `formatUnsupported` | "Formato do <nome> não suportado." | escolher outro microfone (sem botão) |
+| `halFailure` / `recovering(.wakeFailed)` | "Falha no áudio do sistema." | "Tentar novamente" |
 | divergência da entrada padrão | (na linha de roteamento) | "Usar MicBoost" |
+
+`recovering(.formatChanged)`, `recovering(.serviceRestarted)` e `recovering(.sleep)` são transitórios e não mostram faixa. A mensagem de fonte desconectada usa o nome do microfone quando ele é conhecido. A permissão de microfone é reavaliada sempre que o app volta a ficar ativo: se ela foi concedida nesse meio-tempo, o app limpa a mensagem e tenta iniciar de novo; se foi negada com o processamento ligado, a mensagem aparece.
 
 ### Medidores na UI
 
@@ -116,13 +118,17 @@ junto ao rótulo e linhas de diagnóstico/sobre com rótulo à esquerda e valor 
 `render-screenshots`, fora do produto do app. `scripts/render-screenshots.sh` usa
 `NSHostingView.cacheDisplay` numa janela fora da tela para incluir controles AppKit
 nativos, em ambas as aparências; `ImageRenderer` não rasteriza esses controles.
+O executável do auxiliar fixa o locale a partir do idioma resolvido pelo catálogo
+(`UILanguage.locale`: en → `en_US`, pt-BR → `pt_BR`), para que os números das capturas
+acompanhem o texto; as views formatam números com o locale do ambiente.
 O app consulta snapshots de estado a 1 Hz; os medidores têm tarefa separada de 20 Hz,
 cancelada ao fechar o painel. A expansão do EQ fica em `UserDefaults.eqExpanded`.
 A validação manual de VoiceOver, contraste e preferências de acessibilidade está pendente.
 
 As capturas fora da tela documentam o conteúdo SwiftUI, não a composição do menu
 com o desktop. Moldura e transparência exigem conferir o menu real composto pelo
-WindowServer.
+WindowServer. O switch nativo pode sair com o estado visual errado na captura clara
+(`cacheDisplay` em app inativo); no menu real ele é verificado pela acessibilidade.
 
 O executável do app e o auxiliar de capturas registram o SDK real de compilação
 separadamente do mínimo macOS 14. O AppKit assim escolhe os controles da geração

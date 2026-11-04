@@ -3,9 +3,21 @@ import Dispatch
 import Foundation
 import MicBoostDSP
 
+public enum RecoveryReason: Sendable, Equatable {
+    /// The selected source disappeared or stopped being alive.
+    case sourceLost
+    /// The source or the BlackHole changed rate or stream configuration.
+    case formatChanged
+    /// The audio server restarted; every cached object ID is stale.
+    case serviceRestarted
+    /// The engine stopped for the system sleep.
+    case sleep
+    /// The single start attempt after a wake failed.
+    case wakeFailed
+}
 public enum EngineState: Sendable, Equatable {
     case stopped, starting, running
-    case recovering(String)
+    case recovering(RecoveryReason)
     case error(EngineError)
 }
 public struct EngineStatus: Sendable {
@@ -22,6 +34,27 @@ public struct EngineStatus: Sendable {
     public var inputMissing: UInt64
     public var nonfiniteResets: UInt64
     public var ioDeltaHost: UInt64
+    public init(
+        state: EngineState = .stopped, source: AudioDevice? = nil, blackHole: AudioDevice? = nil,
+        defaultInput: DefaultInputStatus = .unresolved, defaultInputName: String? = nil,
+        sampleRate: Double = 0, bufferFrames: UInt32 = 0, reportedLatencyMs: Double = 0,
+        overloads: UInt64 = 0, cycles: UInt64 = 0, inputMissing: UInt64 = 0,
+        nonfiniteResets: UInt64 = 0, ioDeltaHost: UInt64 = 0
+    ) {
+        self.state = state
+        self.source = source
+        self.blackHole = blackHole
+        self.defaultInput = defaultInput
+        self.defaultInputName = defaultInputName
+        self.sampleRate = sampleRate
+        self.bufferFrames = bufferFrames
+        self.reportedLatencyMs = reportedLatencyMs
+        self.overloads = overloads
+        self.cycles = cycles
+        self.inputMissing = inputMissing
+        self.nonfiniteResets = nonfiniteResets
+        self.ioDeltaHost = ioDeltaHost
+    }
 }
 public enum EQBand: Sendable { case low, mid, high }
 public struct MetersSnapshot: Sendable {
@@ -38,9 +71,11 @@ public actor EngineController {
     private lazy var routingManager = DefaultInputManager(hardware: hardware, settings: settings)
     private var channelSelection: ChannelSelection = .mono(channel: 1)
     private var forceRebuild = false
+    private var pendingReason: RecoveryReason = .formatChanged
     private let hardware: any EngineHardware
     private var state: EngineState = .stopped
     private var hasRun = false
+    private var sleeping = false
     private var selected: String?
     private var requested: UInt32 = 256
     private var source: AudioDevice?
@@ -53,72 +88,134 @@ public actor EngineController {
     private var buffer: UInt32 = 0
     private var overloads: UInt64 = 0
     private var tokens: [UUID] = []
+    private var systemTokens: [UUID] = []
     private var pending: Task<Void, Never>?
     private var defaultToken: UUID?
-    public init(settings: SettingsStore = SettingsStore(storage: UserDefaultsStorage())) {
+    /// Rate each device had before MicBoost changed it, keyed by UID.
+    private var previousRates: [String: Double] = [:]
+    /// Rate MicBoost applied to each device, keyed by UID.
+    private var appliedRates: [String: Double] = [:]
+    /// Format notifications that arrive right after a build are the engine's own start.
+    private var settleUntil = Date.distantPast
+    /// Delay before the single start attempt after a wake.
+    private let wakeDelay: Duration
+    private var stateObserver: (@Sendable (EngineState) -> Void)?
+    public init(
+        settings: SettingsStore = SettingsStore(storage: UserDefaultsStorage()), wakeDelay: Duration = .seconds(1)
+    ) {
         hardware = CoreAudioHardware()
         self.settings = settings
+        self.wakeDelay = wakeDelay
     }
     public init(
-        hardware: sending any EngineHardware, settings: SettingsStore = SettingsStore(storage: UserDefaultsStorage())
+        hardware: sending any EngineHardware, settings: SettingsStore = SettingsStore(storage: UserDefaultsStorage()),
+        wakeDelay: Duration = .seconds(1)
     ) {
         self.hardware = hardware
         self.settings = settings
+        self.wakeDelay = wakeDelay
     }
-    public func start(inputUID: String, bufferFrames: UInt32? = nil) async throws {
-        if defaultToken == nil {
-            defaultToken = try hardware.addListener(
-                .init(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDefaultInputDevice), queue: queue
-            ) { [weak self] in
-                Task { try? await self?.defaultChanged() }
-            }
+    /// Receives every state change on the engine queue; used by tests and by `micboost-diag`.
+    public func observe(_ observer: (@Sendable (EngineState) -> Void)?) { stateObserver = observer }
+    private func setState(_ new: EngineState) {
+        guard state != new else { return }
+        state = new
+        stateObserver?(new)
+    }
+
+    /// Working rate shared by source and destination: 48 kHz when available, otherwise
+    /// the highest rate below it, otherwise the lowest above it.
+    public static func workingSampleRate(source: [AudioRange], destination: [AudioRange]) -> Double? {
+        func supports(_ ranges: [AudioRange], _ rate: Double) -> Bool {
+            ranges.contains { $0.minimum <= rate && rate <= $0.maximum }
         }
+        var candidates: Set<Double> = [48000]
+        for range in source + destination {
+            candidates.insert(range.minimum)
+            candidates.insert(range.maximum)
+        }
+        let common = candidates.filter { $0 > 0 && supports(source, $0) && supports(destination, $0) }.sorted()
+        if common.contains(48000) { return 48000 }
+        if let below = common.last(where: { $0 < 48000 }) { return below }
+        return common.first
+    }
+
+    public func start(inputUID: String, bufferFrames: UInt32? = nil) async throws {
+        try subscribeSystem()
         let stored = await settings.current
         controls = stored
         let bufferFrames = bufferFrames ?? UInt32(stored.bufferFrames)
         channelSelection = stored.channelSelectionByUID[inputUID] ?? .mono(channel: 1)
         guard bufferFrames > 0 else { throw EngineError.invalidArgument("Buffer must be positive") }
+        let previousSelection = selected
         try tearDown()
+        // A source switch is a voluntary stop of the previous bridge: give its devices
+        // their rates back before the new source imposes its own working rate.
+        if let previousSelection, previousSelection != inputUID { restoreRates() }
         hasRun = false
+        sleeping = false
         selected = inputUID
         requested = bufferFrames
-        if tokens.isEmpty {
-            tokens.append(
-                try hardware.addListener(
-                    .init(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDevices),
-                    queue: queue
-                ) { [weak self] in Task { await self?.changed() } })
-        }
         try await build()
     }
+    private func subscribeSystem() throws {
+        guard systemTokens.isEmpty else { return }
+        let object = AudioObjectID(kAudioObjectSystemObject)
+        systemTokens.append(
+            try hardware.addListener(.init(object, kAudioHardwarePropertyDevices), queue: queue) { [weak self] in
+                Task { await self?.changed() }
+            })
+        systemTokens.append(
+            try hardware.addListener(
+                .init(object, kAudioHardwarePropertyServiceRestarted), queue: queue
+            ) { [weak self] in
+                Task { await self?.changed(force: true, reason: .serviceRestarted) }
+            })
+        if defaultToken == nil {
+            defaultToken = try hardware.addListener(
+                .init(object, kAudioHardwarePropertyDefaultInputDevice), queue: queue
+            ) { [weak self] in
+                Task { try? await self?.defaultChanged() }
+            }
+        }
+    }
     private func build() async throws {
-        state = .starting
+        setState(.starting)
         do {
             guard hardware.microphoneAuthorized else {
                 throw EngineError.microphonePermissionDenied
             }
             let devices = try hardware.devices()
-            guard let blackHole = devices.first(where: { $0.isBlackHole2ch && $0.alive }) else {
-                state = .error(.blackHoleMissing)
+            guard var blackHole = devices.first(where: { $0.isBlackHole2ch && $0.alive }) else {
+                setState(.error(.blackHoleMissing))
                 return
             }
-            destination = blackHole
-            guard let source = devices.first(where: { $0.uid == selected && $0.alive && $0.isEligible(in: devices) })
+            guard
+                var source = devices.first(where: {
+                    $0.uid == selected && $0.alive && $0.isEligible(in: devices)
+                })
             else {
-                state = hasRun ? .recovering("sourceLost") : .error(.sourceUnavailable(selected ?? ""))
+                setState(hasRun ? .recovering(.sourceLost) : .error(.sourceUnavailable(selected ?? "")))
                 return
+            }
+            guard
+                let working = Self.workingSampleRate(
+                    source: source.supportedRates, destination: blackHole.supportedRates)
+            else {
+                throw EngineError.formatUnsupported
+            }
+            if source.sampleRate != working {
+                recordRate(uid: source.uid, current: source.sampleRate, target: working)
+                try hardware.setRate(source.id, rate: working)
+                source.sampleRate = working
+            }
+            if blackHole.sampleRate != working {
+                recordRate(uid: blackHole.uid, current: blackHole.sampleRate, target: working)
+                try hardware.setRate(blackHole.id, rate: working)
+                blackHole.sampleRate = working
             }
             self.source = source
-            if source.sampleRate != blackHole.sampleRate {
-                guard
-                    blackHole.availableSampleRates.contains(where: {
-                        $0.minimum <= source.sampleRate && $0.maximum >= source.sampleRate
-                    })
-                else {
-                    throw EngineError.formatUnsupported
-                }
-                try hardware.setRate(blackHole.id, rate: source.sampleRate)
-            }
+            destination = blackHole
             for stale in devices where stale.uid == AggregateBuilder.uid {
                 try hardware.destroyAggregate(stale.id)
             }
@@ -151,12 +248,17 @@ public actor EngineController {
                     + Array(repeating: true, count: destinationLayout.outputStreams))
             try hardware.startIO(id, proc: io)
             for device in [source, blackHole] {
-                for selector in [kAudioDevicePropertyDeviceIsAlive, kAudioDevicePropertyNominalSampleRate] {
-                    tokens.append(
-                        try hardware.addListener(.init(device.id, selector), queue: queue) { [weak self] in
-                            Task { await self?.changed(force: true) }
-                        })
-                }
+                tokens.append(
+                    try hardware.addListener(.init(device.id, kAudioDevicePropertyDeviceIsAlive), queue: queue) {
+                        [weak self] in
+                        Task { await self?.changed() }
+                    })
+                let uid = device.uid
+                tokens.append(
+                    try hardware.addListener(.init(device.id, kAudioDevicePropertyNominalSampleRate), queue: queue) {
+                        [weak self] in
+                        Task { await self?.rateChanged(uid: uid) }
+                    })
             }
             for device in [source, blackHole] {
                 for scope in [kAudioObjectPropertyScopeInput, kAudioObjectPropertyScopeOutput] {
@@ -164,7 +266,7 @@ public actor EngineController {
                         try hardware.addListener(
                             .init(device.id, kAudioDevicePropertyStreamConfiguration, scope), queue: queue
                         ) { [weak self] in
-                            Task { await self?.changed(force: true) }
+                            Task { await self?.formatEvent() }
                         })
                 }
             }
@@ -177,10 +279,11 @@ public actor EngineController {
                 + hardware.latencyFrames(blackHole.id, scope: kAudioObjectPropertyScopeOutput)
                 + hardware.latencyFrames(id, scope: kAudioObjectPropertyScopeInput) + buffer
             hasRun = true
-            state = .running
+            setState(.running)
+            settleUntil = Date().addingTimeInterval(0.3)
             try await routingManager.engineDidStart(blackHole: blackHole)
         } catch {
-            state = .error((error as? EngineError) ?? .invalidArgument(String(describing: error)))
+            setState(.error((error as? EngineError) ?? .invalidArgument(String(describing: error))))
             try tearDown()
             throw error
         }
@@ -261,34 +364,89 @@ public actor EngineController {
             inputPeak: value.input_peak, outputPeak: value.output_peak,
             gainReductionDB: value.gr_max_db, inputClipped: value.input_clipped)
     }
-    private func changed(force: Bool = false) {
+    private func changed(force: Bool = false, reason: RecoveryReason = .formatChanged) {
         forceRebuild = forceRebuild || force
+        pendingReason = reason
         pending?.cancel()
         pending = Task { [weak self] in
             do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
             await self?.recover()
         }
     }
-    private func recover() async {
-        guard selected != nil else { return }
-        let forced = forceRebuild
-        forceRebuild = false
-        if !forced, state == .running, let devices = try? hardware.devices(),
-            let currentSource = devices.first(where: { $0.uid == selected }),
-            let currentDestination = devices.first(where: { $0.isBlackHole2ch }),
-            currentSource == source, currentDestination == destination
-        {
+    /// Format notifications during the settling window belong to the engine's own start.
+    private func formatEvent() {
+        guard Date() >= settleUntil else { return }
+        changed(force: true)
+    }
+    /// A rate notification caused by MicBoost's own write is not an external format change.
+    private func rateChanged(uid: String) async {
+        if let applied = appliedRates[uid], (try? hardware.devices().first { $0.uid == uid }?.sampleRate) == applied {
             return
         }
-        state = .recovering("formatChanged")
+        formatEvent()
+    }
+    private func recover() async {
+        guard let uid = selected, !sleeping else { return }
+        let forced = forceRebuild
+        let event = pendingReason
+        forceRebuild = false
+        pendingReason = .formatChanged
+        let devices = (try? hardware.devices()) ?? []
+        let currentSource = devices.first { $0.uid == uid && $0.alive }
+        guard let currentDestination = devices.first(where: { $0.isBlackHole2ch && $0.alive }) else {
+            if state != .error(.blackHoleMissing) {
+                try? tearDown()
+                setState(.error(.blackHoleMissing))
+            }
+            return
+        }
+        if hasRun, currentSource == nil {
+            if state != .recovering(.sourceLost) {
+                try? tearDown()
+                setState(.recovering(.sourceLost))
+            }
+            return
+        }
+        let sameSource = currentSource.map { current in source?.matchesEngineDescriptor(current) ?? false } ?? false
+        let sameDestination = destination?.matchesEngineDescriptor(currentDestination) ?? false
+        if state == .running, sameSource, sameDestination {
+            // Right after a build the HAL still reports the engine's own start; a forced
+            // notification then is not an external format change.
+            let settling = Date() < settleUntil
+            if !forced || (settling && event != .serviceRestarted) { return }
+        }
+        if event == .serviceRestarted {
+            setState(.recovering(.serviceRestarted))
+        } else if currentSource == nil {
+            setState(.recovering(.sourceLost))
+        } else {
+            setState(.recovering(.formatChanged))
+        }
         do {
             try tearDown()
             try await build()
-        } catch { state = .error((error as? EngineError) ?? .invalidArgument(String(describing: error))) }
+        } catch { setState(.error((error as? EngineError) ?? .invalidArgument(String(describing: error)))) }
+    }
+    private func recordRate(uid: String, current: Double, target: Double) {
+        if previousRates[uid] == nil { previousRates[uid] = current }
+        appliedRates[uid] = target
+    }
+    /// Best-effort restore of the rates MicBoost changed, on a voluntary stop only.
+    private func restoreRates() {
+        guard !appliedRates.isEmpty else { return }
+        let devices = (try? hardware.devices()) ?? []
+        for (uid, applied) in appliedRates {
+            guard let device = devices.first(where: { $0.uid == uid && $0.alive }),
+                let previous = previousRates[uid], previous != applied, device.sampleRate == applied
+            else { continue }
+            try? hardware.setRate(device.id, rate: previous)
+        }
+        appliedRates.removeAll()
+        previousRates.removeAll()
     }
     private func tearDown() throws {
-        for token in tokens.dropFirst() { try hardware.removeListener(token) }
-        if tokens.count > 1 { tokens.removeSubrange(1...) }
+        for token in tokens { try hardware.removeListener(token) }
+        tokens.removeAll()
 
         let aggregateExists: Bool
         if let aggregate {
@@ -324,27 +482,42 @@ public actor EngineController {
     }
     public func willSleep() throws {
         guard selected != nil else { return }
+        sleeping = true
+        pending?.cancel()
         try tearDown()
-        state = .recovering("sleep")
+        setState(.recovering(.sleep))
     }
     public func didWake() {
+        sleeping = false
         pending?.cancel()
         pending = Task { [weak self] in
-            do { try await Task.sleep(for: .seconds(1)) } catch { return }
-            await self?.recover()
+            do { try await Task.sleep(for: self?.wakeDelay ?? .seconds(1)) } catch { return }
+            await self?.wakeUp()
+        }
+    }
+    /// One start attempt after the wake; a HAL/format failure falls back to `recovering`.
+    private func wakeUp() async {
+        guard selected != nil, !sleeping else { return }
+        do {
+            try tearDown()
+            try await build()
+        } catch {
+            setState(.recovering(.wakeFailed))
         }
     }
     public func stop() async throws {
         selected = nil
+        sleeping = false
         pending?.cancel()
         try tearDown()
-        for token in tokens { try hardware.removeListener(token) }
-        tokens.removeAll()
+        restoreRates()
+        for token in systemTokens { try hardware.removeListener(token) }
+        systemTokens.removeAll()
         if let defaultToken {
             try hardware.removeListener(defaultToken)
             self.defaultToken = nil
         }
-        state = .stopped
+        setState(.stopped)
         try await routingManager.engineWillStop()
         await settings.flush()
     }
@@ -363,17 +536,20 @@ public actor EngineController {
         counters.frames_over_max += completedCounters.frames_over_max
         let rate = source?.sampleRate ?? 0
         let latency = Double(reportedFrames)
+        let devices = (try? hardware.devices()) ?? []
+        let currentID = try? hardware.defaultInput()
+        let current = devices.first { $0.id == currentID }
         let defaultStatus: DefaultInputStatus
-        if let current = try? hardware.defaultInput() {
+        if currentID != nil, current != nil {
+            let isBlackHole = current?.uid == destination?.uid || currentID == destination?.id
             defaultStatus = DefaultInputStatus(
-                isBlackHole: current == destination?.id, divergedByUser: state == .running && current != destination?.id
-            )
+                isBlackHole: isBlackHole, divergedByUser: state == .running && !isBlackHole)
         } else {
             defaultStatus = .unresolved
         }
         return EngineStatus(
             state: state, source: source, blackHole: destination, defaultInput: defaultStatus,
-            defaultInputName: (try? hardware.devices().first { $0.id == (try? hardware.defaultInput()) }?.name),
+            defaultInputName: current?.name,
             sampleRate: rate,
             bufferFrames: buffer, reportedLatencyMs: rate > 0 ? latency * 1000 / rate : 0,
             overloads: overloads, cycles: counters.cycles, inputMissing: counters.input_missing,

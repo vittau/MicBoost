@@ -30,6 +30,16 @@ public struct AudioDevice: Codable, Equatable, Sendable {
         self.uid = uid
         self.name = name
     }
+    /// Rates the device can take; a device without a reported list keeps its nominal rate.
+    public var supportedRates: [AudioRange] {
+        availableSampleRates.isEmpty ? [AudioRange(sampleRate, sampleRate)] : availableSampleRates
+    }
+    /// Compares the fields that require an engine rebuild. Buffer ranges, latencies and
+    /// safety offsets change while the aggregate runs, and they are not format changes.
+    func matchesEngineDescriptor(_ other: AudioDevice) -> Bool {
+        id == other.id && uid == other.uid && alive == other.alive && sampleRate == other.sampleRate
+            && inputChannels == other.inputChannels && outputChannels == other.outputChannels
+    }
     public var isBlackHole: Bool {
         uid.hasPrefix("BlackHole") || name.hasPrefix("BlackHole")
             || (manufacturer.contains("Existential Audio") && name.contains("BlackHole"))
