@@ -63,7 +63,15 @@ public final class DefaultInputManager {
     /// Applies the input step when the engine reaches `running`.
     public nonisolated(nonsending) func engineDidStart(blackHole: AudioDevice) async throws {
         self.blackHole = blackHole
-        try await adoptBlackHole()
+        if running {
+            try await defaultInputDidChange()
+            return
+        }
+        if await settings.current.manageDefaultInput {
+            try await adoptBlackHole()
+        } else {
+            try await defaultInputDidChange()
+        }
         running = true
     }
 
@@ -89,12 +97,13 @@ public final class DefaultInputManager {
     /// "Usar BlackHole" action: repeats the input step of the start.
     public nonisolated(nonsending) func useBlackHole() async throws {
         try await adoptBlackHole()
+        if !(await settings.current.manageDefaultInput) { await clearManaged() }
     }
 
     /// Applies the restore policy when the engine leaves `running`.
     public nonisolated(nonsending) func engineWillStop(reason: StopReason = .user) async throws {
         defer { running = false }
-        guard reason == .user, let blackHole else {
+        guard reason == .user, await settings.current.manageDefaultInput, let blackHole else {
             status.divergedByUser = false
             return
         }
@@ -120,6 +129,11 @@ public final class DefaultInputManager {
         try hardware.setDefaultInput(previous.id)
         await clearManaged()
         status = DefaultInputStatus(isBlackHole: false, divergedByUser: false, unknown: false)
+    }
+
+    public nonisolated(nonsending) func setManagementEnabled(_ enabled: Bool) async {
+        await settings.update { $0.manageDefaultInput = enabled }
+        if !enabled { await clearManaged() }
     }
 
     private nonisolated(nonsending) func adoptBlackHole() async throws {

@@ -13,7 +13,10 @@ let package = Package(
     targets: [
         .target(name: "MicBoostDSP", linkerSettings: [.linkedFramework("CoreAudio")]),
         .target(name: "MicBoostCore", dependencies: ["MicBoostDSP"]),
-        .executableTarget(name: "MicBoostApp", dependencies: ["MicBoostCore"], resources: [.process("Localization")]),
+        .target(name: "MicBoostUI", dependencies: ["MicBoostCore"], resources: [.process("Localization")]),
+        .executableTarget(name: "MicBoostApp", dependencies: ["MicBoostUI"]),
+        .executableTarget(name: "render-screenshots", dependencies: ["MicBoostUI"]),
+        .testTarget(name: "MicBoostUITests", dependencies: ["MicBoostUI"]),
         .executableTarget(name: "micboost-diag", dependencies: ["MicBoostCore", "MicBoostDSP"]),
         .testTarget(name: "MicBoostDSPTests", dependencies: ["MicBoostDSP"]),
         .testTarget(name: "MicBoostCoreTests", dependencies: ["MicBoostCore"]),

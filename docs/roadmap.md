@@ -8,7 +8,7 @@ Status: `não iniciado` · `em andamento` · `concluído`. Uma etapa só é conc
 | 1 | Ponte mínima | concluído |
 | 2 | Ganho e proteção de pico | em andamento |
 | 3 | Equalizador | concluído |
-| 4 | Interface | não iniciado |
+| 4 | Interface | em andamento |
 | 5 | Recuperação | não iniciado |
 | 6 | Distribuição | não iniciado |
 | 7 | Entrega | não iniciado |
@@ -60,7 +60,7 @@ Condições de conclusão:
 
 ## 4 — Interface
 
-Entregas: item de status, painel, seção do EQ, mensagens de estado, janela de ajustes, localização pt-BR/en, política de entrada padrão integrada ao app.
+Entregas implementadas: item de status, painel, seção do EQ, mensagens de estado, janela de ajustes, localização pt-BR/en, política de entrada padrão integrada ao app e capturas reproduzíveis. A validação completa de teclado, VoiceOver e preferências de acessibilidade permanece pendente.
 
 Condições de conclusão:
 - abrir e fechar o painel não interrompe o áudio;

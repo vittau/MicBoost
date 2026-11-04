@@ -12,6 +12,7 @@ public struct Settings: Codable, Equatable, Sendable {
     public static let gainRange = -12.0...24.0
 
     public var schemaVersion: Int
+    public var manageDefaultInput: Bool
     public var processingEnabled: Bool
     public var selectedInputUID: String?
     public var gainDB: Double
@@ -25,6 +26,7 @@ public struct Settings: Codable, Equatable, Sendable {
     public init(
         schemaVersion: Int = Settings.currentSchemaVersion,
         processingEnabled: Bool = true,
+        manageDefaultInput: Bool = true,
         selectedInputUID: String? = nil,
         gainDB: Double = 0,
         muted: Bool = false,
@@ -36,6 +38,7 @@ public struct Settings: Codable, Equatable, Sendable {
     ) {
         self.schemaVersion = schemaVersion
         self.processingEnabled = processingEnabled
+        self.manageDefaultInput = manageDefaultInput
         self.selectedInputUID = selectedInputUID
         self.gainDB = gainDB
         self.muted = muted
@@ -50,6 +53,7 @@ public struct Settings: Codable, Equatable, Sendable {
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let defaults = Settings()
+        manageDefaultInput = try container.decodeIfPresent(Bool.self, forKey: .manageDefaultInput) ?? true
         schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? defaults.schemaVersion
         processingEnabled =
             try container.decodeIfPresent(Bool.self, forKey: .processingEnabled)
@@ -76,6 +80,7 @@ public struct Settings: Codable, Equatable, Sendable {
         copy.bufferFrames = Self.allowedBufferFrames.contains(bufferFrames) ? bufferFrames : 256
         copy.eq = eq.sanitized()
         copy.channelSelectionByUID = channelSelectionByUID.filter { _, selection in selection.isValid }
+            .mapValues { $0 == .auto ? .mono(channel: 1) : $0 }
         return copy
     }
 }
@@ -94,9 +99,9 @@ public struct EQSettings: Codable, Equatable, Sendable {
 
     public init(
         enabled: Bool = true,
-        low: EQShelfBand = EQShelfBand(frequency: 120, gainDB: 0),
-        mid: EQPeakingBand = EQPeakingBand(frequency: 1000, gainDB: 0, q: 0.9),
-        high: EQShelfBand = EQShelfBand(frequency: 6000, gainDB: 0)
+        low: EQShelfBand = EQShelfBand(frequency: 70, gainDB: -6),
+        mid: EQPeakingBand = EQPeakingBand(frequency: 3000, gainDB: 2, q: 1),
+        high: EQShelfBand = EQShelfBand(frequency: 8000, gainDB: 1.5)
     ) {
         self.enabled = enabled
         self.low = low

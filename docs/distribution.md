@@ -25,8 +25,9 @@ Canais excluídos: Mac App Store, `homebrew/cask` oficial (as regras exigem pass
    - `CFBundleIdentifier`;
    - `CFBundleDevelopmentRegion = en`;
    - `CFBundleLocalizations = [en, pt-BR]`.
-4. Assina com `codesign --force --deep --sign - build/MicBoost.app`, sem hardened runtime e sem entitlements: não há sandbox e o runtime não é exigido sem notarização.
-5. Confere com `codesign --verify --strict build/MicBoost.app`.
+4. Registra no `LC_BUILD_VERSION` do executável o SDK real do Xcode selecionado (`xcrun --sdk macosx --show-sdk-version`), com `scripts/record-build-sdk.sh`/`vtool`, preservando macOS 14 como mínimo e verificando os dois valores. Isso permite ao AppKit escolher a aparência correspondente ao SDK de compilação, em vez de confundir SDK com deployment target.
+5. Assina com `codesign --force --deep --sign - build/MicBoost.app`, sem hardened runtime e sem entitlements: não há sandbox e o runtime não é exigido sem notarização.
+6. Confere com `codesign --verify --strict build/MicBoost.app`.
 
 O script chama `scripts/compile-icon.sh <App>/Contents/Resources` quando o arquivo existe e é executável. Esse helper fornece `AppIcon.icns` e, opcionalmente, `Assets.car`. O plist define `CFBundleIconFile` e `CFBundleIconName` como `AppIcon`. Sem o helper, o bundle de desenvolvimento continua compilável, sem ícone personalizado. Os bundles de localização SwiftPM são copiados para `Contents/Resources`. A versão vem da última tag `v*` (fallback de desenvolvimento `0.0.0`) e o contador é `git rev-list --count HEAD`. Release sempre usa assinatura ad hoc.
 

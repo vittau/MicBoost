@@ -64,7 +64,7 @@ Os valores padrão formam o "padrão de voz": um realce discreto de fala para mi
 ## Ganho
 
 - Faixa do controle: **−12 dB a +24 dB** (6,3% a 1.585%), passo de 0,5 dB, padrão 0 dB. O máximo de +24 dB é mantido: os testes confirmam o teto do limitador nessa faixa. A calibração com voz humana permanece uma verificação manual pendente.
-- Exibição: `+12,0 dB · 398%`, com percentual = 100 · 10^(dB/20) arredondado ao inteiro. 0 dB = 100%, +6,02 dB ≈ 200%.
+- Exibição: `398% (+12,0dB)`, com percentual = 100 · 10^(dB/20) arredondado ao inteiro. 0 dB = 100%, +6,02 dB ≈ 200%.
 - O percentual é de amplitude, não de volume percebido, e a proteção de pico pode reduzir o ganho efetivo.
 - Aplicação: ganho linear por amostra, suavizado por filtro de um polo com τ = 20 ms rumo a `10^(dB/20)`, ou a 0 com mute.
 - Mute: o alvo vai a 0 com a mesma suavização, e o medidor de saída cai. O valor de ganho é mantido.
@@ -79,7 +79,7 @@ Limitador de pico sem lookahead, com ataque instantâneo:
 - Ganho do limitador `g`: se `target < g`, então `g = target` (ataque instantâneo, garante |y| ≤ teto). Caso contrário, `g` volta para 1 com liberação exponencial τ = 150 ms.
 - Ligado entre canais (mesmo `g` em L e R).
 - Clamp final a ±1,0 só como guarda numérica. Com o limitador correto, ele nunca deve atuar.
-- Indicação: redução de ganho (GR) em dB publicada nos medidores. A UI mostra "Limitando" quando o GR passa de 1 dB nos últimos 300 ms.
+- Indicação: redução de ganho (GR) em dB publicada nos medidores. A UI mostra "Limitador ativo" quando o GR passa de 1 dB nos últimos 300 ms.
 
 A distorção de transientes, consequência de não haver lookahead, é aceita na v1.
 

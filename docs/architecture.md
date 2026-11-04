@@ -4,7 +4,7 @@
 
 ```text
 ┌──────────────────────── MicBoostApp (main thread) ────────────────────────┐
-│ AppKit: NSStatusItem + MenuBarPanel (NSPanel)  ·  SwiftUI: PanelView,     │
+│ AppKit: NSStatusItem + NSMenu  ·  SwiftUI: PanelView,     │
 │ SettingsView  ·  @Observable AppModel  ·  MeterPoller (20 Hz, só visível) │
 └───────────────┬───────────────────────────────────────────▲───────────────┘
                 │ comandos async                            │ snapshots de estado
@@ -111,9 +111,24 @@ stopped ──start──▶ starting ──ok──▶ running
 | `gainDB` | `0` | Faixa em [dsp.md](dsp.md#ganho) |
 | `muted` | `false` | |
 | `eq` | ver [dsp.md](dsp.md#equalizador) | `enabled` (padrão `true`), `low{frequency, gainDB}`, `mid{frequency, gainDB, q}`, `high{frequency, gainDB}` |
-| `channelSelectionByUID` | `[:]` | Modo de canais por dispositivo ([audio-engine.md](audio-engine.md#canais)), codificado como `{mode, channel}` com canal baseado em 1 |
+| `channelSelectionByUID` | `[:]` | Modo de canais por dispositivo (ausência = `mono(1)`; `auto` persistido normalizado para `mono(1)`, [audio-engine.md](audio-engine.md#canais)), codificado como `{mode, channel}` com canal baseado em 1 |
 | `bufferFrames` | `256` | Opções 64/128/256/512/1024, limitadas pela faixa do dispositivo |
 | `previousDefaultInputUID` | `nil` | Entrada anterior ao MicBoost assumir a padrão |
 | `defaultInputManaged` | `false` | `true` enquanto a entrada padrão atual foi definida pelo MicBoost |
 
 Cada campo é decodificado isoladamente (`decodeIfPresent`), então um campo ausente mantém o padrão. Esquemas desconhecidos ou dados corrompidos caem nos padrões, sem crash. Valores fora das faixas documentadas (ganho, buffer, frequência/ganho/Q do EQ) são limitados, e seleções de canal inválidas são descartadas na leitura. Os campos de entrada padrão são gravados imediatamente, sem debounce, porque servem de recuperação após crash.
+
+## Interface do app
+
+`MicBoostUI` é uma biblioteca interna com `AppModel`, `PanelView` e `SettingsView`,
+localizações `.strings` e dependência apenas de MicBoostCore e frameworks do sistema.
+O executável auxiliar `render-screenshots` reutiliza as views sem iniciar captura.
+`AppDelegate` mantém o item, menu nativo, janela de ajustes e notificações de suspensão; o encerramento
+assíncrono aguarda `AppModel.shutdown`, stop com fade, restauração e flush dos ajustes.
+O controller mantém `DefaultInputManager` e seu listener de entrada padrão na fila engine.
+Comandos de processamento são serializados pelo modelo para preservar a ordem dos cliques.
+
+O painel usa `NSMenu` e um item com `NSHostingView<PanelView>` transparente.
+O AppKit controla moldura, tracking e fechamento. O frame do host acompanha a
+geometria SwiftUI, e o delegate acompanha a visibilidade para iniciar/cancelar os
+medidores. O tracking começa pelo run loop, fora de um job de concorrência Swift.

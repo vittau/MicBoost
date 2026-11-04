@@ -11,6 +11,9 @@ private func settle(_ engine: OpaquePointer, rate: Double) {
 @Test(arguments: rates) func flatGainMuteLimiter(rate: Double) throws {
     let engine = try #require(mb_engine_create(64, rate))
     defer { mb_engine_destroy(engine) }
+    mb_engine_set_band(engine, MB_LOW, 70, 0, 0.9)
+    mb_engine_set_band(engine, MB_MID, 3000, 0, 1)
+    mb_engine_set_band(engine, MB_HIGH, 8000, 0, 0.9)
     var seed: UInt64 = 42
     let noise: [Float] = (0..<4096).map { _ in
         seed = seed &* 6_364_136_223_846_793_005 &+ 1

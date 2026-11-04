@@ -11,9 +11,9 @@ import Testing
     #expect(settings.gainDB == 0)
     #expect(!settings.muted)
     #expect(settings.eq.enabled)
-    #expect(settings.eq.low == EQShelfBand(frequency: 120, gainDB: 0))
-    #expect(settings.eq.mid == EQPeakingBand(frequency: 1000, gainDB: 0, q: 0.9))
-    #expect(settings.eq.high == EQShelfBand(frequency: 6000, gainDB: 0))
+    #expect(settings.eq.low == EQShelfBand(frequency: 70, gainDB: -6))
+    #expect(settings.eq.mid == EQPeakingBand(frequency: 3000, gainDB: 2, q: 1))
+    #expect(settings.eq.high == EQShelfBand(frequency: 8000, gainDB: 1.5))
     #expect(settings.channelSelectionByUID.isEmpty)
     #expect(settings.bufferFrames == 256)
     #expect(settings.previousDefaultInputUID == nil)
@@ -167,4 +167,13 @@ import Testing
     #expect(storage.decoded?.defaultInputManaged == true)
     try await Task.sleep(for: .milliseconds(500))
     #expect(storage.writes == 1)
+}
+
+@Test func storedAutomaticChannelSelectionUsesMonoOne() async throws {
+    let storage = MemorySettingsStorage()
+    try storage.seed(Settings(channelSelectionByUID: ["automatic": .auto, "chosen": .mono(channel: 2)]))
+    let store = SettingsStore(storage: storage)
+    let settings = await store.current
+    #expect(settings.channelSelectionByUID["automatic"] == .mono(channel: 1))
+    #expect(settings.channelSelectionByUID["chosen"] == .mono(channel: 2))
 }

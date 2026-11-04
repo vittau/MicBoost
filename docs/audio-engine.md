@@ -86,10 +86,13 @@ O modo de canais é escolhido por dispositivo (`channelSelectionByUID`) e muda e
 
 | Modo | Comportamento | Padrão quando |
 |---|---|---|
-| `auto` | 1 canal → mono duplicado; ≥ 2 canais → `mono(1)` | sempre, salvo escolha do usuário |
-| `mono(n)` | canal *n* da fonte, duplicado em L/R do BlackHole | |
+| `mono(n)` | canal *n* da fonte, duplicado em L/R do BlackHole | `mono(1)` é o padrão |
 | `monoMix` | média dos canais 1…N, duplicada em L/R | |
 | `stereo(n)` | canais *n* e *n+1* → L e R | só disponível com ≥ 2 canais |
+
+O modo `auto` é aceito pela API para compatibilidade e equivale a `mono(1)`;
+settings persistidos com esse modo são normalizados para `mono(1)` na leitura.
+A UI oferece Mono 1, Mono 2 e demais canais mono, Misturar e Estéreo, nessa ordem.
 
 Em modo mono, o processador roda um único canal e copia o resultado para L e R. Em estéreo, roda dois canais com o limitador ligado (mesmo ganho de redução nos dois).
 
@@ -159,3 +162,8 @@ Invariantes: nunca definir uma fonte física como padrão, exceto na restauraç�
 Uma fonte que entrega apenas zeros mantém o motor em `running`; não há detecção automática de fonte silenciosa na v1.
 
 Silêncio seguro: sempre que o processador não tiver entrada válida ou detectar não-finitos, a saída para o BlackHole é zero. Antes de qualquer stop voluntário, rampa de saída.
+
+A enumeração tolera `kAudioHardwareBadObjectError` por dispositivo: um objeto pode
+sumir entre a leitura da lista de IDs e suas propriedades, inclusive logo após destruir
+um agregado. Outros erros continuam sendo propagados como `EngineError.halFailure`.
+Listeners do agregado são removidos antes de destruí-lo, preservando a ordem de teardown.

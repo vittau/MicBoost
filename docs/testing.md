@@ -144,3 +144,67 @@ Observações de hardware:
 - As pequenas diferenças de nível entre fonte e BlackHole vêm do resampler de drift e de capturas que começam em instantes distintos.
 - A queda lenta de latência no ensaio de 20 min passa no critério, mas não está claro se ela se estabiliza (resampler de deriva acomodando) ou continua (deriva residual). Um ensaio de várias horas antes da release decide.
 - Reinício real do `coreaudiod` e escuta humana são verificações manuais. A HAL falsa cobre perda e retorno da fonte e do BlackHole.
+
+### Interface e ciclo de vida do app
+
+Na máquina de referência, com a C920 USB a 16 kHz e buffer 256:
+- entrada padrão antes: `BuiltInMicrophoneDevice`;
+- app rodando: `BlackHole2ch_UID`, confirmado por `micboost-diag devices` e pela linha de roteamento da árvore de acessibilidade;
+- switch de processamento desligado pelo controle real (valor AX 0): entrada restaurada para `BuiltInMicrophoneDevice`, sem agregado MicBoost enumerado;
+- saída via AppleScript apontando para o bundle construído: entrada `BuiltInMicrophoneDevice`;
+- verificação final após `micboost-diag run --input BuiltInMicrophoneDevice --seconds 2`: BlackHole a 48000 Hz, entrada padrão `BuiltInMicrophoneDevice`, sem processos MicBoost ou diagnóstico iniciados pela tarefa.
+
+O agregado é privado; sua ausência na enumeração externa é uma verificação adicional,
+não prova isolada da liberação. O caminho de stop destrói IOProc e agregado, coberto
+pelos testes com HAL falsa. Não houve captura de Continuity ou Bluetooth.
+Capturas claras/escuras verificadas visualmente; sliders sem marcas de passo.
+VoiceOver, todos os atalhos, reduzir movimento/transparência e contraste aumentado
+permanecem sem validação manual completa. A etapa 4 permanece em andamento.
+
+Verificação automatizada da interface: 58 testes (6 UI, 11 DSP, 41 Core),
+execução somada de aproximadamente 2 s; a suíte Core inclui o caso negativo
+`fakeRejectsOutputWrite`, que registra uma issue conhecida intencionalmente.
+`swift build`, `swift test`, lint recursivo de formatação, montagem debug e
+`codesign --verify --strict` passam na máquina de referência.
+
+O painel usa a moldura de `NSMenu`, sem sobreposição de material, bordas ou seta.
+A conferência inclui a composição real pelo WindowServer e interação com os controles
+durante o tracking do menu.
+
+No macOS 27, uma sonda de `NSSwitch`/SwiftUI com mínimo 14 e SDK 27.2 mede
+54 × 24 pt. A mesma sonda com o SDK registrado como 14 mede 38 × 22 pt.
+O build do app verifica SDK igual ao Xcode selecionado e mínimo 14 em cada
+arquitetura antes da assinatura. O renderizador recebe a mesma configuração.
+
+Na composição real do menu no macOS 27, o controle ligado foi verificado pela
+acessibilidade como 54 × 24 pt e valor 1, com a cor verde oliva do sistema.
+A conferência incluiu ausência de seta e de corte vertical, remoção da linha
+redundante do caminho de áudio e atualização dos medidores com o menu aberto.
+O ajuste do SDK foi validado também em um executável de teste universal
+(arm64 + x86_64), com mínimo 14, SDK 27.2 e assinatura ad hoc válida em ambas
+as arquiteturas.
+
+Ao alternar mute e restaurar o estado original, a acessibilidade reportou o slider
+de ganho com a mesma origem nas três leituras e tamanho constante de 260 × 16 pt.
+Os dois símbolos de mute ficam centralizados na mesma área de 20 × 20 pt.
+
+Cadência dos medidores com o menu aberto: em 20 intervalos consecutivos, mediana
+53,5 ms e máximo 76,8 ms; espera máxima pela leitura no controller 22,6 ms.
+Medição com relógio monotônico na chegada dos snapshots à UI; não representa
+a latência entre falar e o pixel mudar. O decaimento visual é separado: 20 dB/s,
+ou 1,5 s para cair 30 dB, sem atraso de ataque adicionado pelo modelo.
+
+Ensaio visual de degrau 0 → 100% no macOS 27.2, com a mesma atualização SwiftUI
+para os dois controles: numa captura solicitada 100 ms depois do degrau,
+`ProgressView` ainda ocupava aproximadamente um terço da faixa; a trilha nativa
+de `NSSliderCell` usada pelo medidor já preenchia toda a faixa (captura solicitada
+aos 99,96 ms). O medidor aplica o valor diretamente ao desenho nativo, sem
+interpolar a apresentação dos picos. A escala foi conferida em 0 dBFS (100%) e
+−1 dBFS (89,13%) na escala de amplitude linear; valores ≤ −60 dBFS ficam em zero.
+O teste de proporcionalidade confere que +6,0206 dB dobra o comprimento para
+amplitudes de entrada de 0,01, 0,1 e 0,4.
+
+Na captura clara renderizada a 1×, a trilha colorida do slider de ganho e as duas
+barras de nível medem 6 pixels de altura (6 pt), com cantos simétricos da trilha
+nativa. As renderizações clara e escura conferem o preenchimento de 100% na
+entrada e 89,13% na saída, sem knob nem moldura de indicador de capacidade.
