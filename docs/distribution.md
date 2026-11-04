@@ -29,6 +29,8 @@ Canais excluídos: Mac App Store, `homebrew/cask` oficial (as regras exigem pass
 5. Assina com `codesign --force --deep --sign - build/MicBoost.app`, sem hardened runtime e sem entitlements: não há sandbox e o runtime não é exigido sem notarização.
 6. Confere com `codesign --verify --strict build/MicBoost.app`.
 
+O Xcode precisa ser 27 ou posterior: a interface usa `NSMenuItem.preferredImageVisibility`, que só existe no SDK 27, e é esse SDK que o passo 4 registra no binário.
+
 O script chama `scripts/compile-icon.sh <App>/Contents/Resources` quando o arquivo existe e é executável. Esse helper fornece `AppIcon.icns` e, opcionalmente, `Assets.car`. O plist define `CFBundleIconFile` e `CFBundleIconName` como `AppIcon`. Sem o helper, o bundle de desenvolvimento continua compilável, sem ícone personalizado. Os bundles de localização SwiftPM são copiados para `Contents/Resources`. A versão vem de `MICBOOST_VERSION` quando a variável está definida e, sem ela, da última tag `v*` (fallback de desenvolvimento `0.0.0`); o contador é `git rev-list --count HEAD`. Release sempre usa assinatura ad hoc.
 
 No Apple Silicon, todo binário precisa de assinatura válida para executar; a ad hoc basta.
@@ -66,7 +68,9 @@ Publicação (com `gh release create`, mediante confirmação do mantenedor): an
 
 A release sai sempre como rascunho: o mantenedor revisa, completa o marcador de mudanças das notas e publica. O tap não é tocado pelo workflow; `Casks/micboost.rb` é atualizado à mão com o trecho do resumo.
 
-Os dois workflows usam `runs-on: macos-26` (GitHub-hosted) e `scripts/select-xcode.sh`, que escolhe o `Xcode_*.app` mais recente em `/Applications` com versão 26 ou posterior: o pacote exige Swift 6 e o ícone exige o `actool` dessa versão. O Xcode escolhido aparece no log. Nenhum segredo é configurado: o token do próprio GitHub (`github.token`) cobre a criação do rascunho.
+Os dois workflows usam `runs-on: xcode-27` (GitHub-hosted, arm64) e `scripts/select-xcode.sh`, que escolhe o `Xcode_*.app` mais recente em `/Applications` com versão 27 ou posterior e falha com mensagem clara quando não encontra nenhum. A exigência vem do SDK, não do Swift: a interface usa `NSMenuItem.preferredImageVisibility`, que só existe no SDK 27, e a release precisa ser compilada contra ele porque `scripts/record-build-sdk.sh` grava o SDK real no `LC_BUILD_VERSION` e é dele que o AppKit tira a geração de controles. A imagem `xcode-27` é a única do GitHub Actions com Xcode 27 — macOS 27 com Xcode 27.2, 27.1 (padrão) e 27.0 —, enquanto `macos-26` para no Xcode 26.6, cujo SDK 26 não compila esse código e faria a release registrar SDK 26. O Xcode escolhido, o `swift --version` e a versão do SDK aparecem no log, e o passo falha com `::error::` quando o SDK selecionado é anterior ao 27. A imagem é arm64; a release universal compila o slice x86_64 na mesma máquina pelos `--arch` do `swift build` em `scripts/build-app.sh`. Nenhum segredo é configurado: o token do próprio GitHub (`github.token`) cobre a criação do rascunho.
+
+O `.github/actionlint.yaml` declara o rótulo `xcode-27`: o actionlint 1.7.12 é anterior a essa imagem e conhece apenas os rótulos por versão de macOS, então sem essa declaração o lint acusa `runner-label`.
 
 ## Homebrew (tap próprio)
 
