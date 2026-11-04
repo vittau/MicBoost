@@ -136,15 +136,26 @@ import Testing
 
 @Test func debounceCoalescesWrites() async throws {
     let storage = MemorySettingsStorage()
-    let store = SettingsStore(storage: storage)
+    // The interval outlives the test, so the pending write cannot reach the storage while the
+    // burst runs: the coalescing check does not depend on a wall-clock margin.
+    let store = SettingsStore(storage: storage, debounceInterval: .seconds(30))
     for step in 1...5 {
         await store.update { $0.gainDB = Double(step) }
     }
-    try await Task.sleep(for: .milliseconds(100))
     #expect(storage.writes == 0)
-    try await Task.sleep(for: .milliseconds(500))
+    // Flushing the pending change writes it once, with the last value.
+    await store.flush()
     #expect(storage.writes == 1)
     #expect(storage.decoded?.gainDB == 5)
+}
+
+@Test func debounceWritesAfterTheInterval() async throws {
+    let storage = MemorySettingsStorage()
+    let store = SettingsStore(storage: storage)
+    await store.update { $0.gainDB = 3 }
+    #expect(await waitUntil { storage.writes == 1 })
+    #expect(storage.writes == 1)
+    #expect(storage.decoded?.gainDB == 3)
 }
 
 @Test func unchangedUpdateDoesNotWrite() async throws {
