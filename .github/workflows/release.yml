@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   draft-release:
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
@@ -27,6 +27,13 @@ jobs:
           export DEVELOPER_DIR="$developer_dir"
           xcodebuild -version
           swift --version
+          sdk=$(xcrun --sdk macosx --show-sdk-version)
+          echo "macOS SDK $sdk"
+          sdk_major=${sdk%%.*}
+          if [[ "$sdk_major" -lt 27 ]]; then
+            echo "::error::the build needs the macOS 27 SDK, the selected Xcode ships $sdk"
+            exit 1
+          fi
       - name: Test
         run: swift test
       - name: Package release
