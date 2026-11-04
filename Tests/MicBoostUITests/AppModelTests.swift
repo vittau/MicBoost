@@ -14,7 +14,7 @@ import Testing
         #expect(AppModel.gainStep(option: true) == 1)
     }
     @Test func states() {
-        let model = AppModel()
+        let model = AppModel(statusGrace: .zero)
         model.controls.processingEnabled = false
         #expect(model.icon == "mic")
         model.controls.processingEnabled = true
@@ -43,7 +43,7 @@ import Testing
 }
 
 @MainActor @Test func statusMessageMapping() {
-    let model = AppModel()
+    let model = AppModel(statusGrace: .zero)
     model.controls.processingEnabled = true
     var source = AudioDevice(id: 1, uid: "usb", name: "USB Microphone")
     source.inputChannels = 1
@@ -92,7 +92,7 @@ import Testing
 }
 
 @MainActor @Test func blackHoleReturnClearsTheMessageByItself() {
-    let model = AppModel()
+    let model = AppModel(statusGrace: .zero)
     model.controls.processingEnabled = true
     model.apply(.init(state: .error(.blackHoleMissing)))
     #expect(model.message != nil)
@@ -171,6 +171,195 @@ import Testing
     for picker in [stereo, clamped, eight, stereoEight, single, mix] {
         #expect(picker.values.contains(picker.selection))
     }
+}
+
+@MainActor @Test func disconnectedSourceUsesItsLastKnownName() {
+    let model = AppModel()
+    model.controls.selectedInputUID = "usb"
+    // A source never seen has no name, so the row falls back to the generic label.
+    #expect(model.selectedSourceName == nil)
+    #expect(model.disconnectedSourceLabel == localized("Disconnected microphone"))
+    model.controls.knownSourceNames = ["usb": "fifine Microphone"]
+    #expect(model.selectedSourceName == "fifine Microphone")
+    #expect(
+        model.disconnectedSourceLabel
+            == String.localizedStringWithFormat(localized("%@ (disconnected)"), "fifine Microphone"))
+    // The raw UID never reaches the row.
+    #expect(!model.disconnectedSourceLabel.contains("usb"))
+    // A source reported by the engine outranks the persisted name; another device does not.
+    var present = AudioDevice(id: 1, uid: "usb", name: "USB Microphone")
+    present.inputChannels = 1
+    model.apply(.init(state: .running, source: present))
+    #expect(model.selectedSourceName == "USB Microphone")
+    var other = AudioDevice(id: 2, uid: "other", name: "Other Microphone")
+    other.inputChannels = 1
+    model.apply(.init(state: .running, source: other))
+    #expect(model.selectedSourceName == "fifine Microphone")
+}
+
+@MainActor @Test func sourceLostBannerUsesTheLastKnownNameAfterARelaunch() {
+    let model = AppModel(statusGrace: .zero)
+    model.controls.processingEnabled = true
+    model.controls.selectedInputUID = "usb"
+    model.controls.knownSourceNames = ["usb": "fifine Microphone"]
+    // The engine starts with nothing to report: the name comes from the persisted map.
+    model.apply(.init(state: .recovering(.sourceLost)))
+    #expect(model.statusMessage == .sourceLost("fifine Microphone"))
+    #expect(
+        model.message
+            == String.localizedStringWithFormat(
+                localized("%@ disconnected. Audio resumes when it is reconnected."), "fifine Microphone"))
+    model.apply(.init(state: .error(.sourceUnavailable("usb"))))
+    #expect(model.statusMessage == .sourceLost("fifine Microphone"))
+}
+
+@MainActor @Test func knownSourceNamesAreRemembered() {
+    let model = AppModel()
+    var source = AudioDevice(id: 1, uid: "usb", name: "USB Microphone")
+    source.inputChannels = 1
+    model.rememberSourceNames([source, AudioDevice(id: 9, uid: "empty", name: "")])
+    #expect(model.controls.knownSourceNames == ["usb": "USB Microphone"])
+    var renamed = source
+    renamed.name = "Renamed Microphone"
+    model.rememberSourceNames([renamed])
+    #expect(model.controls.knownSourceNames == ["usb": "Renamed Microphone"])
+}
+
+@MainActor @Test func deviceAbsenceBannersWaitForTheGrace() async throws {
+    let model = AppModel(statusGrace: .milliseconds(100))
+    model.controls.processingEnabled = true
+    model.controls.selectedInputUID = "usb"
+    model.controls.knownSourceNames = ["usb": "fifine Microphone"]
+    // A flap shorter than the grace (a coreaudiod restart) never shows a banner.
+    model.apply(.init(state: .recovering(.serviceRestarted)))
+    model.apply(.init(state: .error(.blackHoleMissing)))
+    #expect(model.message == nil)
+    try await Task.sleep(for: .milliseconds(40))
+    #expect(model.message == nil)
+    model.apply(.init(state: .running, defaultInput: .init(isBlackHole: true)))
+    try await Task.sleep(for: .milliseconds(150))
+    #expect(model.message == nil)
+    // A real absence shows the banner after the grace.
+    model.apply(.init(state: .error(.blackHoleMissing)))
+    #expect(model.message == nil)
+    try await Task.sleep(for: .milliseconds(200))
+    #expect(model.statusMessage == .blackHoleMissing)
+    // The disconnected source follows the same rule and keeps the last known name.
+    model.apply(.init(state: .recovering(.sourceLost)))
+    #expect(model.message == nil)
+    try await Task.sleep(for: .milliseconds(200))
+    #expect(model.statusMessage == .sourceLost("fifine Microphone"))
+}
+
+@MainActor @Test func immediateBannersDoNotWaitForTheGrace() {
+    let model = AppModel()
+    model.controls.processingEnabled = true
+    model.apply(.init(state: .error(.microphonePermissionDenied)))
+    #expect(model.statusMessage == .permissionDenied)
+    model.apply(.init(state: .error(.halFailure(-1, "Start"))))
+    #expect(model.statusMessage == .systemFailure)
+}
+
+@MainActor @Test func routingRowHoldsThroughAServiceRestart() async throws {
+    let model = AppModel(statusGrace: .milliseconds(100))
+    var source = AudioDevice(id: 1, uid: "usb", name: "USB Microphone")
+    source.inputChannels = 1
+    var blackHole = AudioDevice(id: 2, uid: "BlackHole2ch_UID", name: "BlackHole 2ch")
+    blackHole.inputChannels = 2
+    blackHole.outputChannels = 2
+    model.devices = [source, blackHole]
+    let running = EngineStatus(
+        state: .running, source: source, blackHole: blackHole, defaultInput: .init(isBlackHole: true),
+        defaultInputName: "MicBoost")
+    model.apply(running)
+    #expect(
+        model.routing == AppModel.Routing(isBlackHole: true, running: true, canUseMicBoost: true))
+    // The service restarts and the default input cannot be resolved for a moment: the row
+    // keeps the last known state instead of flashing "Unknown" with a disabled button.
+    model.apply(.init(state: .recovering(.serviceRestarted), defaultInput: .unresolved))
+    #expect(model.routing.isBlackHole)
+    #expect(model.routing.running)
+    model.apply(running)
+    try await Task.sleep(for: .milliseconds(200))
+    #expect(model.routing.isBlackHole)
+    // A real loss of the routing information falls back to the unknown row after the grace.
+    model.apply(.init(state: .recovering(.serviceRestarted), defaultInput: .unresolved))
+    #expect(model.routing.isBlackHole)
+    try await Task.sleep(for: .milliseconds(200))
+    #expect(model.routing == AppModel.Routing())
+}
+
+@MainActor @Test func routingRowNamesMicBoostAndOnlyChecksItWhileRunning() {
+    let model = AppModel(statusGrace: .zero)
+    var blackHole = AudioDevice(id: 2, uid: "BlackHole2ch_UID", name: "BlackHole 2ch")
+    blackHole.inputChannels = 2
+    blackHole.outputChannels = 2
+    model.devices = [blackHole]
+    // The engine never started and the microphone permission is denied, but the default
+    // input is still the BlackHole: the row names MicBoost, without the check mark.
+    model.apply(
+        .init(
+            state: .error(.microphonePermissionDenied), defaultInput: .init(isBlackHole: false),
+            defaultInputName: "BlackHole 2ch"))
+    #expect(model.routing == AppModel.Routing(isBlackHole: true))
+    #expect(!model.routing.running)
+    // Running with the BlackHole as default input: the row is the same plus the check mark.
+    model.apply(
+        .init(
+            state: .running, blackHole: blackHole, defaultInput: .init(isBlackHole: true),
+            defaultInputName: "BlackHole 2ch"))
+    #expect(model.routing == AppModel.Routing(isBlackHole: true, running: true, canUseMicBoost: true))
+}
+
+@MainActor @Test func routingRowShowsUseMicBoostOnlyOnARealDivergence() {
+    let model = AppModel(statusGrace: .zero)
+    var source = AudioDevice(id: 1, uid: "usb", name: "USB Microphone")
+    source.inputChannels = 1
+    var blackHole = AudioDevice(id: 2, uid: "BlackHole2ch_UID", name: "BlackHole 2ch")
+    blackHole.inputChannels = 2
+    blackHole.outputChannels = 2
+    model.devices = [source, blackHole]
+    // Diverged while the engine runs: name and an enabled button.
+    model.apply(
+        .init(
+            state: .running, source: source, blackHole: blackHole, defaultInput: .init(isBlackHole: false),
+            defaultInputName: "USB Microphone"))
+    #expect(
+        model.routing
+            == AppModel.Routing(
+                isBlackHole: false, name: "USB Microphone", running: true, canUseMicBoost: true))
+    // Stopped after a start: the button stays enabled, because clicking it still works.
+    model.apply(
+        .init(
+            state: .stopped, source: source, blackHole: blackHole, defaultInput: .init(isBlackHole: false),
+            defaultInputName: "USB Microphone"))
+    #expect(!model.routing.running)
+    #expect(model.routing.canUseMicBoost)
+    // The engine never started: the divergence is shown, but the click would not work.
+    model.apply(.init(state: .stopped, defaultInput: .init(isBlackHole: false), defaultInputName: "USB Microphone"))
+    #expect(model.routing.name == "USB Microphone")
+    #expect(!model.routing.canUseMicBoost)
+    // The default input is unknown: nothing is asserted, so there is no button.
+    model.apply(.init(state: .running, blackHole: blackHole, defaultInput: .unresolved))
+    #expect(model.routing.name == nil)
+}
+
+@MainActor @Test func microphoneListHoldsThroughAServiceRestart() async throws {
+    let model = AppModel(statusGrace: .milliseconds(100))
+    var source = AudioDevice(id: 1, uid: "usb", name: "USB Microphone")
+    source.inputChannels = 1
+    model.devices = [source]
+    #expect(model.sources.map(\.uid) == ["usb"])
+    // The restart empties the list for a moment: the last known rows stay.
+    model.devices = []
+    #expect(model.sources.map(\.uid) == ["usb"])
+    model.devices = [source]
+    try await Task.sleep(for: .milliseconds(200))
+    #expect(model.sources.map(\.uid) == ["usb"])
+    // A real absence clears the list after the grace.
+    model.devices = []
+    try await Task.sleep(for: .milliseconds(200))
+    #expect(model.sources.isEmpty)
 }
 
 @MainActor @Test func limiterBadgeKeepsPanelSize() {

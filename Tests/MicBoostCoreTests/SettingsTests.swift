@@ -15,6 +15,7 @@ import Testing
     #expect(settings.eq.mid == EQPeakingBand(frequency: 3000, gainDB: 2, q: 1))
     #expect(settings.eq.high == EQShelfBand(frequency: 8000, gainDB: 1.5))
     #expect(settings.channelSelectionByUID.isEmpty)
+    #expect(settings.knownSourceNames.isEmpty)
     #expect(settings.bufferFrames == 256)
     #expect(settings.previousDefaultInputUID == nil)
     #expect(!settings.defaultInputManaged)
@@ -39,6 +40,7 @@ import Testing
         "mix": .monoMix,
         "auto": .auto,
     ]
+    settings.knownSourceNames = ["usb": "USB Microphone", "internal": "Built-in Microphone"]
     let data = try JSONEncoder().encode(settings)
     #expect(try JSONDecoder().decode(Settings.self, from: data) == settings)
 }
@@ -91,6 +93,14 @@ import Testing
     #expect(settings.gainDB == 4)
     #expect(settings.bufferFrames == 256)
     #expect(settings.eq == EQSettings())
+    #expect(settings.knownSourceNames.isEmpty)
+}
+
+@Test func knownSourceNamesRoundTripAndDropEmptyEntries() async throws {
+    let storage = MemorySettingsStorage()
+    try storage.seed(Settings(knownSourceNames: ["usb": "USB Microphone", "": "No UID", "gone": ""]))
+    let settings = await SettingsStore(storage: storage).current
+    #expect(settings.knownSourceNames == ["usb": "USB Microphone"])
 }
 
 @Test func outOfRangeValuesAreClamped() async throws {
