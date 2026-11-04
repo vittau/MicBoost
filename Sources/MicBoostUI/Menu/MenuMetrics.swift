@@ -8,12 +8,23 @@ import AppKit
 /// open, matching the metrics of the macOS version this project is built against.
 @MainActor public enum MenuMetrics {
     /// Leading edge of a standard menu item title.
-    public private(set) static var titleInset: CGFloat = 27
+    public private(set) static var titleInset: CGFloat = saved.titleInset
     /// Trailing edge of a standard menu item's key equivalent.
-    public private(set) static var trailingInset: CGFloat = 13
+    public private(set) static var trailingInset: CGFloat = saved.trailingInset
     /// Width of a custom row before the menu's own width replaces it.
     public static let contentWidth: CGFloat = 320
     private static var measured = false
+    private static let storageKey = "menuRowInsets"
+
+    /// Metrics of the previous launch, so the rows start where the system puts them instead of
+    /// moving on the first open of every launch. Only the first launch after installation
+    /// measures them while the panel is already visible.
+    private static var saved: (titleInset: CGFloat, trailingInset: CGFloat) {
+        guard let values = UserDefaults.standard.array(forKey: storageKey) as? [Double],
+            values.count == 2, (12...40).contains(values[0]), (2...30).contains(values[1])
+        else { return (27, 13) }
+        return (CGFloat(values[0]), CGFloat(values[1]))
+    }
 
     /// Reads the insets from the open menu window: the title of a plain item and the key
     /// equivalent column are laid out by AppKit inside the same menu, so they are the menu's
@@ -43,6 +54,7 @@ import AppKit
         guard (12...40).contains(left), (2...30).contains(trailing) else { return }
         titleInset = left.rounded()
         trailingInset = trailing.rounded()
+        UserDefaults.standard.set([Double(titleInset), Double(trailingInset)], forKey: storageKey)
         measured = true
     }
 

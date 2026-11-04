@@ -132,6 +132,110 @@ import MicBoostCore
     }
 }
 
+/// A microphone of the list, as Apple draws device rows in menu bar extras: the transport
+/// symbol in a circular badge, filled with the accent color when the device is selected, then
+/// the name. The row is a view-based item and does not paint a background, so the menu's own
+/// hover highlight shows through (docs/ui.md "Painel", item 5).
+@MainActor final class PanelMicrophoneRow: NSView {
+    private let badge = PanelBadgeView()
+    private let name = PanelMenuRow.label(
+        "", font: .menuFont(ofSize: 0), color: .labelColor)
+    private var leading: NSLayoutConstraint!
+    private var trailing: NSLayoutConstraint!
+
+    init() {
+        super.init(frame: NSRect(x: 0, y: 0, width: MenuMetrics.contentWidth, height: 24))
+        autoresizingMask = [.width]
+        badge.translatesAutoresizingMaskIntoConstraints = false
+        name.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(badge)
+        addSubview(name)
+        leading = badge.leadingAnchor.constraint(equalTo: leadingAnchor, constant: MenuMetrics.titleInset)
+        trailing = name.trailingAnchor.constraint(
+            lessThanOrEqualTo: trailingAnchor, constant: -MenuMetrics.trailingInset)
+        NSLayoutConstraint.activate([
+            leading, trailing,
+            badge.centerYAnchor.constraint(equalTo: centerYAnchor),
+            badge.widthAnchor.constraint(equalToConstant: 18),
+            badge.heightAnchor.constraint(equalToConstant: 18),
+            name.leadingAnchor.constraint(equalTo: badge.trailingAnchor, constant: 8),
+            name.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+        setAccessibilityElement(true)
+        setAccessibilityRole(.menuItem)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    func applyMetrics() {
+        leading.constant = MenuMetrics.titleInset
+        trailing.constant = -MenuMetrics.trailingInset
+    }
+
+    func update(name: String, symbol: String, selected: Bool) {
+        self.name.stringValue = name
+        badge.update(symbol: symbol, selected: selected)
+        textColor()
+        setAccessibilityLabel(name)
+        setAccessibilityValue(selected ? localized("Selected") : "")
+        setAccessibilitySelected(selected)
+    }
+
+    /// The menu draws the highlight; the row only follows the highlighted item's text color,
+    /// like a native item does (docs/ui.md "Painel", item 5).
+    override func draw(_ dirtyRect: NSRect) {
+        textColor()
+        super.draw(dirtyRect)
+    }
+
+    private func textColor() {
+        let highlighted = enclosingMenuItem?.isHighlighted ?? false
+        name.textColor = highlighted ? .selectedMenuItemTextColor : .labelColor
+    }
+}
+
+/// Circular device badge: accent fill when the device is selected, neutral otherwise, with the
+/// transport symbol inside.
+@MainActor final class PanelBadgeView: NSView {
+    private let image = NSImageView()
+    private var selected = false
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.cornerRadius = 9
+        image.translatesAutoresizingMaskIntoConstraints = false
+        image.imageScaling = .scaleProportionallyDown
+        addSubview(image)
+        NSLayoutConstraint.activate([
+            image.centerXAnchor.constraint(equalTo: centerXAnchor),
+            image.centerYAnchor.constraint(equalTo: centerYAnchor),
+            image.widthAnchor.constraint(equalToConstant: 11),
+            image.heightAnchor.constraint(equalToConstant: 11),
+        ])
+        apply()
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    func update(symbol: String, selected: Bool) {
+        self.selected = selected
+        image.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        apply()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        apply()
+    }
+
+    private func apply() {
+        layer?.backgroundColor =
+            (selected ? NSColor.controlAccentColor : NSColor.quaternaryLabelColor).cgColor
+        image.contentTintColor = selected ? .white : .labelColor
+    }
+}
+
 /// Header: the panel title and the processing switch, in the layout of the Wi-Fi and Bluetooth
 /// menu headers (docs/ui.md "Painel", item 1).
 @MainActor final class PanelHeaderRow: PanelMenuRow {

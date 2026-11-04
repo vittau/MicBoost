@@ -30,6 +30,9 @@ enum CaptureError: Error { case noMenuWindow, emptyCapture }
     /// Pops the menu, captures it from the tracking loop and closes it again. A menu closes on
     /// any event outside it, so an attempt may end before the capture; the caller retries.
     func run() throws -> NSImage {
+        // The first open measures the menu's own row insets; a warm-up open makes the capture
+        // use them instead of the initial layout.
+        warmUp()
         var lastError: Error = CaptureError.emptyCapture
         for index in 0..<4 {
             if index > 0 { drain(seconds: 0.25) }
@@ -40,6 +43,17 @@ enum CaptureError: Error { case noMenuWindow, emptyCapture }
             }
         }
         throw lastError
+    }
+
+    private func warmUp() {
+        let timer = Timer(timeInterval: 0.2, repeats: false) { [self] _ in
+            MainActor.assumeIsolated { self.menu.cancelTracking() }
+        }
+        RunLoop.main.add(timer, forMode: .eventTracking)
+        let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        menu.popUp(positioning: nil, at: NSPoint(x: screen.maxX - 420, y: screen.maxY - 120), in: nil)
+        timer.invalidate()
+        drain(seconds: 0.2) { false }
     }
 
     private func attempt() throws -> NSImage? {

@@ -52,6 +52,9 @@ import MicBoostCore
         menu = PanelMenu(title: "MicBoost")
         super.init()
         menu.autoenablesItems = false
+        // No checkmark column: the selected microphone is marked by its row, so every row
+        // starts at the menu's own left inset (docs/ui.md "Painel").
+        menu.showsStateColumn = false
         menu.delegate = self
         buildMenu()
         wire()
@@ -68,6 +71,11 @@ import MicBoostCore
         let quit = NSMenuItem(
             title: localized("Quit MicBoost"), action: #selector(quit), keyEquivalent: "q")
         quit.target = self
+        // Plain text, like the settings item of Apple's own menus: no icon before the title.
+        if #available(macOS 27.0, *) {
+            settings.preferredImageVisibility = .hidden
+            quit.preferredImageVisibility = .hidden
+        }
         // The bare "m" shortcut is native menu item matching, so it only fires while the panel
         // is open (docs/ui.md "Teclado e acessibilidade").
         let mute = NSMenuItem(title: localized("Mute"), action: #selector(mute), keyEquivalent: "m")
@@ -249,8 +257,11 @@ import MicBoostCore
                 menu.removeItem(item)
             }
             sourceItems = uids.map { uid in
-                let item = NSMenuItem(title: uid, action: #selector(selectSource(_:)), keyEquivalent: "")
+                let row = PanelMicrophoneRow()
+                let item = NSMenuItem()
+                item.view = row
                 item.target = self
+                item.action = #selector(selectSource(_:))
                 item.representedObject = uid
                 item.isEnabled = true
                 return item
@@ -264,12 +275,11 @@ import MicBoostCore
         }
         let selected = model.controls.selectedInputUID
         for (item, device) in zip(sourceItems, sources) {
-            item.title = device.name
-            item.state = device.uid == selected ? .on : .off
-            item.image = NSImage(systemSymbolName: Self.symbol(for: device), accessibilityDescription: nil)
-            item.setAccessibilityLabel(device.name)
-            item.setAccessibilityValue(device.uid == selected ? localized("Selected") : "")
-            item.toolTip = nil
+            guard let row = item.view as? PanelMicrophoneRow else { continue }
+            row.applyMetrics()
+            row.update(
+                name: device.name, symbol: Self.symbol(for: device),
+                selected: device.uid == selected)
         }
         let showsDisconnected = selected.map { !uids.contains($0) } ?? false
         disconnectedItem.title = model.disconnectedSourceLabel
@@ -298,6 +308,9 @@ import MicBoostCore
             equalizerBandsRow,
         ] {
             row.applyMetrics()
+        }
+        for item in sourceItems {
+            (item.view as? PanelMicrophoneRow)?.applyMetrics()
         }
     }
 

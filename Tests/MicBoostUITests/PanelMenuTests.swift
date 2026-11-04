@@ -39,8 +39,10 @@ import Testing
         let header = try #require(items.first { $0.title == localized("Microphone") })
         #expect(header.isSectionHeader == true)
         let microphoneIndex = try #require(items.firstIndex(of: header))
-        let names = items.map(\.title)
-        #expect(names[(microphoneIndex + 1)...(microphoneIndex + 2)] == ["USB Microphone", "MacBook Pro Microphone"])
+        let sourceNames = items[(microphoneIndex + 1)...(microphoneIndex + 2)].compactMap {
+            ($0.view as? PanelMicrophoneRow)?.accessibilityLabel()
+        }
+        #expect(sourceNames == ["USB Microphone", "MacBook Pro Microphone"])
         // Actions after the section: the equalizer rows, then the two text items in the footer.
         #expect(
             items.suffix(3).map(\.title) == [localized("Settings…"), localized("Quit MicBoost"), localized("Mute")])
@@ -50,23 +52,28 @@ import Testing
         }
     }
 
-    @Test func selectedSourceIsCheckedAndOthersAreNot() {
+    @Test func selectedSourceIsMarkedAndOthersAreNot() {
         let model = Self.model()
         let panel = PanelMenuController(model: model)
+        #expect(!panel.menu.showsStateColumn)
         let sources = panel.menu.items.filter { $0.representedObject != nil }
         #expect(sources.count == 2)
-        #expect(sources[0].state == .on)
-        #expect(sources[1].state == .off)
-        #expect(sources[0].image != nil)
+        let rows = sources.compactMap { $0.view as? PanelMicrophoneRow }
+        #expect(rows.count == 2)
         #expect(sources[0].target === panel)
         #expect(sources[0].action != nil)
         #expect(sources[0].isEnabled)
-        // Selecting another source moves the check mark.
+        #expect(rows[0].accessibilityValue() as? String == localized("Selected"))
+        #expect(rows[0].isAccessibilitySelected() == true)
+        #expect(rows[1].accessibilityValue() as? String == "")
+        #expect(rows[1].isAccessibilitySelected() == false)
+        // Selecting another source moves the mark.
         model.controls.selectedInputUID = "built-in"
         panel.refresh()
         let updated = panel.menu.items.filter { $0.representedObject != nil }
-        #expect(updated[0].state == .off)
-        #expect(updated[1].state == .on)
+            .compactMap { $0.view as? PanelMicrophoneRow }
+        #expect(updated[0].isAccessibilitySelected() == false)
+        #expect(updated[1].isAccessibilitySelected() == true)
     }
 
     @Test func transportSymbols() {
