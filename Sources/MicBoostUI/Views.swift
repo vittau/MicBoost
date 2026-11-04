@@ -151,6 +151,7 @@ import SwiftUI
                     .accessibilityLabel(localized("Quit MicBoost"))
             }.buttonStyle(PanelMenuItemStyle())
         }.padding(16).frame(width: 320).fixedSize(horizontal: false, vertical: true)
+            .animation(nil, value: model.expanded)
     }
     private func sourceSymbol(_ device: AudioDevice) -> String {
         switch device.transport {
