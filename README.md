@@ -84,6 +84,7 @@ Available today:
   channel options each explain how the microphone inputs map to the left and right output.
   Channel choices are ordered Mono 1 (default), Mono 2 and any further mono channels, Mix, then Stereo.
   Stereo preserves separate left and right inputs; mono sends the selected channel to both sides.
+  About shows the version, project link and license.
 - **Voice preset** for rumble reduction and gentle presence, plus a flat EQ reset.
 - **Processing switch** releases the microphone; quitting restores the previous system input
   when MicBoost still manages it.

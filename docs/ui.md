@@ -90,7 +90,7 @@ junto ao rótulo e linhas de diagnóstico/sobre com rótulo à esquerda e valor 
 
 - **Áudio:** chave "Usar MicBoost como entrada do sistema automaticamente" (`manageDefaultInput`, ligada por padrão), com uma frase explicando que, desligada, cada app precisa selecionar o microfone "BlackHole 2ch" por conta própria; "Buffer (quadros)" (64/128/256/512/1024, só os valores suportados), com descrição abaixo explicando que valores menores reduzem o atraso e valores maiores podem evitar cortes ou estalos; manter o padrão se o áudio estiver estável e modo de canais da fonte atual ([audio-engine.md](audio-engine.md#canais)), com uma linha de legenda para cada opção disponível: Mono 1 (padrão), Mono 2 e demais canais mono em ordem crescente, Misturar e Estéreo. Mono N usa o canal N nos dois lados; Misturar combina todos; Estéreo separa os canais 1 e 2 em esquerda e direita. A lista e as legendas seguem essa ordem; Estéreo só aparece com dois ou mais canais.
 - **Diagnóstico** (somente leitura, atualização a 1 Hz com a janela visível): taxa de amostragem, buffer, latência reportada, overloads, `input_missing`, `nonfinite_resets`. Botão "Copiar relatório" (texto para a área de transferência).
-- **Sobre:** versão, link do projeto, aviso de que o app não é notarizado e informação de licença.
+- **Sobre:** versão, link do projeto e informação de licença.
 
 ## Teclado e acessibilidade
 

@@ -340,8 +340,6 @@ import SwiftUI
                 Text(localized("License: to be defined")).foregroundStyle(.secondary)
             } header: {
                 Text(localized("About"))
-            } footer: {
-                Text(localized("This app is not notarized."))
             }
         }
         .formStyle(.grouped)
