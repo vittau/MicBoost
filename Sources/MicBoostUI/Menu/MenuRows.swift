@@ -759,3 +759,44 @@ import MicBoostCore
         "Q " + q.formatted(.number.locale(AppModel.formatLocale).precision(.fractionLength(1)))
     }
 }
+
+@MainActor final class PanelMonitorRow: PanelMenuRow {
+    let toggle = NSSwitch()
+    var onToggle: ((Bool) -> Void)?
+    init() {
+        super.init(spacing: 0, verticalPadding: 2)
+        toggle.target = self
+        toggle.action = #selector(toggled)
+        toggle.setAccessibilityLabel(localized("Hear My Voice"))
+        let tip = localized("Use headphones: speakers feed your voice back into the microphone.")
+        toggle.toolTip = tip
+        toggle.setAccessibilityHelp(tip)
+        addRow(
+            PanelMenuRow.horizontal([
+                PanelMenuRow.label(localized("Hear My Voice"), font: .systemFont(ofSize: 13), color: .labelColor),
+                PanelMenuRow.spacer(), toggle,
+            ]))
+        updateHeight()
+    }
+    @objc private func toggled() { onToggle?(toggle.state == .on) }
+    override func mouseUp(with event: NSEvent) {
+        guard toggle.isEnabled else { return }
+        toggle.state = toggle.state == .on ? .off : .on
+        toggled()
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+    func update(enabled: Bool, processing: Bool) {
+        toggle.state = enabled ? .on : .off
+        toggle.isEnabled = processing
+    }
+}
+@MainActor final class PanelMonitorDetailRow: PanelMenuRow {
+    private let text = PanelMenuRow.label("", font: .systemFont(ofSize: 11), color: .secondaryLabelColor)
+    init() {
+        super.init(spacing: 0, verticalPadding: 2)
+        addRow(text)
+        updateHeight()
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+    func update(_ value: String) { text.stringValue = value }
+}

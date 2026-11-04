@@ -72,3 +72,11 @@
 "Stereo: channel 1 on the left, channel 2 on the right." = "Stereo: channel 1 on the left, channel 2 on the right.";
 "Stereo" = "Stereo";
 "Choose a microphone in the list." = "Choose a microphone in the list.";
+
+"Hear My Voice" = "Hear My Voice";
+"Use headphones: speakers feed your voice back into the microphone." = "Use headphones: speakers feed your voice back into the microphone.";
+"%@ · high delay (≈ %d ms)" = "%@ · high delay (≈ %d ms)";
+"%@ · ≈ %d ms" = "%@ · ≈ %d ms";
+"No audio output." = "No audio output.";
+"Unavailable with %@." = "Unavailable with %@.";
+"Unsupported format for %@." = "Unsupported format for %@.";

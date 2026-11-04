@@ -100,6 +100,9 @@ import SwiftUI
                     value:
                         "\((model.status?.reportedLatencyMs ?? 0).formatted(.number.locale(locale).precision(.fractionLength(1)))) ms"
                 )
+                LabeledContent(
+                    localized("Hear My Voice"),
+                    value: model.monitorDescription.isEmpty ? localized("Off") : model.monitorDescription)
                 LabeledContent(localized("Audio overloads"), value: "\(model.status?.overloads ?? 0)")
                 LabeledContent(localized("Missing input cycles"), value: "\(model.status?.inputMissing ?? 0)")
                 LabeledContent(localized("Numerical resets"), value: "\(model.status?.nonfiniteResets ?? 0)")
