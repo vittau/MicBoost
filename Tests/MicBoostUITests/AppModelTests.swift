@@ -1,4 +1,5 @@
 import AppKit
+import CoreAudio
 import Foundation
 import MicBoostCore
 import SwiftUI
@@ -381,4 +382,48 @@ import Testing
         #expect(abs(inputLength - inputAmplitude) < 1e-12)
         #expect(abs(outputLength - 2 * inputLength) < 1e-12)
     }
+}
+
+@MainActor @Test func monitorStartFailureTextAndCopyReportIncludeDiagnostics() {
+    let model = AppModel()
+    var source = AudioDevice(id: 1, uid: "source", name: "Source mic")
+    source.transport = kAudioDeviceTransportTypeUSB
+    source.sampleRate = 44100
+    var output = AudioDevice(id: 2, uid: "output", name: "Wireless output")
+    output.transport = kAudioDeviceTransportTypeBluetooth
+    output.sampleRate = 44100
+    output.availableSampleRates = [.init(44100, 48000)]
+    var status = EngineStatus(state: .running, source: source)
+    status.monitor = .unavailable(reason: .startFailed, outputName: output.name)
+    status.monitorOutput = output
+    status.lastMonitorFailure = .init(
+        operation: "Start IO", error: .halFailure(-123, "Start IO"), output: output, workingRate: 44100)
+    model.apply(status)
+    for language in ["en", "pt-BR"] {
+        UILanguage.override = language
+        #expect(
+            model.monitorDescription
+                == (language == "en"
+                    ? "Couldn't use Wireless output for monitoring."
+                    : "Não foi possível usar Wireless output no monitor."))
+    }
+    UILanguage.override = nil
+    #expect(model.report.contains("Source mic | transport=USB | nominal=44100"))
+    #expect(model.report.contains("Wireless output | transport=Bluetooth | nominal=44100"))
+    #expect(model.report.contains("44100.0...48000.0"))
+    #expect(model.report.contains("Start IO: OSStatus -123"))
+}
+
+@MainActor @Test func monitorPanelUsesTotalAndReportSeparatesAddedLatency() {
+    let model = AppModel()
+    let output = AudioDevice(id: 2, uid: "output", name: "Output")
+    var status = EngineStatus(state: .running)
+    status.monitor = .active(output: output, addedLatencyMs: 12, totalLatencyMs: 80)
+    status.monitorStats.underruns = 2
+    status.monitorStats.overruns = 3
+    model.apply(status)
+    #expect(model.monitorDescription.contains("80 ms"))
+    #expect(model.monitorAddedLatency.contains("12"))
+    #expect(model.report.contains("monitor_underruns: 2"))
+    #expect(model.report.contains("monitor_overruns: 3"))
 }

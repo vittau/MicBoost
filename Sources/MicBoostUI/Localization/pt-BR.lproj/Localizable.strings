@@ -80,3 +80,10 @@
 "No audio output." = "Sem saída de áudio.";
 "Unavailable with %@." = "Indisponível com %@.";
 "Unsupported format for %@." = "Formato de %@ não suportado.";
+
+"Couldn't use %@ for monitoring." = "Não foi possível usar %@ no monitor.";
+
+"Monitor added latency" = "Latência adicionada do monitor";
+"Monitor underruns" = "Faltas de áudio do monitor";
+"Monitor overruns" = "Descartes de áudio do monitor";
+"Monitor output rate" = "Taxa da saída do monitor";

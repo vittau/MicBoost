@@ -32,7 +32,9 @@ public protocol EngineHardware: AudioHardware {
     func maximumFrames(_ device: AudioObjectID, buffer: UInt32) throws -> UInt32
     func latencyFrames(_ device: AudioObjectID, scope: AudioObjectPropertyScope) throws -> UInt32
     func setRate(_ device: AudioObjectID, rate: Double) throws
-    func createAggregate(source: String, destination: String, monitor: String?) throws -> AudioObjectID
+    func createAggregate(source: String, destination: String) throws -> AudioObjectID
+    func monitorBuffer(_ device: AudioObjectID) throws -> UInt32
+    func createMonitor(_ device: AudioDevice, context: OpaquePointer, rate: Double) throws -> any MonitorSession
     func destroyAggregate(_ device: AudioObjectID) throws
     func setBuffer(_ device: AudioObjectID, frames: UInt32) throws -> UInt32
     func createIO(_ device: AudioObjectID, context: OpaquePointer) throws -> AudioDeviceIOProcID
@@ -45,10 +47,7 @@ public struct AggregateBuilder {
     public static let uid = "io.github.vittau.MicBoost.engine"
     /// BlackHole owns the aggregate clock and the source is resampled to it, so the
     /// drift resampler sits before the DSP chain and the limiter stays the last stage.
-    public static func description(source: String, destination: String, monitor: String? = nil) -> [String: Any] {
-        let extra = monitor.flatMap {
-            $0 == source ? nil : [kAudioSubDeviceUIDKey: $0, kAudioSubDeviceDriftCompensationKey: 1] as [String: Any]
-        }
+    public static func description(source: String, destination: String) -> [String: Any] {
         return [
             kAudioAggregateDeviceNameKey: "MicBoost Engine",
             kAudioAggregateDeviceUIDKey: uid,
@@ -58,11 +57,11 @@ public struct AggregateBuilder {
             kAudioAggregateDeviceSubDeviceListKey: [
                 [kAudioSubDeviceUIDKey: source, kAudioSubDeviceDriftCompensationKey: 1],
                 [kAudioSubDeviceUIDKey: destination],
-            ] + (extra.map { [$0] } ?? []),
+            ],
         ]
     }
     public static func routing(
-        source: StreamLayout, destination: StreamLayout, monitor: StreamLayout? = nil, monitorIsSource: Bool = false
+        source: StreamLayout, destination: StreamLayout
     ) throws -> mb_routing {
         let count = source.inputs.reduce(0, +)
         guard count > 0, count <= 64, destination.outputs.reduce(0, +) == 2 else {
@@ -88,20 +87,6 @@ public struct AggregateBuilder {
                     channels[index] = mb_channel(buffer: UInt32(source.outputs.count + buffer), channel: channel)
                     index += 1
                 }
-            }
-        }
-        if let monitor {
-            let offset = monitorIsSource ? 0 : source.outputs.count + destination.outputs.count
-            var maps: [mb_channel] = []
-            for (buffer, count) in monitor.outputs.enumerated() {
-                for channel in 0..<count where maps.count < 2 {
-                    maps.append(mb_channel(buffer: UInt32(offset + buffer), channel: channel))
-                }
-            }
-            result.monitor_count = UInt32(maps.count)
-            withUnsafeMutableBytes(of: &result.monitor) { bytes in
-                let channels = bytes.bindMemory(to: mb_channel.self)
-                for (i, map) in maps.enumerated() { channels[i] = map }
             }
         }
         return result
@@ -164,14 +149,24 @@ extension CoreAudioHardware: EngineHardware {
     public func setRate(_ device: AudioObjectID, rate: Double) throws {
         try write(.init(device, kAudioDevicePropertyNominalSampleRate), value: rate)
     }
-    public func createAggregate(source: String, destination: String, monitor: String?) throws -> AudioObjectID {
+    public func createAggregate(source: String, destination: String) throws -> AudioObjectID {
         var id: AudioObjectID = 0
         try checkHAL(
             AudioHardwareCreateAggregateDevice(
-                AggregateBuilder.description(source: source, destination: destination, monitor: monitor)
+                AggregateBuilder.description(source: source, destination: destination)
                     as CFDictionary, &id),
             "Create aggregate")
         return id
+    }
+    public func monitorBuffer(_ device: AudioObjectID) throws -> UInt32 {
+        try scalar(.init(device, kAudioDevicePropertyBufferFrameSize), as: UInt32.self)
+    }
+    public func createMonitor(_ device: AudioDevice, context: OpaquePointer, rate: Double) throws -> any MonitorSession
+    {
+        try MonitorAudioUnits(
+            context: context, rate: rate, channels: min(2, device.outputChannels),
+            device: device.id, outputRate: device.sampleRate, buffer: monitorBuffer(device.id),
+            physicalChannels: device.outputChannels)
     }
     public func destroyAggregate(_ device: AudioObjectID) throws {
         try checkHAL(AudioHardwareDestroyAggregateDevice(device), "Destroy aggregate")

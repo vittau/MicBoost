@@ -2,6 +2,7 @@
 #define MICBOOST_DSP_H
 
 #include <CoreAudio/CoreAudio.h>
+#include <AudioToolbox/AudioToolbox.h>
 #include <stdatomic.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -35,15 +36,24 @@ OSStatus mb_capture_ioproc(
 );
 
 typedef struct mb_engine mb_engine;
-typedef enum { MB_AUTO, MB_MONO, MB_MONO_MIX, MB_STEREO } mb_channel_mode;
-typedef enum { MB_LOW, MB_MID, MB_HIGH } mb_band;
-typedef struct { uint32_t buffer, channel; } mb_channel;
+typedef enum {
+    MB_AUTO,
+    MB_MONO,
+    MB_MONO_MIX,
+    MB_STEREO,
+} mb_channel_mode;
+typedef enum {
+    MB_LOW,
+    MB_MID,
+    MB_HIGH,
+} mb_band;
+typedef struct {
+    uint32_t buffer, channel;
+} mb_channel;
 typedef struct {
     uint32_t input_count;
     mb_channel inputs[64];
     mb_channel outputs[2];
-    uint32_t monitor_count;
-    mb_channel monitor[2];
 } mb_routing;
 typedef struct {
     float input_peak, output_peak, gr_max_db;
@@ -56,7 +66,29 @@ mb_engine * _Nullable mb_engine_create(uint32_t max_frames, double sample_rate);
 void mb_engine_destroy(mb_engine * _Nonnull engine);
 int mb_engine_configure(mb_engine * _Nonnull engine, const mb_routing * _Nonnull routing);
 void mb_engine_set_gain_db(mb_engine * _Nonnull engine, float db);
-void mb_engine_set_monitor_silent(mb_engine * _Nonnull engine, bool value);
+typedef struct mb_monitor mb_monitor;
+typedef struct {
+    uint64_t latency_host, underruns, overruns;
+    uint32_t fill, target;
+    double correction;
+} mb_monitor_stats;
+typedef struct {
+    double integral;
+} mb_monitor_pi;
+double mb_monitor_pi_update(mb_monitor_pi * _Nonnull pi, double error, double rate,
+                            double seconds);
+mb_monitor * _Nullable mb_monitor_create(mb_engine * _Nonnull engine, double rate,
+                                        uint32_t target);
+void mb_monitor_destroy(mb_monitor * _Nonnull monitor);
+void mb_engine_set_monitor_enabled(mb_engine * _Nonnull engine, bool enabled);
+void mb_monitor_set_silent(mb_monitor * _Nonnull monitor, bool silent);
+void mb_monitor_fade_out(mb_monitor * _Nonnull monitor);
+void mb_monitor_read(const mb_monitor * _Nonnull monitor, mb_monitor_stats * _Nonnull stats);
+void mb_monitor_write(mb_engine * _Nonnull engine, const float * _Nonnull left,
+                      const float * _Nonnull right, uint32_t frames, uint64_t host);
+OSStatus mb_monitor_render(void * _Nonnull context, AudioUnitRenderActionFlags * _Nonnull flags,
+                          const AudioTimeStamp * _Nonnull timestamp, UInt32 bus,
+                          UInt32 frames, AudioBufferList * _Nullable output);
 void mb_engine_set_muted(mb_engine * _Nonnull engine, bool muted);
 void mb_engine_set_eq_enabled(mb_engine * _Nonnull engine, bool enabled);
 void mb_engine_set_band(mb_engine * _Nonnull engine, mb_band band, float hz, float db, float q);

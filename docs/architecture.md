@@ -14,7 +14,8 @@
 └───────────────┬───────────────────────────────────────────▲───────────────┘
                 │ setters atômicos (C)                      │ leituras atômicas (medidores/contadores)
 ┌───────────────▼──────────── MicBoostDSP (C, tempo real) ──────────────────┐
-│ mb_ioproc → mapa de canais → EQ → ganho → limitador → BlackHole (+monitor)│
+│ mb_ioproc → mapa de canais → EQ → ganho → limitador → BlackHole (+fila)   │
+│ AUHAL (saída padrão) ← Varispeed ← mb_monitor_render ← fila SPSC          │
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -91,8 +92,8 @@ stopped ──start──▶ starting ──ok──▶ running
 - Em `recovering`, o controller observa a lista de dispositivos e tenta de novo quando a condição muda. Não há polling. Exceção: depois do wake, uma única tentativa com atraso de 1 s; se ela falhar por HAL ou formato, o estado fica `recovering(.wakeFailed)`.
 - `error(.blackHoleMissing)` e `error(.sourceUnavailable)` saem sozinhos quando o dispositivo aparece. `microphonePermissionDenied` é reavaliado quando o app volta a ficar ativo.
 - `stop` faz uma rampa de saída para zero (τ = 3 ms, atingindo −90 dB em aproximadamente 31 ms; espera de 40 ms com limite de 50 ms), `AudioDeviceStop`, destrói o IOProc, destrói o agregado, devolve as taxas que o MicBoost mudou e restaura a entrada padrão conforme a política.
-- Ganho, mute, EQ, bypass e modo de canais **nunca** reiniciam o motor. Mudar a fonte, o tamanho de buffer ou o [monitor](audio-engine.md#modo-monitor) (ligar, desligar, saída padrão trocada) reconstrói o motor (stop → start), com rampa.
-- `EngineController.setMonitorEnabled(_:)` guarda o desejo do usuário em memória (não persistido) e reconstrói se o motor estiver rodando; cada start resolve a saída de monitor na hora.
+- Ganho, mute, EQ, bypass, modo de canais e o [monitor](audio-engine.md#modo-monitor) **nunca** reiniciam o motor. Mudar a fonte ou o tamanho de buffer reconstrói o motor (stop → start), com rampa.
+- `EngineController.setMonitorEnabled(_:)` guarda o desejo do usuário em memória (não persistido) e inicia ou para só a cadeia do monitor (AUHAL + Varispeed), com o motor em `running`; a saída de monitor é resolvida a cada início do monitor.
 - O controller expõe um observador de estado na fila `engine`. `micboost-diag run` o usa para imprimir cada transição com o instante; os testes o usam para verificar o caminho percorrido.
 
 ## Modelo de domínio (MicBoostCore)
@@ -101,7 +102,7 @@ stopped ──start──▶ starting ──ok──▶ running
 - `DeviceService` publica `[AudioDevice]` de entrada elegíveis (ver exclusões em [audio-engine.md](audio-engine.md#enumeração-e-elegibilidade)), o BlackHole detectado (se houver) e o UID da entrada padrão atual.
 - `Settings`: preferências persistidas, com `EQSettings` (`low`, `mid`, `high`) e `ChannelSelection` (`auto`, `mono(canal)`, `monoMix`, `stereo(primeiroCanal)`, canais baseados em 1). `SettingsStore` é o actor que as lê e grava ([Persistência](#persistência)).
 - `DefaultInputManager`: aplica a [política de entrada padrão](audio-engine.md#política-de-entrada-padrão-defaultinputmanager) sobre `AudioHardware` e `SettingsStore`, e publica `DefaultInputStatus`.
-- `EngineStatus` (snapshot enviado à UI): `state`, `source: AudioDevice?`, `blackHole: AudioDevice?`, `defaultInput: DefaultInputStatus` (`isBlackHole`, `divergedByUser`, `unknown`), `sampleRate`, `bufferFrames`, `reportedLatencyMs`, `monitor: MonitorStatus` ([audio-engine.md](audio-engine.md#modo-monitor)), contadores (overloads, eventos NaN).
+- `EngineStatus` (snapshot enviado à UI): `state`, `source: AudioDevice?`, `blackHole: AudioDevice?`, `defaultInput: DefaultInputStatus` (`isBlackHole`, `divergedByUser`, `unknown`), `sampleRate`, `bufferFrames`, `reportedLatencyMs`, `monitor: MonitorStatus` ([audio-engine.md](audio-engine.md#modo-monitor)), `monitorOutput` (saída resolvida), `monitorStats` (ocupação, correção, underruns/overruns e timestamp de latência), `lastMonitorFailure` (operação, erro tipado e saída), contadores (overloads, eventos NaN).
 
 ## Persistência
 

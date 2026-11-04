@@ -40,11 +40,15 @@ import SwiftUI
             do { try await engine.setMonitorEnabled(enabled) } catch { self.error = error as? EngineError }
         }
     }
+    public var monitorAddedLatency: String {
+        guard case .active(_, let added, _) = status?.monitor, let added else { return "—" }
+        return String(format: "%.1f ms", locale: Self.formatLocale, added)
+    }
     public var monitorDescription: String {
         guard let status else { return "" }
         switch status.monitor {
         case .off: return ""
-        case .active(let output, let latency):
+        case .active(let output, _, let latency):
             let format = localized(latency > 50 ? "%@ · high delay (≈ %d ms)" : "%@ · ≈ %d ms")
             return String(format: format, output.name, Int(latency.rounded()))
         case .unavailable(let reason, let name):
@@ -52,6 +56,7 @@ import SwiftUI
             case .noOutput: return localized("No audio output.")
             case .outputIsLoopback: return String(format: localized("Unavailable with %@."), name ?? "")
             case .formatUnsupported: return String(format: localized("Unsupported format for %@."), name ?? "")
+            case .startFailed: return String(format: localized("Couldn't use %@ for monitoring."), name ?? "")
             }
         }
     }
@@ -515,8 +520,27 @@ import SwiftUI
     }
     public var report: String {
         guard let status else { return localized("Stopped") }
+        func deviceDetails(_ device: AudioDevice?) -> String {
+            guard let device else { return "—" }
+            let transport: String
+            switch device.transport {
+            case kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE: transport = "Bluetooth"
+            case kAudioDeviceTransportTypeUSB: transport = "USB"
+            case kAudioDeviceTransportTypeBuiltIn: transport = "Built-in"
+            case kAudioDeviceTransportTypeAggregate: transport = "Aggregate"
+            default: transport = "\(device.transport)"
+            }
+            let rates = device.supportedRates.map { "\($0.minimum)...\($0.maximum)" }.joined(separator: ", ")
+            return "\(device.name) | transport=\(transport) | nominal=\(device.sampleRate) Hz | available=\(rates)"
+        }
+        let failure =
+            status.lastMonitorFailure.map { failure in
+                if case .halFailure(let code, _) = failure.error { return "\(failure.operation): OSStatus \(code)" }
+                return "\(failure.operation): \(failure.error)"
+            } ?? "—"
         return
-            "\(status.sampleRate) Hz\n\(status.bufferFrames) frames\n\(status.reportedLatencyMs) ms\nMonitor: \(monitorDescription)\nOverloads: \(status.overloads)\ninput_missing: \(status.inputMissing)\nnonfinite_resets: \(status.nonfiniteResets)"
+            "Source: \(deviceDetails(status.source))\nMonitor output: \(deviceDetails(status.monitorOutput))\nLast monitor failure: \(failure)\n"
+            + "\(status.sampleRate) Hz\n\(status.bufferFrames) frames\n\(status.reportedLatencyMs) ms\nMonitor: \(monitorDescription)\nMonitor added: \(monitorAddedLatency)\nmonitor_fill: \(status.monitorStats.fill)\nmonitor_correction_ppm: \(status.monitorStats.correction * 1e6)\nmonitor_underruns: \(status.monitorStats.underruns)\nmonitor_overruns: \(status.monitorStats.overruns)\nOverloads: \(status.overloads)\ninput_missing: \(status.inputMissing)\nnonfinite_resets: \(status.nonfiniteResets)"
     }
     public func shutdown() async throws {
         monitor?.cancel()
