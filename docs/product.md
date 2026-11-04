@@ -5,7 +5,8 @@
 Amplificar e equalizar o microfone escolhido pelo usuário e disponibilizar o áudio processado pelo BlackHole 2ch, com:
 
 - interface com aparência de controle nativo do macOS (Volume/Bluetooth da Central de Controle);
-- resposta imediata dos controles e latência de áudio adicional de no máximo 100 ms no uso normal (fonte → BlackHole), com arquitetura sem fila que mire < 20 ms, porque o modo monitor da v2 exige isso (ver [testing.md](testing.md#medição-de-latência));
+- resposta imediata dos controles e latência de áudio adicional de no máximo 100 ms no uso normal (fonte → BlackHole), com arquitetura sem fila que mire < 20 ms (ver [testing.md](testing.md#medição-de-latência));
+- modo monitor para ouvir a própria voz processada na saída de áudio do sistema, com latência adicionada pelo MicBoost **< 20 ms**, excluindo a latência física dos dispositivos ([audio-engine.md](audio-engine.md#modo-monitor));
 - ganho acima de 200% (+6,02 dB), sem teto herdado de outra solução;
 - instalação simples **sem notarização** e sem adesão paga ao Apple Developer Program.
 
@@ -30,13 +31,14 @@ Motivação: o VirtuMic tem interface pesada e atraso perceptível (o log dele m
 7. Persistência de ganho, mute, EQ, dispositivo selecionado e seleção de canais.
 8. Detecção e recuperação: BlackHole ausente, permissão de microfone negada, desconexão da fonte, suspensão/retomada, mudança de formato e mudança manual da entrada padrão.
 9. Tela secundária de ajustes avançados (buffer, canais, diagnóstico).
-10. Distribuição: tap Homebrew próprio com dependência do cask `blackhole-2ch` e download direto `.zip` ([distribution.md](distribution.md)).
+10. Modo monitor: chave no painel que leva a voz processada também à saída padrão do sistema (fones), com latência adicionada pelo MicBoost medida < 20 ms em saídas internas, com fio e USB ([audio-engine.md](audio-engine.md#modo-monitor)).
+11. Distribuição: tap Homebrew próprio com dependência do cask `blackhole-2ch` e download direto `.zip` ([distribution.md](distribution.md)).
 
 ## Fora de escopo da v1
 
-Redução de ruído, compressor avançado, ganho automático, modo monitor (ouvir a si mesmo; previsto para a v2, ver abaixo), presets de EQ, gráfico de resposta, módulo da Central de Controle, Mac App Store, `homebrew/cask` oficial, notarização, iniciar no login.
+Redução de ruído, compressor avançado, ganho automático, volume próprio do monitor, presets de EQ, gráfico de resposta, módulo da Central de Controle, Mac App Store, `homebrew/cask` oficial, notarização, iniciar no login.
 
-Modo monitor (v2): ouvir a própria voz processada na saída de áudio (fones), com latência total da fonte à saída **< 20 ms**. Acima disso, o atraso é percebido como eco. Decisões de arquitetura da v1 não podem inviabilizar essa meta.
+Modo monitor em saídas Bluetooth: funciona, mas a latência física do próprio fone (tipicamente acima de 100 ms) pode tornar o atraso total alto. Essa latência não entra na meta de < 20 ms adicionados pelo MicBoost; o painel avisa quando a estimativa total reportada passa de 50 ms.
 
 Limitação inerente: o ganho digital também amplifica ruído e não recupera áudio já saturado na origem. O painel indica saturação da entrada quando ela ocorre.
 
@@ -48,7 +50,7 @@ Fonte (captura explícita) → EQ 3 bandas → ganho → proteção de pico → 
 
 1. O MicBoost captura a fonte pelo UID, nunca pela entrada padrão.
 2. Enquanto o processamento está ligado, o BlackHole deve ser a entrada padrão. O MicBoost **nunca** define o microfone físico como entrada padrão.
-3. A saída padrão do sistema (fones/alto-falantes) **nunca** é alterada. A saída para o BlackHole é interna ao motor.
+3. A saída padrão do sistema (fones/alto-falantes) **nunca** é alterada. A saída para o BlackHole é interna ao motor, e o modo monitor só lê qual é a saída padrão.
 4. Nenhum dispositivo BlackHole pode ser fonte; ele é excluído da lista, o que impede realimentação.
 5. Fechar o painel não interrompe o processamento.
 6. Ao sair do app ou desligar o processamento, a entrada padrão anterior é restaurada **somente se** a entrada atual ainda for o BlackHole definido pelo MicBoost **e** o dispositivo anterior existir.
@@ -79,6 +81,11 @@ Estabilidade e desempenho:
 - Sem cortes ou estalos no ensaio de estabilidade de 20 minutos.
 - Latência, CPU, memória e condições de teste registradas em [testing.md](testing.md#resultados-registrados). Desvios da meta são documentados antes da entrega.
 - A interface permanece responsiva.
+
+Modo monitor:
+- Com o monitor ligado, a voz processada (a mesma entregue ao BlackHole) sai na saída padrão do sistema, com latência adicionada < 20 ms (mediana) no buffer padrão em saída interna, com fio ou USB. Essa latência é a ponte fonte → BlackHole medida com o subdispositivo de monitor presente no agregado, pois as duas saídas são escritas no mesmo ciclo; latência de dispositivo, safety offset e latência de stream de entrada e saída são contexto e não entram no critério ([testing.md](testing.md#medição-de-latência-do-monitor)).
+- Ligar e desligar o monitor não altera ganho, EQ, roteamento nem a entrada padrão; trocar a saída padrão com o monitor ligado leva o monitor à nova saída.
+- O monitor nunca usa um BlackHole (nem um agregado que o contenha) como saída.
 
 Recuperação:
 - O áudio volta após reconectar a fonte, ou o painel explica o impedimento.

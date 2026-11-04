@@ -13,7 +13,7 @@ struct mb_engine {
     float *scratch;
     _Atomic float gain, bands[9], input_peak, output_peak;
     _Atomic unsigned selection;
-    _Atomic bool muted, eq, fading, fade_done, clipped;
+    _Atomic bool muted, eq, fading, fade_done, clipped, monitor_silent;
     _Atomic uint64_t cycles, missing, nonfinite, oversized, delta;
     double decay;
     double rate, current_gain, gain_decay, release, limiter, wet;
@@ -67,7 +67,7 @@ void mb_engine_destroy(mb_engine *e) {
 }
 
 int mb_engine_configure(mb_engine *e, const mb_routing *r) {
-    if (!r->input_count || r->input_count > 64) {
+    if (!r->input_count || r->input_count > 64 || r->monitor_count > 2) {
         return -1;
     }
     e->routing = *r;
@@ -76,6 +76,9 @@ int mb_engine_configure(mb_engine *e, const mb_routing *r) {
 
 void mb_engine_set_gain_db(mb_engine *e, float db) {
     atomic_store(&e->gain, isfinite(db) ? fmaxf(-12, fminf(24, db)) : 0);
+}
+void mb_engine_set_monitor_silent(mb_engine *e, bool value) {
+    atomic_store(&e->monitor_silent, value);
 }
 void mb_engine_set_muted(mb_engine *e, bool value) {
     atomic_store(&e->muted, value);
@@ -348,6 +351,7 @@ OSStatus mb_ioproc(AudioObjectID device, const AudioTimeStamp *now,
             }
         }
     }
+    bool monitor_silent = atomic_load(&e->monitor_silent);
     unsigned flags = frames == 0 ? 2u : 0u;
     for (uint32_t base = 0; base < frames;) {
         uint32_t n = frames - base;
@@ -389,6 +393,23 @@ OSStatus mb_ioproc(AudioObjectID device, const AudioTimeStamp *now,
                 size_t index = (size_t)(base + i) * buffer.mNumberChannels + map.channel;
                 if (index < buffer.mDataByteSize / sizeof(float)) {
                     ((float *)buffer.mData)[index] = outputs[c][i];
+                }
+            }
+        }
+        for (unsigned c = 0; c < (monitor_silent ? 0 : e->routing.monitor_count); c++) {
+            mb_channel map = e->routing.monitor[c];
+            if (map.buffer >= out->mNumberBuffers) {
+                continue;
+            }
+            AudioBuffer buffer = out->mBuffers[map.buffer];
+            if (!buffer.mData || map.channel >= buffer.mNumberChannels) {
+                continue;
+            }
+            for (uint32_t i = 0; i < n; i++) {
+                size_t index = (size_t)(base + i) * buffer.mNumberChannels + map.channel;
+                if (index < buffer.mDataByteSize / sizeof(float)) {
+                    ((float *)buffer.mData)[index] = e->routing.monitor_count == 1
+                        ? (outputs[0][i] + outputs[1][i]) * 0.5f : outputs[c][i];
                 }
             }
         }

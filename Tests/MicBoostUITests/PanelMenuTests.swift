@@ -31,6 +31,19 @@ import Testing
         return model
     }
 
+    @Test func monitorRowClickUpdatesModel() throws {
+        let model = Self.model()
+        let panel = PanelMenuController(model: model)
+        let row = try #require(panel.menu.items.compactMap { $0.view as? PanelMonitorRow }.first)
+        let event = try #require(
+            NSEvent.mouseEvent(
+                with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil,
+                eventNumber: 0, clickCount: 1, pressure: 0))
+        row.mouseUp(with: event)
+        #expect(model.monitorEnabled)
+        row.mouseUp(with: event)
+        #expect(!model.monitorEnabled)
+    }
     @Test func sectionOrderAndNativeItems() throws {
         let model = Self.model()
         let panel = PanelMenuController(model: model)
@@ -188,7 +201,7 @@ import Testing
             frequency.map { $0.accessibilityValue() as? String }.compactMap { $0 } == ["70 Hz", "3000 Hz", "8000 Hz"])
         // Every switch of the panel is a native NSSwitch.
         let switches = rows.flatMap(Self.switches)
-        #expect(switches.count == 2)
+        #expect(switches.count == 3)
         #expect(switches.allSatisfy { $0 is NSSwitch })
         // The meters are the native level indicator.
         let meters = rows.flatMap(Self.meters)

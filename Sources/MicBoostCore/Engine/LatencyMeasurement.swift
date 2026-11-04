@@ -5,6 +5,13 @@ import Foundation
 import MicBoostDSP
 
 public struct LatencyMeasurement: Sendable {
+    public static func monitorPhysicalMilliseconds(
+        sourceToBlackHole: Double, input: HardwareLatency, output: HardwareLatency, sampleRate: Double
+    )
+        -> Double
+    {
+        sourceToBlackHole + (Double(input.total) + Double(output.total)) * 1000 / sampleRate
+    }
     public let milliseconds: Double
     public let correlation: Double
     public let sourcePeak: Float
@@ -107,7 +114,8 @@ extension CoreAudioHardware {
             }
         }
         guard best >= 0.5 else {
-            throw EngineError.invalidArgument("Room signal cannot establish latency: correlation=\(best)")
+            throw EngineError.invalidArgument(
+                "Room signal cannot establish latency: correlation=\(best); snap fingers near the microphone and retry")
         }
         return LatencyMeasurement(
             milliseconds: Double(lag) * 1000 / source.sampleRate,

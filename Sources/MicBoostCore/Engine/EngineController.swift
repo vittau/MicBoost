@@ -40,7 +40,16 @@ extension EngineState {
         }
     }
 }
+public enum MonitorUnavailableReason: Sendable, Equatable {
+    case noOutput, outputIsLoopback, formatUnsupported
+}
+public enum MonitorStatus: Sendable, Equatable {
+    case off
+    case active(output: AudioDevice, reportedLatencyMs: Double)
+    case unavailable(reason: MonitorUnavailableReason, outputName: String?)
+}
 public struct EngineStatus: Sendable {
+    public var monitor: MonitorStatus = .off
     public var state: EngineState
     public var source: AudioDevice?
     public var blackHole: AudioDevice?
@@ -91,6 +100,14 @@ public actor EngineController {
     private var controls = Settings()
     private lazy var routingManager = DefaultInputManager(hardware: hardware, settings: settings)
     private var channelSelection: ChannelSelection = .mono(channel: 1)
+    private var monitorEnabled = false
+    private var diagnosticMonitorSilent = false
+    private var monitorOutputUID: String?
+    private var monitorStatus: MonitorStatus = .off
+    private var monitorOutput: AudioDevice?
+    /// The resolved candidate is retained even when monitoring is unavailable.
+    private var resolvedMonitorOutput: AudioDevice?
+    private var resolvedMonitorEligible = false
     private var forceRebuild = false
     private var pendingReason: RecoveryReason = .formatChanged
     private let hardware: any EngineHardware
@@ -193,6 +210,11 @@ public actor EngineController {
             ) { [weak self] in
                 Task { await self?.changed(force: true, reason: .serviceRestarted) }
             })
+        systemTokens.append(
+            try hardware.addListener(.init(object, kAudioHardwarePropertyDefaultOutputDevice), queue: queue) {
+                [weak self] in
+                Task { await self?.monitorChanged() }
+            })
         if defaultToken == nil {
             defaultToken = try hardware.addListener(
                 .init(object, kAudioHardwarePropertyDefaultInputDevice), queue: queue
@@ -201,7 +223,23 @@ public actor EngineController {
             }
         }
     }
-    private func build() async throws {
+    /// Diagnostic override; never changes the system default output.
+    public static func reportedMonitorLatency(
+        inputFrames: UInt32, outputFrames: UInt32, bufferFrames: UInt32, sampleRate: Double
+    ) -> Double {
+        guard sampleRate > 0 else { return 0 }
+        return (Double(inputFrames) + Double(outputFrames) + 2 * Double(bufferFrames)) * 1000 / sampleRate
+    }
+    public func setDiagnosticMonitorSilent(_ silent: Bool) { diagnosticMonitorSilent = silent }
+    public func setMonitorOutput(uid: String?) { monitorOutputUID = uid }
+    public func setMonitorEnabled(_ enabled: Bool) async throws {
+        guard monitorEnabled != enabled else { return }
+        monitorEnabled = enabled
+        guard state == .running, !sleeping else { return }
+        try tearDown()
+        try await build()
+    }
+    private func build(withoutMonitor: Bool = false) async throws {
         setState(.starting)
         do {
             guard hardware.microphoneAuthorized else {
@@ -220,9 +258,51 @@ public actor EngineController {
                 setState(hasRun ? .recovering(.sourceLost) : .error(.sourceUnavailable(selected ?? "")))
                 return
             }
+            let previousMonitor = monitorOutput
+            monitorOutput = nil
+            resolvedMonitorOutput = nil
+            resolvedMonitorEligible = false
+            monitorStatus = .off
+            var monitor: AudioDevice?
+            if monitorEnabled {
+                resolvedMonitorOutput = currentMonitorOutput(in: devices)
+                resolvedMonitorEligible = monitorEligible(resolvedMonitorOutput, in: devices)
+                if let output = resolvedMonitorOutput, output.outputChannels > 0 {
+                    if !resolvedMonitorEligible {
+                        monitorStatus = .unavailable(reason: .outputIsLoopback, outputName: output.name)
+                    } else if withoutMonitor {
+                        monitorStatus = .unavailable(reason: .formatUnsupported, outputName: output.name)
+                    } else {
+                        monitor = output
+                    }
+                } else {
+                    monitorStatus = .unavailable(reason: .noOutput, outputName: nil)
+                }
+            }
+            var destinationRates = blackHole.supportedRates
+            if let output = monitor {
+                destinationRates = blackHole.supportedRates.flatMap { a in
+                    output.supportedRates.compactMap { b -> AudioRange? in
+                        let low = max(a.minimum, b.minimum)
+                        let high = min(a.maximum, b.maximum)
+                        return low <= high ? AudioRange(low, high) : nil
+                    }
+                }
+                if Self.workingSampleRate(source: source.supportedRates, destination: destinationRates) == nil {
+                    monitorStatus = .unavailable(reason: .formatUnsupported, outputName: output.name)
+                    monitor = nil
+                    destinationRates = blackHole.supportedRates
+                }
+            }
+            if let previousMonitor, previousMonitor.uid != monitor?.uid {
+                restoreMonitorRate(previousMonitor)
+                let refreshed = try hardware.devices()
+                resolvedMonitorOutput = monitorEnabled ? currentMonitorOutput(in: refreshed) : nil
+                resolvedMonitorEligible = monitorEligible(resolvedMonitorOutput, in: refreshed)
+            }
             guard
                 let working = Self.workingSampleRate(
-                    source: source.supportedRates, destination: blackHole.supportedRates)
+                    source: source.supportedRates, destination: destinationRates)
             else {
                 throw EngineError.formatUnsupported
             }
@@ -236,12 +316,25 @@ public actor EngineController {
                 try hardware.setRate(blackHole.id, rate: working)
                 blackHole.sampleRate = working
             }
+            if var output = monitor {
+                if output.uid == source.uid { output.sampleRate = source.sampleRate }
+                monitorOutput = output
+                if output.sampleRate != working {
+                    recordRate(uid: output.uid, current: output.sampleRate, target: working)
+                    try hardware.setRate(output.id, rate: working)
+                    output.sampleRate = working
+                    monitor = output
+                    monitorOutput = output
+                }
+                monitor = output
+                resolvedMonitorOutput = output
+            }
             self.source = source
             destination = blackHole
             for stale in devices where stale.uid == AggregateBuilder.uid {
                 try hardware.destroyAggregate(stale.id)
             }
-            let id = try hardware.createAggregate(source: source.uid, destination: blackHole.uid)
+            let id = try hardware.createAggregate(source: source.uid, destination: blackHole.uid, monitor: monitor?.uid)
             aggregate = id
             let deadline = Date().addingTimeInterval(2)
             while !(try hardware.devices().contains(where: { $0.id == id && $0.alive })) {
@@ -251,10 +344,15 @@ public actor EngineController {
             buffer = try hardware.setBuffer(id, frames: requested)
             let sourceLayout = try hardware.layout(source.id)
             let destinationLayout = try hardware.layout(blackHole.id)
-            var routing = try AggregateBuilder.routing(source: sourceLayout, destination: destinationLayout)
+            let monitorLayout = try monitor.map { try hardware.layout($0.id) }
+            let extraLayout = monitor?.uid == source.uid ? nil : monitorLayout
+            var routing = try AggregateBuilder.routing(
+                source: sourceLayout, destination: destinationLayout, monitor: monitorLayout,
+                monitorIsSource: monitor?.uid == source.uid)
             guard let context = mb_engine_create(try hardware.maximumFrames(id, buffer: buffer), source.sampleRate)
             else { throw EngineError.formatUnsupported }
             engine = context
+            mb_engine_set_monitor_silent(context, diagnosticMonitorSilent)
             guard mb_engine_configure(context, &routing) == 0 else { throw EngineError.formatUnsupported }
             setChannelSelection(channelSelection)
             applyControls()
@@ -263,13 +361,15 @@ public actor EngineController {
             try hardware.streamUsage(
                 id, proc: io, input: true,
                 enabled: Array(repeating: true, count: sourceLayout.inputStreams)
-                    + Array(repeating: false, count: destinationLayout.inputStreams))
+                    + Array(repeating: false, count: destinationLayout.inputStreams)
+                    + Array(repeating: false, count: extraLayout?.inputStreams ?? 0))
             try hardware.streamUsage(
                 id, proc: io, input: false,
-                enabled: Array(repeating: false, count: sourceLayout.outputStreams)
-                    + Array(repeating: true, count: destinationLayout.outputStreams))
+                enabled: Array(repeating: monitor?.uid == source.uid, count: sourceLayout.outputStreams)
+                    + Array(repeating: true, count: destinationLayout.outputStreams)
+                    + Array(repeating: true, count: extraLayout?.outputStreams ?? 0))
             try hardware.startIO(id, proc: io)
-            for device in [source, blackHole] {
+            for device in [source, blackHole] + (monitor.map { [$0] } ?? []) {
                 tokens.append(
                     try hardware.addListener(.init(device.id, kAudioDevicePropertyDeviceIsAlive), queue: queue) {
                         [weak self] in
@@ -282,7 +382,7 @@ public actor EngineController {
                         Task { await self?.rateChanged(uid: uid) }
                     })
             }
-            for device in [source, blackHole] {
+            for device in [source, blackHole] + (monitor.map { [$0] } ?? []) {
                 for scope in [kAudioObjectPropertyScopeInput, kAudioObjectPropertyScopeOutput] {
                     tokens.append(
                         try hardware.addListener(
@@ -300,15 +400,32 @@ public actor EngineController {
                 try hardware.latencyFrames(source.id, scope: kAudioObjectPropertyScopeInput)
                 + hardware.latencyFrames(blackHole.id, scope: kAudioObjectPropertyScopeOutput)
                 + hardware.latencyFrames(id, scope: kAudioObjectPropertyScopeInput) + buffer
+            if let monitor {
+                let latency = try Self.reportedMonitorLatency(
+                    inputFrames: hardware.latencyFrames(source.id, scope: kAudioObjectPropertyScopeInput),
+                    outputFrames: hardware.latencyFrames(monitor.id, scope: kAudioObjectPropertyScopeOutput),
+                    bufferFrames: buffer, sampleRate: working)
+                monitorStatus = .active(output: monitor, reportedLatencyMs: latency)
+            }
             hasRun = true
             setState(.running)
             settleUntil = Date().addingTimeInterval(0.3)
             try await routingManager.engineDidStart(blackHole: blackHole)
         } catch {
+            if monitorOutput != nil, !withoutMonitor {
+                try tearDown()
+                try await build(withoutMonitor: true)
+                return
+            }
             setState(.error((error as? EngineError) ?? .invalidArgument(String(describing: error))))
             try tearDown()
             throw error
         }
+    }
+    private func monitorChanged() {
+        guard monitorEnabled, state == .running else { return }
+        settleUntil = .distantPast
+        changed(force: true)
     }
     private func overloaded() { overloads += 1 }
     public func setChannelSelection(_ selection: ChannelSelection) {
@@ -431,7 +548,12 @@ public actor EngineController {
         }
         let sameSource = currentSource.map { current in source?.matchesEngineDescriptor(current) ?? false } ?? false
         let sameDestination = destination?.matchesEngineDescriptor(currentDestination) ?? false
-        if state == .running, sameSource, sameDestination {
+        let currentOutput = currentMonitorOutput(in: devices)
+        let sameMonitor =
+            !monitorEnabled
+            || (sameMonitorDescriptor(resolvedMonitorOutput, currentOutput)
+                && resolvedMonitorEligible == monitorEligible(currentOutput, in: devices))
+        if state == .running, sameSource, sameDestination, sameMonitor {
             // Right after a build the HAL still reports the engine's own start; a forced
             // notification then is not an external format change.
             let settling = Date() < settleUntil
@@ -449,22 +571,51 @@ public actor EngineController {
             try await build()
         } catch { setState(.error((error as? EngineError) ?? .invalidArgument(String(describing: error)))) }
     }
+    private func currentMonitorOutput(in devices: [AudioDevice]) -> AudioDevice? {
+        let id = try? hardware.defaultOutput()
+        return devices.first {
+            (monitorOutputUID == nil ? $0.id == id : $0.uid == monitorOutputUID) && $0.alive
+        }
+    }
+    private func monitorEligible(_ output: AudioDevice?, in devices: [AudioDevice]) -> Bool {
+        guard var output, output.outputChannels > 0 else { return false }
+        output.inputChannels = 1
+        return output.isEligible(in: devices)
+    }
+    private func sameMonitorDescriptor(_ previous: AudioDevice?, _ current: AudioDevice?) -> Bool {
+        guard let previous, let current else { return previous == nil && current == nil }
+        return previous.matchesEngineDescriptor(current)
+            && previous.availableSampleRates == current.availableSampleRates
+            && previous.subdeviceUIDs == current.subdeviceUIDs
+    }
+    private func restoreMonitorRate(_ output: AudioDevice) {
+        // A duplex source remains in the aggregate when its monitoring role ends.
+        guard output.uid != source?.uid, output.uid != destination?.uid else { return }
+        restoreRates(only: [output.uid])
+    }
     private func recordRate(uid: String, current: Double, target: Double) {
         if previousRates[uid] == nil { previousRates[uid] = current }
         appliedRates[uid] = target
     }
-    /// Best-effort restore of the rates MicBoost changed, on a voluntary stop only.
-    private func restoreRates() {
+    /// Restore all rates on voluntary stop, or only an output leaving the aggregate.
+    private func restoreRates(only uids: Set<String>? = nil) {
         guard !appliedRates.isEmpty else { return }
         let devices = (try? hardware.devices()) ?? []
-        for (uid, applied) in appliedRates {
+        for (uid, applied) in appliedRates where uids == nil || uids?.contains(uid) == true {
             guard let device = devices.first(where: { $0.uid == uid && $0.alive }),
                 let previous = previousRates[uid], previous != applied, device.sampleRate == applied
             else { continue }
             try? hardware.setRate(device.id, rate: previous)
         }
-        appliedRates.removeAll()
-        previousRates.removeAll()
+        if let uids {
+            for uid in uids {
+                appliedRates.removeValue(forKey: uid)
+                previousRates.removeValue(forKey: uid)
+            }
+        } else {
+            appliedRates.removeAll()
+            previousRates.removeAll()
+        }
     }
     private func tearDown() throws {
         for token in tokens { try hardware.removeListener(token) }
@@ -569,12 +720,14 @@ public actor EngineController {
         } else {
             defaultStatus = .unresolved
         }
-        return EngineStatus(
+        var result = EngineStatus(
             state: state, source: source, blackHole: destination, defaultInput: defaultStatus,
             defaultInputName: current?.name,
             sampleRate: rate,
             bufferFrames: buffer, reportedLatencyMs: rate > 0 ? latency * 1000 / rate : 0,
             overloads: overloads, cycles: counters.cycles, inputMissing: counters.input_missing,
             nonfiniteResets: counters.nonfinite_resets, ioDeltaHost: counters.io_delta_host)
+        result.monitor = state == .running ? monitorStatus : .off
+        return result
     }
 }

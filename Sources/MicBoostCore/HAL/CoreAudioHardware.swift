@@ -97,6 +97,11 @@ public final class CoreAudioHardware: AudioHardware {
         }
         return d
     }
+    public func defaultOutput() throws -> AudioObjectID {
+        try scalar(
+            .init(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDefaultOutputDevice),
+            as: AudioObjectID.self)
+    }
     public func defaultInput() throws -> AudioObjectID {
         try scalar(
             .init(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDefaultInputDevice),

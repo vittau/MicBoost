@@ -31,6 +31,10 @@ import MicBoostCore
     private let bannerRow = PanelBannerRow()
     private let gainRow = PanelGainRow()
     private let metersRow = PanelMetersRow()
+    private let monitorRow = PanelMonitorRow()
+    private let monitorDetailRow = PanelMonitorDetailRow()
+    private let monitorItem = NSMenuItem()
+    private let monitorDetailItem = NSMenuItem()
     private let routingRow = PanelRoutingRow()
     private let equalizerHeaderRow = PanelEQHeaderRow()
     private let equalizerBandsRow = PanelEQBandsRow()
@@ -86,6 +90,7 @@ import MicBoostCore
         for (item, row) in [
             (headerItem, headerRow), (bannerItem, bannerRow), (gainItem, gainRow),
             (metersItem, metersRow), (routingItem, routingRow),
+            (monitorItem, monitorRow), (monitorDetailItem, monitorDetailRow),
             (equalizerHeaderItem, equalizerHeaderRow), (equalizerBandsItem, equalizerBandsRow),
         ] {
             item.view = row
@@ -96,6 +101,7 @@ import MicBoostCore
         menu.addItem(headerItem)
         menu.addItem(gainItem)
         menu.addItem(metersItem)
+        menu.addItem(monitorItem)
         menu.addItem(.separator())
         menu.addItem(routingItem)
         menu.addItem(microphoneHeaderItem)
@@ -109,6 +115,10 @@ import MicBoostCore
     }
 
     private func wire() {
+        monitorRow.onToggle = { [weak self] enabled in
+            self?.model.setMonitorEnabled(enabled)
+            self?.refresh()
+        }
         headerRow.onToggle = { [weak self] enabled in self?.model.processing(enabled) }
         gainRow.onMute = { [weak self] in self?.model.mute() }
         gainRow.onGain = { [weak self] db in self?.model.gain(db) }
@@ -209,6 +219,12 @@ import MicBoostCore
 
     /// Rewrites every row from the model; runs on each state snapshot while the panel is open.
     public func refresh() {
+        monitorRow.update(enabled: model.monitorEnabled, processing: model.controls.processingEnabled)
+        monitorDetailRow.update(model.monitorDescription)
+        setItem(
+            monitorDetailItem,
+            present: model.monitorEnabled && model.controls.processingEnabled && !model.monitorDescription.isEmpty,
+            at: menu.index(of: monitorItem) + 1)
         headerRow.update(enabled: model.controls.processingEnabled)
         updateBanner()
         gainRow.update(
@@ -304,7 +320,7 @@ import MicBoostCore
     /// Adopts the insets measured from the menu's own layout (docs/ui.md "Painel").
     private func applyMetrics() {
         for row in [
-            headerRow, bannerRow, gainRow, metersRow, routingRow, equalizerHeaderRow,
+            headerRow, bannerRow, gainRow, metersRow, monitorRow, monitorDetailRow, routingRow, equalizerHeaderRow,
             equalizerBandsRow,
         ] {
             row.applyMetrics()

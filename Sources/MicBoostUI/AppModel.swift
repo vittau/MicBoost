@@ -33,6 +33,28 @@ import SwiftUI
     /// routing row and the microphone list may flash (docs/ui.md "Mensagens de estado").
     public static let absenceGrace: Duration = .milliseconds(1500)
 
+    public var monitorEnabled = false
+    public func setMonitorEnabled(_ enabled: Bool) {
+        monitorEnabled = enabled
+        Task {
+            do { try await engine.setMonitorEnabled(enabled) } catch { self.error = error as? EngineError }
+        }
+    }
+    public var monitorDescription: String {
+        guard let status else { return "" }
+        switch status.monitor {
+        case .off: return ""
+        case .active(let output, let latency):
+            let format = localized(latency > 50 ? "%@ · high delay (≈ %d ms)" : "%@ · ≈ %d ms")
+            return String(format: format, output.name, Int(latency.rounded()))
+        case .unavailable(let reason, let name):
+            switch reason {
+            case .noOutput: return localized("No audio output.")
+            case .outputIsLoopback: return String(format: localized("Unavailable with %@."), name ?? "")
+            case .formatUnsupported: return String(format: localized("Unsupported format for %@."), name ?? "")
+            }
+        }
+    }
     public var controls = Settings()
     public var status: EngineStatus? {
         didSet {
@@ -494,7 +516,7 @@ import SwiftUI
     public var report: String {
         guard let status else { return localized("Stopped") }
         return
-            "\(status.sampleRate) Hz\n\(status.bufferFrames) frames\n\(status.reportedLatencyMs) ms\nOverloads: \(status.overloads)\ninput_missing: \(status.inputMissing)\nnonfinite_resets: \(status.nonfiniteResets)"
+            "\(status.sampleRate) Hz\n\(status.bufferFrames) frames\n\(status.reportedLatencyMs) ms\nMonitor: \(monitorDescription)\nOverloads: \(status.overloads)\ninput_missing: \(status.inputMissing)\nnonfinite_resets: \(status.nonfiniteResets)"
     }
     public func shutdown() async throws {
         monitor?.cancel()

@@ -12,6 +12,7 @@ Status: `não iniciado` · `em andamento` · `concluído`. Uma etapa só é conc
 | 5 | Recuperação | em andamento |
 | 6 | Distribuição | em andamento |
 | 7 | Entrega | não iniciado |
+| 8 | Modo monitor | em andamento |
 
 ## 0 — Estrutura e diagnóstico
 
@@ -102,6 +103,20 @@ Condições de conclusão:
 - README do repositório completo, conforme [distribution.md](distribution.md#readme-do-repositório), com capturas da interface final;
 - medições registradas;
 - artefatos publicados apenas dos canais validados.
+
+## 8 — Modo monitor
+
+Status: implementação disponível; medições com monitor silencioso e validação
+manual pendentes de sessão com o mantenedor. Ensaios destinados aos alto-falantes
+do Mac, mesmo silenciosos, exigem sua presença e pedido explícito.
+
+Entregas: [modo monitor](audio-engine.md#modo-monitor) com a saída padrão como terceiro subdispositivo do agregado, `MonitorStatus`, linha do monitor no painel e no diagnóstico ([ui.md](ui.md#painel)), testes com a HAL falsa e de UI, `micboost-diag monitor-latency` e README atualizado.
+
+Condições de conclusão:
+- `swift build` e `swift test` verdes, com os testes de [testing.md](testing.md#micboostcoretests-com-fakeaudiohardware);
+- latência adicionada pelo MicBoost medida silenciosamente por `monitor-latency`: ponte fonte → BlackHole com o subdispositivo de monitor presente (mediana < 20 ms no buffer padrão de 256 frames a 48 kHz, fonte e saída internas), excluindo latências físicas de entrada/saída da HAL; registrar a medição e a estimativa física total como contexto em [testing.md](testing.md#resultados-registrados);
+- `micboost-diag run --monitor --monitor-silent` por 60 s sem overload nem `input_missing`, com o pico no BlackHole ≤ −1 dBFS;
+- validação manual com o mantenedor: ouvir a própria voz nos fones sem eco perceptível, trocar a saída padrão com o monitor ligado e desligar o monitor sem alterar o áudio entregue aos apps além da rampa.
 
 ## Decisões em aberto
 

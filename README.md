@@ -37,6 +37,8 @@ Microsoft Teams, FaceTime, Discord, QuickTime and more.
   <sub>The MicBoost menu: on/off switch, volume, level meters, microphone and equalizer.</sub>
 </p>
 
+Hear your processed voice through your current speakers or headphones with **Hear My Voice**. Use headphones to avoid feedback; monitoring starts off each time you open MicBoost.
+
 ## What you need
 
 - A Mac with macOS 14 Sonoma or later (Apple Silicon or Intel).
