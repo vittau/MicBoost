@@ -45,8 +45,8 @@ Conteúdo, de cima para baixo (SwiftUI, `PanelView`):
    - divergência: "Entrada do sistema: <nome>" + botão "Usar MicBoost".
    - com `manageDefaultInput` desligado, a linha só informa a entrada atual, sem tratá-la como divergência; o botão "Usar MicBoost" aparece se a entrada não for o BlackHole.
 5. **Microfone:** lista de fontes elegíveis no estilo das listas de dispositivos da Central de Controle (ícone por transporte, nome, marca de seleção). Selecionar troca a fonte (reconstrução do motor com rampa). Uma fonte persistida que não está conectada aparece como "<nome> (desconectado)".
-6. **Equalizador:** seção expansível (`DisclosureGroup`, recolhida por padrão; o estado de expansão persiste; clicar no título ou no chevron alterna a expansão, e o teclado continua usando o controle nativo), com:
-   - `Toggle` "Ativar EQ" com switch nativo padrão;
+6. **Equalizador:** seção expansível (`DisclosureGroup`, recolhida por padrão; o estado de expansão persiste; clicar no título ou no chevron alterna a expansão, e o teclado continua usando o controle nativo), com switch nativo "Ativar EQ" sempre visível à direita do título, independente da expansão. Alternar o switch não expande nem recolhe os ajustes. Apenas as bandas e ações ficam na área recolhível:
+
    - Graves: slider de ganho (dB) + campo de frequência (Hz);
    - Médios: slider de ganho + campo de frequência + slider "Largura" com o valor de Q mostrado (Q maior = banda mais estreita);
    - Agudos: slider de ganho + campo de frequência;

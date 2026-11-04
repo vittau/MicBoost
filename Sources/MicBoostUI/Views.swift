@@ -112,16 +112,6 @@ import SwiftUI
             Divider()
             DisclosureGroup(isExpanded: $model.expanded) {
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text(localized("Enable EQ"))
-                        Spacer()
-                        Toggle(localized("Enable EQ"), isOn: $model.controls.eq.enabled)
-                            .labelsHidden()
-                            .accessibilityLabel(localized("Enable EQ"))
-                            .toggleStyle(.switch)
-
-                            .onChange(of: model.controls.eq.enabled) { model.eq() }
-                    }
                     band(
                         "Bass", gain: $model.controls.eq.low.gainDB, frequency: $model.controls.eq.low.frequency,
                         range: EQSettings.lowFrequencyRange)
@@ -140,10 +130,17 @@ import SwiftUI
                     }.buttonStyle(.borderless)
                 }.padding(.top, 8)
             } label: {
-                Text(localized("Equalizer"))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-                    .onTapGesture { model.expanded.toggle() }
+                HStack {
+                    Text(localized("Equalizer"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .onTapGesture { model.expanded.toggle() }
+                    Toggle(localized("Enable EQ"), isOn: $model.controls.eq.enabled)
+                        .labelsHidden()
+                        .accessibilityLabel(localized("Enable EQ"))
+                        .toggleStyle(.switch)
+                        .onChange(of: model.controls.eq.enabled) { model.eq() }
+                }
             }
             Divider()
             VStack(spacing: 0) {

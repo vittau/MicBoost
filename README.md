@@ -57,7 +57,8 @@ Available today:
 - **Gain from −12 to +24 dB**, mute and peak protection; mute and the limiting indicator keep
   the panel layout stable.
 - **3-band EQ** with adjustable bass, parametric mids and treble, bypass and reset. Click its
-  title or disclosure arrow to expand or collapse it; each band has a clear section heading.
+  title or disclosure arrow to expand or collapse the adjustments; the EQ switch stays visible
+  in the header. Each band has a clear section heading.
 
 - **Any Core Audio input**, captured explicitly by UID — the source does not have to be the
   system default input.
