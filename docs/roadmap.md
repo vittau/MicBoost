@@ -114,7 +114,7 @@ Entregas: [modo monitor](audio-engine.md#modo-monitor) com a saída padrão como
 
 Condições de conclusão:
 - `swift build` e `swift test` verdes, com os testes de [testing.md](testing.md#micboostcoretests-com-fakeaudiohardware);
-- latência adicionada pelo MicBoost medida silenciosamente por `monitor-latency`: ponte fonte → BlackHole com o subdispositivo de monitor presente (mediana < 50 ms no buffer padrão, fonte e saída internas), excluindo latências físicas de entrada/saída da HAL; registrar a medição e a estimativa física total como contexto em [testing.md](testing.md#resultados-registrados);
+- latência adicionada pelo MicBoost medida silenciosamente por `monitor-latency`: ponte fonte → BlackHole com o subdispositivo de monitor presente (mediana < 20 ms no buffer padrão de 256 frames a 48 kHz, fonte e saída internas), excluindo latências físicas de entrada/saída da HAL; registrar a medição e a estimativa física total como contexto em [testing.md](testing.md#resultados-registrados);
 - `micboost-diag run --monitor --monitor-silent` por 60 s sem overload nem `input_missing`, com o pico no BlackHole ≤ −1 dBFS;
 - validação manual com o mantenedor: ouvir a própria voz nos fones sem eco perceptível, trocar a saída padrão com o monitor ligado e desligar o monitor sem alterar o áudio entregue aos apps além da rampa.
 

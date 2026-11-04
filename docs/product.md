@@ -6,7 +6,7 @@ Amplificar e equalizar o microfone escolhido pelo usuário e disponibilizar o á
 
 - interface com aparência de controle nativo do macOS (Volume/Bluetooth da Central de Controle);
 - resposta imediata dos controles e latência de áudio adicional de no máximo 100 ms no uso normal (fonte → BlackHole), com arquitetura sem fila que mire < 20 ms (ver [testing.md](testing.md#medição-de-latência));
-- modo monitor para ouvir a própria voz processada na saída de áudio do sistema, com latência adicionada pelo MicBoost **< 50 ms**, excluindo a latência física dos dispositivos ([audio-engine.md](audio-engine.md#modo-monitor));
+- modo monitor para ouvir a própria voz processada na saída de áudio do sistema, com latência adicionada pelo MicBoost **< 20 ms**, excluindo a latência física dos dispositivos ([audio-engine.md](audio-engine.md#modo-monitor));
 - ganho acima de 200% (+6,02 dB), sem teto herdado de outra solução;
 - instalação simples **sem notarização** e sem adesão paga ao Apple Developer Program.
 
@@ -31,14 +31,14 @@ Motivação: o VirtuMic tem interface pesada e atraso perceptível (o log dele m
 7. Persistência de ganho, mute, EQ, dispositivo selecionado e seleção de canais.
 8. Detecção e recuperação: BlackHole ausente, permissão de microfone negada, desconexão da fonte, suspensão/retomada, mudança de formato e mudança manual da entrada padrão.
 9. Tela secundária de ajustes avançados (buffer, canais, diagnóstico).
-10. Modo monitor: chave no painel que leva a voz processada também à saída padrão do sistema (fones), com latência adicionada pelo MicBoost medida < 50 ms em saídas internas, com fio e USB ([audio-engine.md](audio-engine.md#modo-monitor)).
+10. Modo monitor: chave no painel que leva a voz processada também à saída padrão do sistema (fones), com latência adicionada pelo MicBoost medida < 20 ms em saídas internas, com fio e USB ([audio-engine.md](audio-engine.md#modo-monitor)).
 11. Distribuição: tap Homebrew próprio com dependência do cask `blackhole-2ch` e download direto `.zip` ([distribution.md](distribution.md)).
 
 ## Fora de escopo da v1
 
 Redução de ruído, compressor avançado, ganho automático, volume próprio do monitor, presets de EQ, gráfico de resposta, módulo da Central de Controle, Mac App Store, `homebrew/cask` oficial, notarização, iniciar no login.
 
-Modo monitor em saídas Bluetooth: funciona, mas a latência física do próprio fone (tipicamente acima de 100 ms) pode tornar o atraso total alto. Essa latência não entra na meta de < 50 ms adicionados pelo MicBoost; o painel avisa quando a estimativa total reportada passa de 50 ms.
+Modo monitor em saídas Bluetooth: funciona, mas a latência física do próprio fone (tipicamente acima de 100 ms) pode tornar o atraso total alto. Essa latência não entra na meta de < 20 ms adicionados pelo MicBoost; o painel avisa quando a estimativa total reportada passa de 50 ms.
 
 Limitação inerente: o ganho digital também amplifica ruído e não recupera áudio já saturado na origem. O painel indica saturação da entrada quando ela ocorre.
 
@@ -83,7 +83,7 @@ Estabilidade e desempenho:
 - A interface permanece responsiva.
 
 Modo monitor:
-- Com o monitor ligado, a voz processada (a mesma entregue ao BlackHole) sai na saída padrão do sistema, com latência adicionada < 50 ms (mediana) no buffer padrão em saída interna, com fio ou USB. Essa latência é a ponte fonte → BlackHole medida com o subdispositivo de monitor presente no agregado, pois as duas saídas são escritas no mesmo ciclo; latência de dispositivo, safety offset e latência de stream de entrada e saída são contexto e não entram no critério ([testing.md](testing.md#medição-de-latência-do-monitor)).
+- Com o monitor ligado, a voz processada (a mesma entregue ao BlackHole) sai na saída padrão do sistema, com latência adicionada < 20 ms (mediana) no buffer padrão em saída interna, com fio ou USB. Essa latência é a ponte fonte → BlackHole medida com o subdispositivo de monitor presente no agregado, pois as duas saídas são escritas no mesmo ciclo; latência de dispositivo, safety offset e latência de stream de entrada e saída são contexto e não entram no critério ([testing.md](testing.md#medição-de-latência-do-monitor)).
 - Ligar e desligar o monitor não altera ganho, EQ, roteamento nem a entrada padrão; trocar a saída padrão com o monitor ligado leva o monitor à nova saída.
 - O monitor nunca usa um BlackHole (nem um agregado que o contenha) como saída.
 

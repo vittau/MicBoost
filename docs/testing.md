@@ -84,7 +84,7 @@ Método (`micboost-diag latency`):
 
 **Aceitação (v1, fonte → BlackHole):** mediana ≤ 100 ms em toda fonte suportada, exceto fontes cuja própria latência de entrada reportada já exceda esse valor (por exemplo, Continuity), que ficam documentadas como limitação.
 
-**Objetivo de engenharia:** mediana < 20 ms no buffer padrão para fontes USB e internas a 48 kHz, para deixar margem ao [modo monitor](#medição-de-latência-do-monitor); desvios são registrados abaixo com a causa.
+**Objetivo de engenharia:** mediana fonte → BlackHole < 20 ms no buffer padrão de 256 frames para fontes USB e internas a 48 kHz, também adotada como critério de latência adicionada do [modo monitor](#medição-de-latência-do-monitor) quando o subdispositivo de monitor está presente no agregado; desvios são registrados abaixo com a causa.
 
 ## Medição de latência do monitor
 
@@ -111,7 +111,7 @@ usa a saída indicada ou, sem `--output`, a saída padrão, sem alterá-la.
 4. Repete N tentativas (padrão 10), com mediana, mínimo e máximo da latência adicionada
    em ms e frames; imprime separadamente o resumo da estimativa física total em ms.
 
-Aceitação: mediana da **latência adicionada pelo MicBoost < 50 ms**, medida na ponte
+Aceitação: mediana da **latência adicionada pelo MicBoost < 20 ms**, medida na ponte
 fonte → BlackHole com o subdispositivo de monitor presente, buffer 256 a 48 kHz, fonte
 interna ou USB e saída interna ou com fio. Dispositivo, safety offset e stream de
 entrada e saída são contexto e não entram no critério. A escuta real com fones é validação manual com o mantenedor.
@@ -201,11 +201,14 @@ mínimo 15,1042 e máximo 15,1250 ms; `io_delta_ms = 14,6458`. A diferença de
 aproximadamente 1,917 ms aparece também no timing do IOProc, muito menor que os
 ~40 ms do valor acústico; não identifica isoladamente custo de drift ou de buffer.
 As condições não foram repetidas com monitor e a comparação não é ensaio controlado.
+Os 13,19 ms sem monitor e os 15,10 ms com o subdispositivo de monitor no ensaio
+anterior à regra são apenas contexto; a aceitação de < 20 ms permanece pendente
+de ensaio com monitor e mantenedor presente.
 
 `swift build` e `swift format lint --strict --recursive Sources Tests Package.swift`
-aprovados; `swift test`: 137 testes (53 UI em 1,273 s, 12 DSP em 0,144 s,
-72 Core em 0,939 s, incluindo um caso conhecido da HAL falsa), total dos targets
-2,356 s sem compilação. Capturas do painel regeneradas com monitor desligado.
+aprovados; `swift test`: 137 testes (53 UI em 1,228 s, 12 DSP em 0,131 s,
+72 Core em 0,943 s, incluindo um caso conhecido da HAL falsa), total dos targets
+2,302 s sem compilação. Capturas do painel regeneradas com monitor desligado.
 Entrada e saída padrão conferidas ao encerrar: `BuiltInMicrophoneDevice` e
 `BuiltInSpeakerDevice`. Nenhum processo de diagnóstico permaneceu em execução.
 
@@ -216,7 +219,7 @@ A estimativa física ilustrativa completa usa os termos de entrada que a correla
 cancela: `31,5208 + 13,1875 + 11,2917 = 56,0000 ms`, próxima dos 55,792 ms do
 registro acústico anterior à regra. Esse cruzamento explica a ordem de grandeza da
 anomalia; não substitui medição com monitor presente nem prova aceitação. A meta
-< 50 ms se refere somente à ponte medida com monitor no agregado, não a essa soma. Com a ponte
+< 20 ms se refere somente à ponte medida com monitor no agregado, não a essa soma. Com a ponte
 registrada no ensaio antigo com monitor (15,1042 ms), a soma seria 57,9167 ms; as
 condições diferentes e a instabilidade acústica impedem comparação de precisão.
 

@@ -130,7 +130,7 @@ O valor oficial é o medido ([testing.md](testing.md#medição-de-latência)); o
 
 ## Modo monitor
 
-Com o monitor ligado, a voz processada sai também na saída padrão do sistema, para o usuário ouvir a si mesmo. A meta é latência **adicionada pelo MicBoost < 50 ms**: a mediana fonte → BlackHole medida com o subdispositivo de monitor presente, pois BlackHole e monitor são escritos no mesmo ciclo. Latências físicas de entrada e saída não entram na meta ([testing.md](testing.md#medição-de-latência-do-monitor)).
+Com o monitor ligado, a voz processada sai também na saída padrão do sistema, para o usuário ouvir a si mesmo. A meta é latência **adicionada pelo MicBoost < 20 ms**: a mediana fonte → BlackHole medida a 48 kHz e buffer de 256 frames com o subdispositivo de monitor presente, pois BlackHole e monitor são escritos no mesmo ciclo. Latências físicas de entrada e saída não entram na meta ([testing.md](testing.md#medição-de-latência-do-monitor)).
 
 **Decisão: a saída de monitor é um subdispositivo do mesmo agregado.** O IOProc único escreve no BlackHole e na saída de monitor no mesmo ciclo, sem fila. A estimativa total do monitor inclui a latência física de entrada da fonte, dois buffers do agregado e a latência física de saída; os termos físicos não fazem parte da meta de latência adicionada. Um segundo IOProc na saída exigiria buffer circular e resampler próprio, e acrescentaria a ocupação da fila à latência.
 
