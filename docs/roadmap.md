@@ -74,8 +74,6 @@ Condições de conclusão: cada linha da tabela de [audio-engine.md](audio-engin
 
 ## 6 — Distribuição
 
-Status: `em andamento`.
-
 Entregas implementadas:
 - `scripts/package-release.sh <versão>`, com build de release universal e as verificações de arquitetura, assinatura ad hoc, minos e versão descritas em [distribution.md](distribution.md#release-download-direto);
 - modelo do cask em `packaging/homebrew/micboost.rb` e modelo das notas de release em `packaging/release-notes.md`;
