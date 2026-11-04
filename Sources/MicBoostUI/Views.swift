@@ -338,7 +338,7 @@ import SwiftUI
                 LabeledContent(localized("Project")) {
                     Link("GitHub", destination: URL(string: "https://github.com/vittau/MicBoost")!)
                 }
-                Text(localized("License: to be defined")).foregroundStyle(.secondary)
+                Text(localized("License: GPL-3.0")).foregroundStyle(.secondary)
             } header: {
                 Text(localized("About"))
             }

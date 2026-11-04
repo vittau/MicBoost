@@ -91,7 +91,7 @@ Pendências:
 Condições de conclusão:
 - os cenários de [distribution.md](distribution.md#homebrew-tap-próprio) e da primeira abertura foram validados em um Mac que não participou do desenvolvimento;
 - os resultados reais foram registrados em [distribution.md](distribution.md);
-- a variante com o instalador do BlackHole está decidida (publicada ou descartada) após a definição da licença.
+- a variante com o instalador do BlackHole está decidida (publicada ou descartada).
 
 ## 7 — Entrega
 
@@ -104,7 +104,6 @@ Condições de conclusão:
 
 | Decisão | Recomendação atual | Quando |
 |---|---|---|
-| Licença do MicBoost | GPL-3.0, que alinha com o BlackHole e simplifica uma eventual redistribuição conjunta | antes da etapa 6 |
 | Queda lenta de latência no ensaio longo | ensaio de várias horas para confirmar que se estabiliza | antes da etapa 6 |
 | Calibração do ganho com voz humana | manter +24 dB; teto aprovado nos testes numéricos, calibração manual pendente | antes de concluir etapa 2 |
 | Homebrew 7 / macOS 27 com cask sem notarização | investigar com tap local: quarentena e "Abrir Mesmo Assim" para app ad hoc, permissão de microfone após `brew upgrade`, BlackHole já instalado, `brew uninstall` | antes da etapa 6 |
