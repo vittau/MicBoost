@@ -75,8 +75,8 @@ Available today:
 - **Slim level meters**, matching the gain slider track, refresh about 20 times per second
   with gradual peak decay. Their rounded native slider tracks
   show each new peak directly; the stable **Limiter active** indicator shows
-  peak protection. Their scale ends at 0 dBFS, so the protected
-  −1 dBFS output reaches about 98.3% of the bar. This visual decay does not delay the audio.
+  peak protection. Bar lengths follow linear peak amplitude: 200% gain doubles the output
+  length with flat EQ and no limiting. The protected −1 dBFS output reaches about 89.1% of the bar. This visual decay does not delay the audio.
 - **Menu bar panel** with gain, meters, routing status, microphones and EQ, plus settings for
   buffer, channels, automatic system input switching and diagnostics, using native grouped
   sections and switches.

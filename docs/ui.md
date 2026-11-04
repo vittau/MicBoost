@@ -41,7 +41,7 @@ Conteúdo, de cima para baixo (SwiftUI, `PanelView`):
    - **Ligar:** reconstrói o motor com a fonte e os ajustes persistidos e reaplica a política de entrada padrão.
    - O estado persiste (`processingEnabled`), e a troca nunca fecha o painel.
 2. **Ganho:** botão de mute com o ícone `mic.fill`/`mic.slash.fill` centralizado em uma área fixa de 20 × 20 pt para não deslocar o slider ao alternar, `Slider` de ganho de −12 a +24 dB e rótulo `398% (+12,0dB)` (percentual primeiro; dB entre parênteses). O valor é editável: clicar no rótulo abre um campo numérico em dB. O selo "Limitador ativo" (pílula discreta) aparece ao lado do valor de ganho durante a proteção de pico; sua área permanece reservada e o selo fica oculto para acessibilidade quando inativo, sem alterar a altura do painel ou deslocar controles.
-3. **Medidores:** duas barras horizontais de 6 pt de espessura (como a trilha do slider de ganho), "Entrada" e "Saída", em dBFS de −60 a 0, sempre na cor de destaque do sistema, sem flash vermelho nem aviso textual de saturação.
+3. **Medidores:** duas barras horizontais de 6 pt de espessura (como a trilha do slider de ganho), "Entrada" e "Saída", com comprimento proporcional à amplitude de pico (0…1), valores de acessibilidade em dBFS de −60 a 0, sempre na cor de destaque do sistema, sem flash vermelho nem aviso textual de saturação.
 4. **Entrada do sistema:** apenas o estado da entrada padrão; a fonte selecionada é indicada pela marcação na lista de microfones, sem uma linha adicional de caminho do áudio:
    - ok: "Entrada do sistema: MicBoost" com marcação;
    - divergência: "Entrada do sistema: <nome>" + botão "Usar MicBoost".
@@ -133,7 +133,9 @@ O menu ativa o app ao abrir para que os controles AppKit sejam apresentados ativ
 Os toggles usam `.toggleStyle(.switch)`, sem tamanho, escala, tint ou estado visual
 forçados: o AppKit escolhe as métricas e a cor de destaque a partir do sistema.
 
-Os medidores usam escala fixa de −60 a 0 dBFS: 0 dBFS preenche 100% da barra.
-O teto do limitador permanece em −1 dBFS, correspondente a 98,33% nessa escala;
-não alterar a escala nem o teto do áudio para preencher artificialmente a saída.
-Valores fora da faixa são limitados a 0…100% apenas para desenhar a barra.
+Os medidores usam amplitude linear: comprimento = `10^(dBFS/20)`, limitado a 0…1;
+valores de −60 dBFS ou menores ficam em zero. 0 dBFS preenche 100% da barra.
+Com EQ plano e sem redução do limitador, ganho de 200% produz uma barra de saída
+duas vezes maior que a de entrada. As barras representam os picos reais antes
+do EQ e depois do limitador, e não uma projeção do ganho escolhido.
+O teto de −1 dBFS corresponde a 89,13% da barra; o áudio mantém esse teto.

@@ -53,10 +53,21 @@ import Testing
 
 @MainActor @Test func meterScaleReachesItsEndpoints() {
     #expect(AppModel.meterFraction(-60) == 0)
-    #expect(AppModel.meterFraction(-30) == 0.5)
+    #expect(abs(AppModel.meterFraction(-30) - sqrt(0.001)) < 1e-12)
     #expect(AppModel.meterFraction(0) == 1)
     #expect(AppModel.meterFraction(6) == 1)
     #expect(AppModel.meterFraction(-90) == 0)
-    #expect(abs(AppModel.meterFraction(-1) - 59.0 / 60.0) < 1e-12)
+    #expect(abs(AppModel.meterFraction(-1) - pow(10, -1.0 / 20)) < 1e-12)
     #expect(AppModel.meterFraction(.nan) == 0)
+}
+
+@MainActor @Test func meterLengthTracksAmplitudeGain() {
+    let doublingDB = 20 * log10(2.0)
+    for inputAmplitude in [0.01, 0.1, 0.4] {
+        let inputDB = 20 * log10(inputAmplitude)
+        let inputLength = AppModel.meterFraction(inputDB)
+        let outputLength = AppModel.meterFraction(inputDB + doublingDB)
+        #expect(abs(inputLength - inputAmplitude) < 1e-12)
+        #expect(abs(outputLength - 2 * inputLength) < 1e-12)
+    }
 }

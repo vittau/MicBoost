@@ -161,7 +161,7 @@ Capturas claras/escuras verificadas visualmente; sliders sem marcas de passo.
 VoiceOver, todos os atalhos, reduzir movimento/transparência e contraste aumentado
 permanecem sem validação manual completa. A etapa 4 permanece em andamento.
 
-Verificação automatizada da interface: 56 testes (5 UI, 11 DSP, 40 Core),
+Verificação automatizada da interface: 57 testes (6 UI, 11 DSP, 40 Core),
 execução somada de aproximadamente 2 s; a suíte Core inclui o caso negativo
 `fakeRejectsOutputWrite`, que registra uma issue conhecida intencionalmente.
 `swift build`, `swift test`, lint recursivo de formatação, montagem debug e
@@ -200,9 +200,11 @@ para os dois controles: numa captura solicitada 100 ms depois do degrau,
 de `NSSliderCell` usada pelo medidor já preenchia toda a faixa (captura solicitada
 aos 99,96 ms). O medidor aplica o valor diretamente ao desenho nativo, sem
 interpolar a apresentação dos picos. A escala foi conferida em 0 dBFS (100%) e
-−1 dBFS (98,33%), com clamp somente fora de −60…0 dBFS.
+−1 dBFS (89,13%) na escala de amplitude linear; valores ≤ −60 dBFS ficam em zero.
+O teste de proporcionalidade confere que +6,0206 dB dobra o comprimento para
+amplitudes de entrada de 0,01, 0,1 e 0,4.
 
 Na captura clara renderizada a 1×, a trilha colorida do slider de ganho e as duas
 barras de nível medem 6 pixels de altura (6 pt), com cantos simétricos da trilha
 nativa. As renderizações clara e escura conferem o preenchimento de 100% na
-entrada e 98,33% na saída, sem knob nem moldura de indicador de capacidade.
+entrada e 89,13% na saída, sem knob nem moldura de indicador de capacidade.

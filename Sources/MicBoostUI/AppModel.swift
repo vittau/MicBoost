@@ -40,8 +40,8 @@ public func localized(_ key: String) -> String {
     }
     public static func gainStep(option: Bool) -> Double { option ? 1 : 0.5 }
     public static func meterFraction(_ db: Double) -> Double {
-        guard db.isFinite else { return 0 }
-        return min(1, max(0, (db + 60) / 60))
+        guard db.isFinite, db > -60 else { return 0 }
+        return min(1, pow(10, db / 20))
     }
     public var icon: String {
         if error != nil || status?.defaultInput.divergedByUser == true { return "exclamationmark.triangle.fill" }
