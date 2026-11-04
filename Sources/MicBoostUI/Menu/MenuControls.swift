@@ -52,6 +52,7 @@ import AppKit
         warningValue = 2
         criticalValue = 2
         isEditable = false
+        refusesFirstResponder = true
         setAccessibilityElement(true)
         setAccessibilityRole(.levelIndicator)
         applyTint()
@@ -63,6 +64,14 @@ import AppKit
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    /// A meter is a display, not a control: mouse-downs and drags belong to the row, and the
+    /// meter never takes the keyboard focus (docs/ui.md "Medidores na UI").
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override var acceptsFirstResponder: Bool { false }
+
+    override func mouseDown(with event: NSEvent) {}
 
     private var colorObserver: (any NSObjectProtocol)?
 

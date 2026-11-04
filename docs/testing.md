@@ -43,7 +43,7 @@ Em 16, 44,1, 48 e 96 kHz:
 - Linha de entrada do sistema: BlackHole como entrada padrão mostra "MicBoost" com marcação só com o motor rodando; divergência mostra o nome com "Usar MicBoost" habilitado quando o clique funciona; entrada desconhecida não mostra botão.
 - Catálogo de strings: toda chave passada a `localized(...)` ou `String(localized:)` em `MicBoostUI` e `MicBoostApp` existe nos dois `.strings`, os dois catálogos têm exatamente as mesmas chaves e cada tradução preserva os placeholders da chave.
 - Permissão reavaliada ao ativar o app: negada mantém a faixa, concedida limpa e tenta iniciar de novo.
-- Formatação de ganho e escala dos medidores.
+- Formatação de ganho e escala dos medidores; o medidor ignora o mouse e o foco, e o valor de ganho é texto somente leitura.
 
 ## Ferramenta de diagnóstico (`micboost-diag`)
 
@@ -230,12 +230,13 @@ graves, médios e agudos e largura — são `NSSlider` puro dentro das views de 
 pressionado. O knob só acompanha valores externos quando não há arrasto, e as setas andam
 0,5 dB (1 dB com ⌥) ou 0,1 de Q.
 
-A suíte tem 107 testes (58 Core, 11 DSP, 38 UI) com execução somada de aproximadamente
-1,8 s; os testes de UI cobrem a estrutura do menu (ordem dos itens, seção "Microfone",
+A suíte tem 109 testes (58 Core, 11 DSP, 40 UI) com execução somada de aproximadamente
+1,9 s; os testes de UI cobrem a estrutura do menu (ordem dos itens, seção "Microfone",
 marcação da fonte selecionada, linha de fonte desconectada, atalhos ⌘, ⌘Q e "m"), as linhas
-de view em AppKit (cinco `NSSlider`, dois `NSSwitch`, dois `NSLevelIndicator`), a altura do
-painel com e sem o selo do limitador, a leitura dos campos numéricos (vazio, inválido,
-vírgula, ponto, fora da faixa) e o passo de seta dos sliders. `swift build`, `swift test`,
+de view em AppKit (cinco `NSSlider`, dois `NSSwitch`, dois `NSLevelIndicator` somente leitura
+e sem foco), a altura do painel com e sem o selo do limitador, o valor de ganho como rótulo,
+a leitura dos campos numéricos (vazio, inválido, vírgula, ponto, fora da faixa) e o passo de
+seta dos sliders. `swift build`, `swift test`,
 lint de formatação recursivo e a montagem debug passam. O arrasto no menu real, inclusive
 soltando o mouse fora da janela do menu, a navegação por teclado e o clique nas linhas são
 verificação manual pendente.
@@ -246,8 +247,8 @@ A lógica de recuperação está implementada e coberta pela HAL falsa; os itens
 interação humana (notificações de suspensão, TCC, remoção do driver, reinício real do
 `coreaudiod`) continuam pendentes no roteiro manual acima. A etapa 5 permanece em andamento.
 
-Verificação automatizada: 107 testes (58 Core, 11 DSP, 38 UI) com execução somada de
-aproximadamente 1,8 s; a suíte Core inclui o caso
+Verificação automatizada: 109 testes (58 Core, 11 DSP, 40 UI) com execução somada de
+aproximadamente 1,9 s; a suíte Core inclui o caso
 negativo `fakeRejectsOutputWrite`, que registra uma issue conhecida intencionalmente.
 `swift build`, `swift test`, lint recursivo de formatação, montagem debug e
 `codesign --verify --strict` passam na máquina de referência.
@@ -294,3 +295,11 @@ montado pelo `PanelMenuController` com o mesmo estado de exemplo, então mostra 
 nativos, o selo da fonte selecionada, os atalhos ⌘, e ⌘Q e as insets medidas do menu. Os
 itens de view alinham com o título dos itens nativos. `settings-*` continua vindo de
 `NSHostingView.cacheDisplay`: não há menu a compor e os controles SwiftUI são AppKit por baixo.
+
+Reteste do menu (2026-11-04): o medidor é exibição pura — `hitTest` devolve `nil`, `acceptsFirstResponder`
+é falso e o `mouseDown` é inerte —, e o valor de ganho virou rótulo somente leitura, sem campo nem ação de
+clique; o ganho continua pelo slider e pelas setas (0,5 dB, 1 dB com ⌥). As capturas `eq-*`, `panel-*` e
+`error-*` foram regeradas sem anel de foco e sem texto selecionado no primeiro campo de frequência, porque o
+auxiliar solta o primeiro respondedor antes da captura. `swift build`, `swift test` (109 testes) e
+`swift format lint --strict` passam; o arrasto do medidor e o clique no valor de ganho no menu real ficam para
+a verificação manual do mantenedor.

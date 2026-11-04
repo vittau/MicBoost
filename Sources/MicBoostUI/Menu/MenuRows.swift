@@ -342,17 +342,16 @@ import MicBoostCore
     }
 }
 
-/// Gain row: the mute button, the native slider, the editable gain label and the limiter badge
-/// (docs/ui.md "Painel", item 2).
+/// Gain row: the mute button, the native slider, the read-only gain label and the limiter badge
+/// (docs/ui.md "Painel", item 3).
 @MainActor final class PanelGainRow: PanelMenuRow {
     let mute = NSButton()
     let slider = MenuSliderControl(frame: .zero)
-    private let value = NSButton(title: "", target: nil, action: nil)
-    private let field = MenuNumberField(width: 74)
+    private let value = PanelMenuRow.label(
+        "", font: .monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular),
+        color: .labelColor)
     private let badge = PanelPill(radius: 8)
     private let badgeLabel = PanelMenuRow.label("", font: .systemFont(ofSize: 11), color: .secondaryLabelColor)
-    private var editing = false
-    private var gainDB = 0.0
 
     var onMute: (() -> Void)?
     var onGain: ((Double) -> Void)?
@@ -383,24 +382,14 @@ import MicBoostCore
         slider.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         slider.setAccessibilityLabel(localized("Gain"))
 
-        value.isBordered = false
-        value.bezelStyle = .inline
-        value.font = .monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
-        value.contentTintColor = .labelColor
-        value.target = self
-        value.action = #selector(startEditing)
         value.setAccessibilityLabel(localized("Gain"))
-        value.translatesAutoresizingMaskIntoConstraints = false
-        field.isHidden = true
-        field.onCommit = { [weak self] db in self?.finishEditing(db) }
-        field.onCancel = { [weak self] in self?.cancelEditing() }
 
         badgeLabel.setContentHuggingPriority(.required, for: .horizontal)
         badge.setAccessibilityLabel(localized("Limiter active"))
         badgeStack()
 
         let sliderRow = PanelMenuRow.horizontal([mute, slider])
-        let valueRow = PanelMenuRow.horizontal([value, field, PanelMenuRow.spacer(), badge])
+        let valueRow = PanelMenuRow.horizontal([value, PanelMenuRow.spacer(), badge])
         addRow(sliderRow)
         addRow(valueRow)
         updateHeight()
@@ -420,38 +409,13 @@ import MicBoostCore
 
     @objc private func gainChanged() { onGain?(slider.doubleValue) }
 
-    @objc private func startEditing() {
-        guard !editing else { return }
-        editing = true
-        field.show(gainDB, fractionDigits: 1)
-        value.isHidden = true
-        field.isHidden = false
-        window?.makeFirstResponder(field)
-    }
-
-    private func finishEditing(_ db: Double) {
-        guard editing else { return }
-        editing = false
-        field.isHidden = true
-        value.isHidden = false
-        onGain?(db)
-    }
-
-    private func cancelEditing() {
-        guard editing else { return }
-        editing = false
-        field.isHidden = true
-        value.isHidden = false
-    }
-
     func update(gainDB: Double, muted: Bool, limiting: Bool) {
-        self.gainDB = gainDB
         let symbol = muted ? "mic.slash.fill" : "mic.fill"
         mute.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
         mute.setAccessibilityValue(localized(muted ? "On" : "Off"))
         slider.reflect(gainDB)
         slider.setAccessibilityValue(AppModel.gainLabel(gainDB))
-        value.title = AppModel.gainLabel(gainDB)
+        value.stringValue = AppModel.gainLabel(gainDB)
         badge.isHidden = !limiting
     }
 }
