@@ -287,13 +287,31 @@ import SwiftUI
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 }
-                Picker(localized("Channels"), selection: Binding(get: { channel }, set: setChannel)) {
-                    Text(localized("Automatic")).tag(0)
-                    Text(localized("Mono mix")).tag(-1)
-                    ForEach(1...max(1, Int(model.status?.source?.inputChannels ?? 1)), id: \.self) {
-                        Text("Mono \($0)").tag($0)
+                VStack(alignment: .leading, spacing: 4) {
+                    Picker(localized("Channels"), selection: Binding(get: { channel }, set: setChannel)) {
+                        Text(localized("Automatic")).tag(0)
+                        Text(localized("Mono mix")).tag(-1)
+                        ForEach(1...sourceChannelCount, id: \.self) {
+                            Text("Mono \($0)").tag($0)
+                        }
+                        if sourceChannelCount >= 2 { Text("Stereo 1–2").tag(-2) }
                     }
-                    if (model.status?.source?.inputChannels ?? 0) >= 2 { Text("Stereo 1–2").tag(-2) }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(localized("Automatic: uses the first channel on both sides."))
+                        Text(localized("Mono mix: combines all channels on both sides."))
+                        ForEach(1...sourceChannelCount, id: \.self) { channel in
+                            Text(
+                                String.localizedStringWithFormat(
+                                    localized("Mono %lld: uses channel %lld on both sides."),
+                                    Int64(channel), Int64(channel)))
+                        }
+                        if sourceChannelCount >= 2 {
+                            Text(localized("Stereo 1–2: channel 1 on the left, channel 2 on the right."))
+                        }
+                    }
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
             Section(localized("Diagnostics")) {
@@ -331,6 +349,9 @@ import SwiftUI
         .formStyle(.grouped)
 
         .frame(width: 540)
+    }
+    private var sourceChannelCount: Int {
+        max(1, Int(model.status?.source?.inputChannels ?? 1))
     }
     private var channel: Int {
         switch model.controls.channelSelectionByUID[model.controls.selectedInputUID ?? ""] ?? .auto {
