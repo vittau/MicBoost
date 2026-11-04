@@ -1,0 +1,6 @@
+# The workflows run on the GitHub-hosted "xcode-27" image (docs/distribution.md).
+# actionlint 1.7.12 predates that label and lists only OS-based macOS labels, so
+# it must be declared here to keep "runs-on: xcode-27" clean.
+self-hosted-runner:
+  labels:
+    - xcode-27

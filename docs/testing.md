@@ -38,8 +38,12 @@ Em 16, 44,1, 48 e 96 kHz:
 ### `MicBoostUITests`
 
 - Mapeamento de `AppModel` para cada linha de [ui.md](ui.md#mensagens-de-estado): estado do motor → mensagem, ação da faixa e ícone; a mensagem de BlackHole ausente some sozinha quando o motor volta a `running`.
+- Fonte desconectada: a linha da lista e a faixa usam o último nome conhecido daquele UID, inclusive o nome persistido quando o app abre com o dispositivo ausente; sem nome conhecido, a linha mostra o rótulo genérico, nunca o UID.
+- Carência de 1,5 s: uma ausência de dispositivo que dura menos que isso (reinício do `coreaudiod`) não mostra faixa; a faixa aparece quando a condição persiste. A linha de entrada do sistema e a lista de microfones mantêm o último estado conhecido durante a carência.
+- Linha de entrada do sistema: BlackHole como entrada padrão mostra "MicBoost" com marcação só com o motor rodando; divergência mostra o nome com "Usar MicBoost" habilitado quando o clique funciona; entrada desconhecida não mostra botão.
+- Catálogo de strings: toda chave passada a `localized(...)` ou `String(localized:)` em `MicBoostUI` e `MicBoostApp` existe nos dois `.strings`, os dois catálogos têm exatamente as mesmas chaves e cada tradução preserva os placeholders da chave.
 - Permissão reavaliada ao ativar o app: negada mantém a faixa, concedida limpa e tenta iniciar de novo.
-- Formatação de ganho e escala dos medidores.
+- Formatação de ganho e escala dos medidores; o medidor ignora o mouse e o foco, e o valor de ganho é texto somente leitura.
 
 ## Ferramenta de diagnóstico (`micboost-diag`)
 
@@ -114,7 +118,7 @@ Preparação para todos os itens: app aberto com processamento ligado, microfone
 |---|---|---|---|
 | 1 | Com o áudio tocando, desconectar o microfone USB; esperar 5 s; reconectar | "<nome> desconectado. O áudio volta quando ele for reconectado." durante a ausência; a faixa some quando ele volta, sem escolher outro microfone | continua BlackHole 2ch; volta a tocar no mesmo microfone |
 | 2 | Suspender o Mac (menu Apple → Suspender) e acordar | nenhuma durante o sono; ícone volta a "ativo" cerca de 1 s depois de acordar. Se a tentativa falhar, a faixa "Falha no áudio do sistema." aparece com "Tentar novamente" | continua BlackHole 2ch |
-| 3 | `sudo killall coreaudiod` com o áudio tocando; esperar 10 s | nenhuma faixa (ou a de falha por um instante), áudio volta sozinho | continua BlackHole 2ch |
+| 3 | `sudo killall coreaudiod` com o áudio tocando; esperar 10 s | nenhuma faixa e nenhuma troca da linha de entrada do sistema; áudio volta sozinho | continua BlackHole 2ch |
 | 4 | Ajustes do Sistema → Privacidade e Segurança → Microfone: desligar o MicBoost; voltar ao app; religar a permissão e voltar ao app | com a permissão desligada, "O MicBoost não tem acesso ao microfone." com "Abrir Ajustes de Privacidade"; ao religar e voltar ao app a faixa some e o áudio volta | continua BlackHole 2ch |
 | 5 | Com o áudio tocando: `sudo mv /Library/Audio/Plug-Ins/HAL/BlackHole2ch.driver /tmp/` e `sudo killall coreaudiod`. Depois: `sudo mv /tmp/BlackHole2ch.driver /Library/Audio/Plug-Ins/HAL/` e `sudo killall coreaudiod` | "BlackHole 2ch não encontrado." com "Como instalar" enquanto o driver está ausente; a faixa some sozinha quando ele volta | continua a entrada que estava em uso; nada é escrito enquanto falta o BlackHole |
 | 6 | Em Ajustes do Sistema → Som → Entrada, escolher outro microfone; no painel, clicar em "Usar MicBoost" | linha "Entrada do sistema: <nome>" com "Usar MicBoost"; depois "Entrada do sistema: MicBoost" com marcação. Trocar a entrada de novo deve marcar divergência sem reverter sozinho | volta a BlackHole 2ch só depois do clique no botão |
@@ -122,6 +126,22 @@ Preparação para todos os itens: app aberto com processamento ligado, microfone
 | 8 | Sair do app (Sair do MicBoost) | — | a entrada anterior é restaurada e as taxas que o MicBoost mudou voltam às originais |
 
 ## Resultados registrados
+
+### Testes manuais com o mantenedor (2026-11-03/04)
+
+fifine USB a 48 kHz, Mono 1, buffer 256, EQ no padrão de voz, voz falada na distância de uso. Níveis medidos com `micboost-diag capture --device BlackHole2ch_UID` (10 s, RMS em janelas de 100 ms):
+
+| Ganho | Voz (mediana / p90) | Pico | Ruído de fundo |
+|---|---|---|---|
+| 0 dB | −46,2 / −42,0 dBFS | −23,4 dBFS | −63,4 dBFS |
+| +18 dB | −28,9 / −24,6 dBFS | −6,1 dBFS | −51,1 dBFS |
+| +24 dB | −20,4 / −17,3 dBFS | −1,6 dBFS | −42,6 dBFS |
+
+- Calibração: com esse microfone, a voz chega ao nível de chamada (≈ −20 dBFS) só no máximo de +24 dB; a faixa atual é necessária e suficiente.
+- Proteção de pico: palmas a +24 dB acionaram "Limitador ativo", mas o BlackHole recebeu picos de até 1,1845 (+1,47 dBFS), com 118 amostras acima do teto de 0,891; as amostras alternam de sinal quase a cada amostra. O DSP limita a 0,891 e corta em ±1, então o excesso vem do resampler de drift do agregado, aplicado ao BlackHole depois do limitador. Correção em andamento: BlackHole como relógio principal e compensação de drift na fonte ([roadmap.md](roadmap.md#decisões-em-aberto)).
+- Recuperação aprovada no app real: desconectar e reconectar o microfone USB; `killall coreaudiod` (o áudio volta sozinho; as faixas de dispositivo ausente durante o reinício foram eliminadas pela carência de 1,5 s); permissão de microfone negada e concedida (o macOS oferece "Encerrar e Reabrir" ao mudar a permissão com o app aberto; depois de reaberto, o áudio volta); troca manual da entrada padrão com "Usar MicBoost" (sem disputa); mudança de taxa do BlackHole no Configuração de Áudio e MIDI.
+- Menu nativo aprovado: sliders soltos fora do menu, campos de frequência, faixa traduzida, botão de apoio, alinhamento sem coluna de marca.
+- Pendentes: BlackHole ausente (remoção do driver), suspensão e retomada, restauração da entrada ao sair depois de divergir e usar "Usar MicBoost" duas vezes (correção na HAL falsa, falta o app real), medidores somente leitura e ganho sem campo no app real, VoiceOver e preferências de acessibilidade.
 
 
 Validação de ganho e EQ (2026-11-03): C920 USB, 16 kHz, buffer 256, canal automático (primeiro canal copiado para L/R). Capturas simultâneas da fonte e do BlackHole de 3 s após 2 s de assentamento, usando o sinal ambiente; picos variam com o alinhamento e com o resampler de drift.
@@ -170,7 +190,7 @@ Observações de hardware:
 - Com a tampa fechada, o macOS silencia o microfone interno por hardware: a permissão continua concedida e os callbacks entregam zeros. A medição de latência recusa esse sinal (correlação 0).
 - As pequenas diferenças de nível entre fonte e BlackHole vêm do resampler de drift e de capturas que começam em instantes distintos.
 - A queda lenta de latência no ensaio de 20 min passa no critério, mas não está claro se ela se estabiliza (resampler de deriva acomodando) ou continua (deriva residual). Um ensaio de várias horas antes da release decide.
-- Reinício real do `coreaudiod` e escuta humana são verificações manuais. A HAL falsa cobre perda e retorno da fonte e do BlackHole.
+- Reinício real do `coreaudiod` e escuta humana são verificações manuais. A HAL falsa cobre perda e retorno da fonte e do BlackHole. As transições de estado do motor ficam no log unificado, na categoria `engine`: aplicar, por exemplo, `log show --last 5m --info --predicate 'subsystem == "io.github.vittau.MicBoost"'` depois de um teste manual.
 
 ### Interface e ciclo de vida do app
 
@@ -188,68 +208,54 @@ Capturas claras/escuras verificadas visualmente; sliders sem marcas de passo.
 VoiceOver, todos os atalhos, reduzir movimento/transparência e contraste aumentado
 permanecem sem validação manual completa. A etapa 4 permanece em andamento.
 
-Verificação automatizada da interface: 58 testes (6 UI, 11 DSP, 41 Core),
-execução somada de aproximadamente 2 s; a suíte Core inclui o caso negativo
+Verificação automatizada da interface: 107 testes (38 UI, 11 DSP, 58 Core),
+execução somada de aproximadamente 1,8 s; a suíte Core inclui o caso negativo
 `fakeRejectsOutputWrite`, que registra uma issue conhecida intencionalmente.
 `swift build`, `swift test`, lint recursivo de formatação, montagem debug e
 `codesign --verify --strict` passam na máquina de referência.
 
-O painel usa a moldura de `NSMenu`, sem sobreposição de material, bordas ou seta.
-A conferência inclui a composição real pelo WindowServer e interação com os controles
-durante o tracking do menu.
+O painel é um `NSMenu` de itens reais: lista de microfones, "Ajustes…" (⌘,), "Sair do
+MicBoost" (⌘Q), cabeçalhos de seção e separadores. A conferência inclui a composição real
+pelo WindowServer, com hover, destaque e atalhos desenhados pelo AppKit.
 
-No macOS 27, uma sonda de `NSSwitch`/SwiftUI com mínimo 14 e SDK 27.2 mede
-54 × 24 pt. A mesma sonda com o SDK registrado como 14 mede 38 × 22 pt.
-O build do app verifica SDK igual ao Xcode selecionado e mínimo 14 em cada
-arquitetura antes da assinatura. O renderizador recebe a mesma configuração.
+Menu nativo (2026-11-03): as capturas passaram a vir do menu real aberto pelo auxiliar e
+capturado com `SCScreenshotManager`, porque o painel não é mais uma view SwiftUI. Dimensões
+em 1×: `eq-*` 320 × 601, `panel-*` 320 × 306, `error-*` 320 × 361, `settings-*` 540 × 853.
+As linhas de view alinham com o título dos itens nativos: o menu abre sem a coluna de
+marcação (`showsStateColumn = false`), o auxiliar mede as insets do próprio menu na primeira
+abertura (título de item sem imagem e coluna de atalho) e as linhas passam a usá-las. Na
+captura final, as linhas de view começam em 15 pt e os itens nativos "Ajustes…" e "Sair do
+MicBoost" em 17 pt — a diferença é o desenho do glifo, não a coluna. A fonte selecionada é
+marcada por um selo circular de 18 pt com a cor de destaque (sem coluna de marcação, sem
+checkmark), e "Ajustes…" fica em texto puro, sem o ícone automático que o macOS 27 desenha
+em itens com ⌘, Clicar no cabeçalho do EQ durante o tracking insere o
+item das bandas e o menu passa de 377 para 601 pt de altura na mesma sessão; esconder o
+item não redimensiona o menu, por isso as linhas condicionais são inseridas e removidas.
 
-Na composição real do menu no macOS 27, o controle ligado foi verificado pela
-acessibilidade como 54 × 24 pt e valor 1, com a cor verde oliva do sistema.
-A conferência incluiu ausência de seta e de corte vertical, remoção da linha
-redundante do caminho de áudio e atualização dos medidores com o menu aberto.
-O ajuste do SDK foi validado também em um executável de teste universal
-(arm64 + x86_64), com mínimo 14, SDK 27.2 e assinatura ad hoc válida em ambas
-as arquiteturas.
+Os medidores são `NSLevelIndicator` (`continuousCapacity`, `.small`): o controle nativo tem
+16 pt de altura intrínseca no macOS 27, com preenchimento na cor de destaque do sistema. As duas barras
+das capturas clara e escura mostram 0 dBFS preenchendo a faixa e −1 dBFS em 89,13% dela na
+escala de amplitude linear; valores ≤ −60 dBFS ficam em zero. `warningValue` e
+`criticalValue` ficam acima do máximo, então nenhuma captura mostra amarelo ou vermelho.
+O teste de proporcionalidade confere que +6,0206 dB dobra o comprimento para amplitudes de
+entrada de 0,01, 0,1 e 0,4.
 
-Ao alternar mute e restaurar o estado original, a acessibilidade reportou o slider
-de ganho com a mesma origem nas três leituras e tamanho constante de 260 × 16 pt.
-Os dois símbolos de mute ficam centralizados na mesma área de 20 × 20 pt.
+Sliders do painel em `NSSlider` (2026-11-03): os cinco sliders do painel — ganho, ganho de
+graves, médios e agudos e largura — são `NSSlider` puro dentro das views de item, porque o
+`Slider` do SwiftUI podia perder o mouse-up no tracking do menu e ficar preso no estado
+pressionado. O knob só acompanha valores externos quando não há arrasto, e as setas andam
+0,5 dB (1 dB com ⌥) ou 0,1 de Q.
 
-Cadência dos medidores com o menu aberto: em 20 intervalos consecutivos, mediana
-53,5 ms e máximo 76,8 ms; espera máxima pela leitura no controller 22,6 ms.
-Medição com relógio monotônico na chegada dos snapshots à UI; não representa
-a latência entre falar e o pixel mudar. O decaimento visual é separado: 20 dB/s,
-ou 1,5 s para cair 30 dB, sem atraso de ataque adicionado pelo modelo.
-
-Ensaio visual de degrau 0 → 100% no macOS 27.2, com a mesma atualização SwiftUI
-para os dois controles: numa captura solicitada 100 ms depois do degrau,
-`ProgressView` ainda ocupava aproximadamente um terço da faixa; a trilha nativa
-de `NSSliderCell` usada pelo medidor já preenchia toda a faixa (captura solicitada
-aos 99,96 ms). O medidor aplica o valor diretamente ao desenho nativo, sem
-interpolar a apresentação dos picos. A escala foi conferida em 0 dBFS (100%) e
-−1 dBFS (89,13%) na escala de amplitude linear; valores ≤ −60 dBFS ficam em zero.
-O teste de proporcionalidade confere que +6,0206 dB dobra o comprimento para
-amplitudes de entrada de 0,01, 0,1 e 0,4.
-
-Na captura clara renderizada a 1×, a trilha colorida do slider de ganho e as duas
-barras de nível medem 6 pixels de altura (6 pt), com cantos simétricos da trilha
-nativa. As renderizações clara e escura conferem o preenchimento de 100% na
-entrada e 89,13% na saída, sem knob nem moldura de indicador de capacidade.
-
-Sliders do painel em `NSSlider` (2026-11-03): os cinco sliders do painel — ganho,
-ganho de graves, médios e agudos e largura — usam `NSSlider` em `NSViewRepresentable`,
-porque o `Slider` do SwiftUI podia perder o mouse-up no tracking do menu e ficar
-preso no estado pressionado. As capturas regeradas mantêm as dimensões anteriores
-(`panel-*` 320 × 325, `eq-*` 320 × 663, `error-*` 320 × 379, `settings-*` 540 × 808),
-e a comparação pixel a pixel mostra diferença apenas na área do knob (até 22 × 22 pt
-por slider): trilha de 6 pt, preenchimento verde até o knob, espaçamento e altura de
-16 pt do controle são idênticos. A suíte tem 84 testes (57 Core, 11 DSP, 16 UI) com
-execução somada de aproximadamente 1,0 s (Core 0,65 s, DSP 0,16 s, UI 0,2 s); os
-quatro testes novos de UI cobrem a ação do `NSSlider` → binding, valor externo sem
-mover o knob durante o arrasto, passos de seta (0,5 dB, 1 dB com ⌥ e limite da faixa)
-e os cinco `NSSlider` na hierarquia do painel expandido. `swift build`, `swift test`,
-lint de formatação recursivo e a montagem debug passam. O arrasto no menu real,
-inclusive soltando o mouse fora da janela do menu, é verificação manual pendente.
+A suíte tem 109 testes (58 Core, 11 DSP, 40 UI) com execução somada de aproximadamente
+1,9 s; os testes de UI cobrem a estrutura do menu (ordem dos itens, seção "Microfone",
+marcação da fonte selecionada, linha de fonte desconectada, atalhos ⌘, ⌘Q e "m"), as linhas
+de view em AppKit (cinco `NSSlider`, dois `NSSwitch`, dois `NSLevelIndicator` somente leitura
+e sem foco), a altura do painel com e sem o selo do limitador, o valor de ganho como rótulo,
+a leitura dos campos numéricos (vazio, inválido, vírgula, ponto, fora da faixa) e o passo de
+seta dos sliders. `swift build`, `swift test`,
+lint de formatação recursivo e a montagem debug passam. O arrasto no menu real, inclusive
+soltando o mouse fora da janela do menu, a navegação por teclado e o clique nas linhas são
+verificação manual pendente.
 
 ### Recuperação (etapa 5)
 
@@ -257,8 +263,8 @@ A lógica de recuperação está implementada e coberta pela HAL falsa; os itens
 interação humana (notificações de suspensão, TCC, remoção do driver, reinício real do
 `coreaudiod`) continuam pendentes no roteiro manual acima. A etapa 5 permanece em andamento.
 
-Verificação automatizada: 78 testes (57 Core, 11 DSP, 10 UI) com execução somada de
-aproximadamente 1,2 s (Core 0,64 s, DSP 0,17 s, UI 0,38 s); a suíte Core inclui o caso
+Verificação automatizada: 109 testes (58 Core, 11 DSP, 40 UI) com execução somada de
+aproximadamente 1,9 s; a suíte Core inclui o caso
 negativo `fakeRejectsOutputWrite`, que registra uma issue conhecida intencionalmente.
 `swift build`, `swift test`, lint recursivo de formatação, montagem debug e
 `codesign --verify --strict` passam na máquina de referência.
@@ -292,8 +298,40 @@ para as anteriores. Estado final: BlackHole a 48000 Hz, C920 a 16000 Hz, entrada
 
 Capturas para o README: `docs/screenshots/eq-{light,dark}.png` e
 `settings-{light,dark}.png` foram regeradas com estado de amostra realista (entrada do sistema
-MicBoost com marcação, microfone USB selecionado, ganho +6 dB, medidores com níveis, 48000 Hz,
+MicBoost com marcação, microfone USB com o selo de seleção, ganho +6 dB, medidores com níveis, 48000 Hz,
 buffer 256 no seletor e no diagnóstico, latência reportada de 15,3 ms, switches nativos no
 estado ativo e licença GPL-3.0). O locale vem do idioma resolvido pelo catálogo (`en` →
 `en_US`), então os números usam ponto decimal e vírgula de milhar do inglês. `panel-*` e
 `error-*` continuam geradas, mas não são mais referenciadas no README.
+
+O menu deixou de ser uma view SwiftUI: as capturas `eq-*`, `panel-*` e `error-*` são do
+`NSMenu` real, aberto pelo auxiliar e capturado com `SCScreenshotManager` (ScreenCaptureKit) a
+partir do laço de tracking, com recorte na view de conteúdo do menu. A captura usa o menu
+montado pelo `PanelMenuController` com o mesmo estado de exemplo, então mostra os itens
+nativos, o selo da fonte selecionada, os atalhos ⌘, e ⌘Q e as insets medidas do menu. Os
+itens de view alinham com o título dos itens nativos. `settings-*` continua vindo de
+`NSHostingView.cacheDisplay`: não há menu a compor e os controles SwiftUI são AppKit por baixo.
+
+Reteste do menu (2026-11-04): o medidor é exibição pura — `hitTest` devolve `nil`, `acceptsFirstResponder`
+é falso e o `mouseDown` é inerte —, e o valor de ganho virou rótulo somente leitura, sem campo nem ação de
+clique; o ganho continua pelo slider e pelas setas (0,5 dB, 1 dB com ⌥). As capturas `eq-*`, `panel-*` e
+`error-*` foram regeradas sem anel de foco e sem texto selecionado no primeiro campo de frequência, porque o
+auxiliar solta o primeiro respondedor antes da captura. `swift build`, `swift test` (109 testes) e
+`swift format lint --strict` passam; o arrasto do medidor e o clique no valor de ganho no menu real ficam para
+a verificação manual do mantenedor.
+
+Restauração na saída (2026-11-04): a sequência manual que não restaurou a entrada padrão —
+divergência em Ajustes do Sistema, "Usar MicBoost", divergência de novo, "Usar MicBoost", sair —
+foi reproduzida na HAL falsa. Com a notificação de `kAudioHardwarePropertyDefaultInputDevice` da
+mudança anterior ainda na fila `engine` quando a ação roda, a política lia a entrada antiga,
+liberava `defaultInputManaged` recém-gravado e o stop não restaurava nada; o estado persistido
+ficava igual ao observado no app (`previousDefaultInputUID` preenchido, `defaultInputManaged =
+false`, entrada padrão ainda o BlackHole). Os testes `pendingDivergenceNotificationDoesNotDropTheAdoption`,
+`quitAfterUseBlackHoleRestoresThePreviousInput`, `relaunchWithBlackHoleAlreadyDefaultKeepsThePersistedOwnership`
+e `stopAndRestartRestoresOncePerVoluntaryStop` cobrem a sequência, e
+`TerminationBarrierTests` cobre o portão de encerramento: a resposta a
+`reply(toApplicationShouldTerminate:)` só vem depois do stop, um segundo ⌘Q não corta a
+restauração e o prazo de 5 s encerra o app mesmo com o stop pendurado. Falta confirmar no app
+com hardware real: divergir, usar MicBoost, divergir de novo, usar MicBoost e sair, com a
+entrada anterior restaurada e `log show --last 5m --info --predicate 'subsystem ==
+"io.github.vittau.MicBoost"'` mostrando as linhas da categoria `routing`.

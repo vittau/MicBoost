@@ -19,6 +19,9 @@ public struct Settings: Codable, Equatable, Sendable {
     public var muted: Bool
     public var eq: EQSettings
     public var channelSelectionByUID: [String: ChannelSelection]
+    /// Last name each source reported, keyed by UID, so a source that is absent keeps
+    /// its name in the UI after a relaunch (docs/ui.md "Painel").
+    public var knownSourceNames: [String: String]
     public var bufferFrames: Int
     public var previousDefaultInputUID: String?
     public var defaultInputManaged: Bool
@@ -32,6 +35,7 @@ public struct Settings: Codable, Equatable, Sendable {
         muted: Bool = false,
         eq: EQSettings = EQSettings(),
         channelSelectionByUID: [String: ChannelSelection] = [:],
+        knownSourceNames: [String: String] = [:],
         bufferFrames: Int = 256,
         previousDefaultInputUID: String? = nil,
         defaultInputManaged: Bool = false
@@ -44,6 +48,7 @@ public struct Settings: Codable, Equatable, Sendable {
         self.muted = muted
         self.eq = eq
         self.channelSelectionByUID = channelSelectionByUID
+        self.knownSourceNames = knownSourceNames
         self.bufferFrames = bufferFrames
         self.previousDefaultInputUID = previousDefaultInputUID
         self.defaultInputManaged = defaultInputManaged
@@ -65,6 +70,9 @@ public struct Settings: Codable, Equatable, Sendable {
         channelSelectionByUID =
             try container.decodeIfPresent(
                 [String: ChannelSelection].self, forKey: .channelSelectionByUID) ?? defaults.channelSelectionByUID
+        knownSourceNames =
+            try container.decodeIfPresent([String: String].self, forKey: .knownSourceNames)
+            ?? defaults.knownSourceNames
         bufferFrames = try container.decodeIfPresent(Int.self, forKey: .bufferFrames) ?? defaults.bufferFrames
         previousDefaultInputUID = try container.decodeIfPresent(String.self, forKey: .previousDefaultInputUID)
         defaultInputManaged =
@@ -81,6 +89,7 @@ public struct Settings: Codable, Equatable, Sendable {
         copy.eq = eq.sanitized()
         copy.channelSelectionByUID = channelSelectionByUID.filter { _, selection in selection.isValid }
             .mapValues { $0 == .auto ? .mono(channel: 1) : $0 }
+        copy.knownSourceNames = knownSourceNames.filter { !$0.key.isEmpty && !$0.value.isEmpty }
         return copy
     }
 }

@@ -43,7 +43,7 @@ Condições de conclusão:
 
 ## 2 — Ganho e proteção de pico
 
-Entregas: ganho suavizado, mute, limitador, medidores e contadores; testes DSP correspondentes. Implementação e medição com som ambiente verificadas; calibração e gravação de voz humana pendentes.
+Entregas: ganho suavizado, mute, limitador, medidores e contadores; testes DSP correspondentes. Implementação, medição com som ambiente e calibração com voz verificadas. Pendente: o teto do limitador não vale no BlackHole por causa do resampler de drift (correção do relógio do agregado em andamento).
 
 Condições de conclusão:
 - níveis conferidos com sinal conhecido (testes) e com gravação de voz;
@@ -80,7 +80,7 @@ Entregas implementadas:
 - `scripts/package-release.sh <versão>`, com build de release universal e as verificações de arquitetura, assinatura ad hoc, minos e versão descritas em [distribution.md](distribution.md#release-download-direto);
 - modelo do cask em `packaging/homebrew/micboost.rb` e modelo das notas de release em `packaging/release-notes.md`;
 - `.zip` + `.sha256` gerados localmente e verificados;
-- `.github/workflows/ci.yml` (build, testes e lint de formatação) e `.github/workflows/release.yml` (release em rascunho a partir da tag), com `scripts/select-xcode.sh` para escolher o Xcode 26 ou posterior;
+- `.github/workflows/ci.yml` (build, testes e lint de formatação) e `.github/workflows/release.yml` (release em rascunho a partir da tag), na imagem `xcode-27`, com `scripts/select-xcode.sh` para escolher o Xcode 27 ou posterior, que traz o SDK 27 exigido pela interface;
 - evidência local de Gatekeeper: [distribution.md](distribution.md#verificação-local-por-spctl).
 
 Pendências:
@@ -108,5 +108,5 @@ Condições de conclusão:
 | Decisão | Recomendação atual | Quando |
 |---|---|---|
 | Queda lenta de latência no ensaio longo | ensaio de várias horas para confirmar que se estabiliza | antes da etapa 6 |
-| Calibração do ganho com voz humana | manter +24 dB; teto aprovado nos testes numéricos, calibração manual pendente | antes de concluir etapa 2 |
+| Picos acima do teto no BlackHole | BlackHole como relógio principal e compensação de drift na fonte; plano B: teto de −3 dBFS | antes de concluir etapa 2 |
 | Homebrew 7 / macOS 27 com cask sem notarização | investigar com tap local: quarentena e "Abrir Mesmo Assim" para app ad hoc, permissão de microfone após `brew upgrade`, BlackHole já instalado, `brew uninstall` | antes da etapa 6 |

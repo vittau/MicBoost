@@ -18,8 +18,8 @@ calls, recorders, anything — hears the processed voice.
 > review of its human maintainer.
 
 > [!WARNING]
-> **Pre-release:** the menu bar panel, EQ and settings are available from source. Releases,
-> the Homebrew tap and full recovery/accessibility validation remain pending.
+> **Pre-release:** MicBoost runs from source today. Releases, the Homebrew tap and part of the
+> manual validation (accessibility, sleep/wake) are still pending.
 
 ## Screenshots
 
@@ -62,60 +62,38 @@ the limiter is the last stage, so BlackHole receives exactly what the engine wro
 −1 dBFS ceiling holds at its output.
 The aggregate is private: other apps never see it, and it disappears with the process.
 
-Gain, mute and the 3-band EQ can be adjusted in the menu bar panel. Peak protection
-keeps the output below −1 dBFS; human voice calibration and listening checks remain pending.
+Gain, mute and the EQ change instantly, without restarting the audio. Peak protection holds the
+processed signal at −1 dBFS.
 
 ## Features
 
-Available today:
-
-- **Gain from −12 to +24 dB**, mute and peak protection; mute and the limiting indicator keep
-  the panel layout stable.
-- **3-band EQ** with adjustable bass, parametric mids and treble, bypass and reset. Click its
-  title or disclosure arrow to expand or collapse the adjustments; the EQ switch stays visible
-  in the header. Expansion is immediate to keep the menu stable. Each band has a clear section heading.
-
-- **Any Core Audio input**, captured explicitly by UID — the source does not have to be the
-  system default input.
-- **No audio queue**: private aggregate device and one IOProc, with latency measured and
-  documented below.
-- **BlackHole 2ch as the destination**, with BlackHole variants and aggregates containing
-  BlackHole excluded from the source list, so feedback cannot be selected.
-- **Safe silence on zero input**: a source that delivers zeros — the built-in microphone with the
-  lid closed, for example — produces silence in BlackHole, not noise.
-
-- **Recognizable menu bar icon**, with a microphone and rising bars matching the app icon;
-  a slash across the bars indicates that processing is switched off.
-- **Standard macOS menu surface**, with compact spacing inspired by the macOS Wi-Fi menu,
-  system-managed appearance and dismissal, without a popover arrow.
-- **Gain readout** shows the percentage first, followed by decibels, for example `126% (+2.0dB)`.
-- **Slim level meters**, matching the gain slider track, refresh about 20 times per second
-  with gradual peak decay. Their rounded native slider tracks
-  show each new peak directly; the stable **Limiter active** indicator shows
-  peak protection. Bar lengths follow linear peak amplitude: 200% gain doubles the output
-  length with flat EQ and no limiting. The protected −1 dBFS output reaches about 89.1% of the bar. This visual decay does not delay the audio.
-- **Menu bar panel** with gain, meters, routing status, microphones and EQ, plus settings for
-  buffer, channels, automatic system input switching and diagnostics, using native grouped
-  sections and switches. Buffer sizes are labeled in frames, with guidance on latency and audio stability;
-  channel options each explain how the microphone inputs map to the left and right output.
-  Channel choices are ordered Mono 1 (default), Mono 2 and any further mono channels, Mix, then Stereo.
-  Stereo preserves separate left and right inputs; mono sends the selected channel to both sides.
-  About shows the version, project link and license.
-- **Voice preset** for rumble reduction and gentle presence, plus a flat EQ reset.
-- **Processing switch** releases the microphone; quitting restores the previous system input
-  when MicBoost still manages it.
-- **Recovery without intervention**: unplugging and plugging the microphone back in,
-  sleep/wake, a missing BlackHole driver, a rate or stream change made by another app, a
-  restart of the Core Audio service and granting the microphone permission later all bring
-  the bridge back on the same microphone, showing one short message in the panel when the
-  user needs to act.
-- **One working rate for both ends**: MicBoost runs source and BlackHole at 48 kHz when both
-  support it, otherwise at the best rate they share, and gives the previous rates back when
-  you quit or switch microphones.
-
-Planned for v1:
-
-- **Homebrew tap and `.zip` release** (stage 6).
+- **Gain up to +24 dB (1585%)**, which is what a typical USB microphone at speaking distance
+  needs to reach call level, plus mute. Gain is shown as a percentage and in decibels, for
+  example `200% (+6.0dB)`.
+- **Peak protection** with a **Limiter active** badge while it works, so loud moments do not
+  distort the call.
+- **3-band EQ** — bass, parametric mids and treble — with an on/off switch, a **Voice preset**
+  that removes rumble and adds gentle presence without losing body, and **Reset EQ** for a flat
+  response.
+- **Any Core Audio microphone** — USB, built-in, audio interfaces, Bluetooth, iPhone — captured
+  directly, whether or not it is the system input.
+- **Automatic system input**: while processing is on, MicBoost becomes the system input, and
+  quitting gives the previous one back. It never fights you: if you pick another input yourself,
+  the menu offers **Use MicBoost** instead of switching back. You can turn the automation off in
+  Settings.
+- **One-click on/off switch** that fully releases the microphone, also available with ⌥-click on
+  the menu bar icon.
+- **Native macOS menu** with the system's own switches, sliders, level meters and menu items,
+  following your accent color and light or dark appearance.
+- **Low latency without an audio queue**: about 15 ms with a 48 kHz USB microphone at the
+  default buffer (see [Latency](#latency)).
+- **Automatic recovery**: unplugging and plugging the microphone back in, sleep and wake, a
+  missing BlackHole driver, a sample-rate change or a Core Audio restart bring the audio back
+  on the same microphone, with a short message when you need to act.
+- **Best shared sample rate**: 48 kHz when the microphone and BlackHole both support it,
+  otherwise the best rate they share; the previous rates come back when you quit.
+- **Settings** for buffer size, channel mapping (Mono 1, Mono 2…, Mix, Stereo) and diagnostics.
+- **English and Brazilian Portuguese.**
 
 ## Requirements
 
@@ -157,10 +135,9 @@ never disables Gatekeeper or SIP and never removes the quarantine flag, and neit
 1. Open MicBoost and allow microphone access.
 2. Click its menu bar icon and choose your microphone. MicBoost sets the processed input as
    the system input automatically by default; disable this in Audio settings if desired.
-3. Adjust gain, mute and EQ in the panel. Close the panel whenever you like; audio keeps running.
+3. Adjust gain, mute and EQ in the menu. Close it whenever you like; audio keeps running.
 4. In your calling or recording app, choose **BlackHole 2ch** or **System Default**.
-5. Turn processing off to release the microphone, or choose **Quit MicBoost** from the text menu
-   at the bottom of the panel. Standard macOS shortcuts include ⌘, for settings and ⌘Q to quit. The previous
+5. Turn processing off to release the microphone, or choose **Quit MicBoost** (⌘Q). The previous
    system input is restored if automatic switching is enabled and you have not changed it yourself.
 
 ### Diagnostics
@@ -200,9 +177,7 @@ that is why the low-rate source is slower.
 - **Recovery:** unplugging the USB microphone during a run moves the engine to "recovering", with
   silence in BlackHole; plugging it back in resumes the bridge on its own. Changing the working
   rate of either end returns to `running` in 0.4–1.3 s.
-- **Still pending:** built-in microphone and Bluetooth measurements. Recovery paths that need a
-  person (sleep/wake notifications, TCC changes, removing the driver, restarting the real
-  `coreaudiod`) are listed in the manual checklist.
+- **Still pending:** built-in microphone and Bluetooth measurements.
 
 Full results and conditions: [docs/testing.md](docs/testing.md#resultados-registrados).
 
@@ -218,7 +193,11 @@ Full results and conditions: [docs/testing.md](docs/testing.md#resultados-regist
   permission granted and the callbacks keep firing, but they deliver zeros; MicBoost cannot
   capture audio in that state.
 - **Digital gain amplifies noise too**, and it cannot recover audio that was already clipped at
-  the source.
+  the source. If your microphone has a hardware gain knob, or you can speak closer to it, use that
+  first.
+- **Very loud transients can still overshoot −1 dBFS** on the way into BlackHole: the clock
+  correction between the microphone and BlackHole runs after the limiter. A fix that moves it
+  before the limiter is being measured.
 - **MicBoost changes the sample rate of the selected microphone** to the working rate it shares
   with BlackHole (48 kHz when both support it). Other apps that read that microphone directly
   adapt to the change, and the previous rate is restored when you quit or switch microphones.
@@ -258,7 +237,7 @@ feedback, the calling app is monitoring its own output.
 
 ## Uninstall
 
-MicBoost is not installed anywhere yet. To clean up a local build, quit MicBoost from its panel, then delete the checkout and its
+MicBoost is not installed anywhere yet. To clean up a local build, quit MicBoost from its menu, then delete the checkout and its
 `build/` directory. Settings are removed with:
 
 ```sh
@@ -280,7 +259,7 @@ open build/MicBoost.app
 ```
 
 `swift test` runs without audio hardware, BlackHole or microphone permission. `build-app.sh`
-assembles and ad-hoc signs `build/MicBoost.app`. The app opens a menu bar panel. The project is a single SwiftPM package — there is
+assembles and ad-hoc signs `build/MicBoost.app`. The app lives in the menu bar. The project is a single SwiftPM package — there is
 no `.xcodeproj`.
 
 ## Support

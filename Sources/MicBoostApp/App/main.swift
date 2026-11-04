@@ -2,37 +2,28 @@ import AppKit
 import MicBoostUI
 import SwiftUI
 
-@MainActor final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
+@MainActor final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let model = AppModel()
+    private var panel: PanelMenuController?
     private var status: NSStatusItem?
-    private let panelMenu = NSMenu(title: "MicBoost")
-    private var menuHost: NSView?
     private var optionClickMonitor: Any?
     private var settings: NSWindow?
-    private var quitting = false
+    /// Awaits `AppModel.shutdown` before the process exits (docs/architecture.md "Interface do app").
+    private lazy var termination = TerminationBarrier(
+        shutdown: { [model] in try await model.shutdown() },
+        reply: { NSApplication.shared.reply(toApplicationShouldTerminate: $0) })
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureMenu()
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         status = item
-        panelMenu.autoenablesItems = false
-        panelMenu.delegate = self
-        let host = NSHostingView(
-            rootView: PanelView(model: model)
-                .onGeometryChange(for: CGSize.self) {
-                    $0.size
-                } action: { [weak self] size in
-                    guard let host = self?.menuHost, host.frame.size != size else { return }
-                    host.setFrameSize(size)
-                })
-        host.safeAreaRegions = []
-        host.frame = NSRect(origin: .zero, size: host.fittingSize)
-        host.autoresizingMask = [.width]
-        menuHost = host
-        let content = NSMenuItem()
-        content.view = host
-        content.isEnabled = true
-        panelMenu.addItem(content)
-        item.menu = panelMenu
+        let panel = PanelMenuController(model: model)
+        self.panel = panel
+        panel.onOpen = { [weak self] in
+            NSApplication.shared.activate(ignoringOtherApps: true)
+            self?.status?.button?.highlight(true)
+        }
+        panel.onClose = { [weak self] in self?.status?.button?.highlight(false) }
+        item.menu = panel.menu
         optionClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) {
             [weak self] event in
             let consumed = MainActor.assumeIsolated {
@@ -46,6 +37,7 @@ import SwiftUI
         model.onSettings = { [weak self] in self?.showSettings() }
         model.onQuit = { NSApplication.shared.terminate(nil) }
         model.onUpdate = { [weak self] in self?.update() }
+        model.onMeters = { [weak self] in self?.refreshMeters() }
         let center = NSWorkspace.shared.notificationCenter
         center.addObserver(self, selector: #selector(sleep), name: NSWorkspace.willSleepNotification, object: nil)
         center.addObserver(self, selector: #selector(wake), name: NSWorkspace.didWakeNotification, object: nil)
@@ -88,6 +80,16 @@ import SwiftUI
         status?.button?.setAccessibilityLabel(
             "MicBoost, \(model.message ?? localized(model.controls.processingEnabled ? "Active" : "Stopped")), \(AppModel.gainLabel(model.controls.gainDB))"
         )
+        refreshPanel()
+    }
+    /// Rows repaint only while the panel is open; opening it refreshes everything.
+    private func refreshPanel() {
+        guard model.panelVisible else { return }
+        panel?.refresh()
+    }
+    private func refreshMeters() {
+        guard model.panelVisible else { return }
+        panel?.refreshLive()
     }
     private func showPanel() {
         RunLoop.main.perform(inModes: [.default]) { [weak self] in
@@ -95,16 +97,7 @@ import SwiftUI
         }
     }
     private func closePanel() {
-        panelMenu.cancelTracking()
-    }
-    func menuWillOpen(_ menu: NSMenu) {
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        status?.button?.highlight(true)
-        model.setPanelVisible(true)
-    }
-    func menuDidClose(_ menu: NSMenu) {
-        model.setPanelVisible(false)
-        status?.button?.highlight(false)
+        panel?.close()
     }
     @objc private func showSettings() {
         closePanel()
@@ -132,18 +125,7 @@ import SwiftUI
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         closePanel()
-        guard !quitting else { return .terminateNow }
-        quitting = true
-        Task {
-            do {
-                try await model.shutdown()
-                sender.reply(toApplicationShouldTerminate: true)
-            } catch {
-                quitting = false
-                sender.reply(toApplicationShouldTerminate: false)
-            }
-        }
-        return .terminateLater
+        return termination.shouldTerminate()
     }
 }
 let app = NSApplication.shared

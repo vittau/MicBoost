@@ -1,5 +1,6 @@
 import CoreAudio
 import Foundation
+import os
 
 /// Published view of the system default input, relative to MicBoost.
 public struct DefaultInputStatus: Codable, Equatable, Sendable {
@@ -48,8 +49,13 @@ public final class DefaultInputManager {
 
     private let hardware: any AudioHardware
     private let settings: SettingsStore
+    private let log = Logger(subsystem: "io.github.vittau.MicBoost", category: "routing")
     private var blackHole: AudioDevice?
     private var running = false
+    /// MicBoost is between persisting the recovery state and writing the BlackHole as the
+    /// default input. A notification read in that window still sees the previous input, so it
+    /// is not evidence of a user divergence.
+    private var adopting = false
     private var status = DefaultInputStatus.unresolved
 
     public init(hardware: any AudioHardware, settings: SettingsStore) {
@@ -80,10 +86,13 @@ public final class DefaultInputManager {
     public nonisolated(nonsending) func defaultInputDidChange() async throws -> DefaultInputStatus {
         let (currentID, device) = try currentDefaultInput()
         let isBlackHole = isBlackHoleDevice(currentID, device)
-        if running, !isBlackHole {
+        if running, !isBlackHole, !adopting {
             // The user owns the default input now: stop claiming it and do not revert.
             let stored = await settings.current
-            if stored.defaultInputManaged {
+            // Revalidate after the suspension: an adoption or a stop that started meanwhile
+            // owns the default input, and this observation is not a user divergence.
+            if stored.defaultInputManaged, !adopting, running {
+                log.notice("default input diverged while owned; releasing it")
                 await clearManaged()
             }
         }
@@ -101,8 +110,12 @@ public final class DefaultInputManager {
     }
 
     /// Applies the restore policy when the engine leaves `running`.
+    ///
+    /// `running` goes false before the first `await`: the engine already left `running`, and a
+    /// queued default-input notification must not release the ownership while the restore is
+    /// in flight.
     public nonisolated(nonsending) func engineWillStop(reason: StopReason = .user) async throws {
-        defer { running = false }
+        running = false
         guard reason == .user, await settings.current.manageDefaultInput, let blackHole else {
             status.divergedByUser = false
             return
@@ -111,9 +124,13 @@ public final class DefaultInputManager {
         let currentIsBlackHole = currentID == blackHole.id || current?.uid == blackHole.uid
         status = DefaultInputStatus(isBlackHole: currentIsBlackHole, divergedByUser: false, unknown: current == nil)
         let stored = await settings.current
-        guard stored.defaultInputManaged else { return }
+        guard stored.defaultInputManaged else {
+            log.notice("stop without restore: MicBoost does not own the default input")
+            return
+        }
         guard currentIsBlackHole else {
             // The user changed the input while we ran: nothing to restore.
+            log.notice("stop without restore: the default input is not the BlackHole")
             await clearManaged()
             return
         }
@@ -123,10 +140,12 @@ public final class DefaultInputManager {
             let previous = devices.first(where: { $0.uid == previousUID }),
             previous.alive
         else {
+            log.notice("stop without restore: the previous input is gone")
             await clearManaged()
             return
         }
         try hardware.setDefaultInput(previous.id)
+        log.notice("restored the previous default input")
         await clearManaged()
         status = DefaultInputStatus(isBlackHole: false, divergedByUser: false, unknown: false)
     }
@@ -149,6 +168,12 @@ public final class DefaultInputManager {
         }
         let previousUID = current?.uid
         // Persist the recovery state before the write, so a crash in between still restores.
+        // The persist yields the executor, so a queued default-input notification can run
+        // while the HAL still reports the old input; `adopting` keeps that observation from
+        // releasing the ownership the write is about to take.
+        adopting = true
+        defer { adopting = false }
+        log.notice("adopting the BlackHole after the previous default input")
         await settings.updateDefaultInput {
             $0.previousDefaultInputUID = previousUID
             $0.defaultInputManaged = true

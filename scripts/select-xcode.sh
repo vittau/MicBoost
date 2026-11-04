@@ -1,9 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 # Print the DEVELOPER_DIR of the newest Xcode_*.app that is new enough for the
-# package: Swift 6 needs Xcode 26 or later, and the icon needs actool from it.
+# package: the interface uses AppKit APIs introduced in macOS 27, so the build
+# needs the macOS 27 SDK, which only Xcode 27 or later ships
+# (docs/distribution.md). The icon needs actool from the same Xcode.
 dir=${1:-/Applications}
-minimum_major=${2:-26}
+minimum_major=${2:-27}
 
 newer() {
     local left=$1 right=$2
@@ -34,6 +36,7 @@ for app in "$dir"/Xcode_*.app; do
 done
 if [[ -z "$best_dir" ]]; then
     echo "no Xcode_*.app with version $minimum_major or later in $dir" >&2
+    echo "the build needs the macOS $minimum_major SDK; on GitHub Actions use runs-on: xcode-$minimum_major" >&2
     exit 1
 fi
 echo "$best_dir"

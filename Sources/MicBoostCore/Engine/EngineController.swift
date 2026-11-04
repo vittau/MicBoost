@@ -2,6 +2,7 @@ import CoreAudio
 import Dispatch
 import Foundation
 import MicBoostDSP
+import os
 
 public enum RecoveryReason: Sendable, Equatable {
     /// The selected source disappeared or stopped being alive.
@@ -19,6 +20,25 @@ public enum EngineState: Sendable, Equatable {
     case stopped, starting, running
     case recovering(RecoveryReason)
     case error(EngineError)
+}
+/// Short stable form of the engine state for the unified log.
+extension EngineState {
+    var logName: String {
+        switch self {
+        case .stopped: "stopped"
+        case .starting: "starting"
+        case .running: "running"
+        case .recovering(let reason):
+            switch reason {
+            case .sourceLost: "recovering.sourceLost"
+            case .formatChanged: "recovering.formatChanged"
+            case .serviceRestarted: "recovering.serviceRestarted"
+            case .sleep: "recovering.sleep"
+            case .wakeFailed: "recovering.wakeFailed"
+            }
+        case .error(let error): "error(\(error))"
+        }
+    }
 }
 public struct EngineStatus: Sendable {
     public var state: EngineState
@@ -66,6 +86,7 @@ public struct MetersSnapshot: Sendable {
 public actor EngineController {
     private let queue = DispatchSerialQueue(label: "io.github.vittau.MicBoost.engine")
     nonisolated public var unownedExecutor: UnownedSerialExecutor { queue.asUnownedSerialExecutor() }
+    private let log = Logger(subsystem: "io.github.vittau.MicBoost", category: "engine")
     private let settings: SettingsStore
     private var controls = Settings()
     private lazy var routingManager = DefaultInputManager(hardware: hardware, settings: settings)
@@ -120,6 +141,7 @@ public actor EngineController {
     private func setState(_ new: EngineState) {
         guard state != new else { return }
         state = new
+        log.notice("state=\(new.logName, privacy: .public) source=\(self.selected ?? "-", privacy: .public)")
         stateObserver?(new)
     }
 
