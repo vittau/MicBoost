@@ -48,6 +48,7 @@ Em 16, 44,1, 48 e 96 kHz:
 - Formatação de ganho e escala dos medidores; o medidor ignora o mouse e o foco, e os valores de ganho e de frequência são texto somente leitura.
 - Frequência do EQ: a grade quantiza nos limites das faixas de degrau (195, 199, 200, 950, 999, 1000, 1240, 1250, 9750, 9999, 10000, 10400 e 14000 Hz), os padrões e os limites de banda estão na grade, as setas andam para o valor seguinte ou anterior e param nos limites; o mapeamento logarítmico posição ↔ Hz volta ao mesmo valor e o meio da escala é a média geométrica.
 - Slider de frequência do menu: o arrasto (posição logarítmica → Hz → grade → faixa) grava a frequência da banda no `AppModel`, o rótulo e o valor de acessibilidade mostram "1000 Hz", o knob não se move com atualizações do modelo durante o arrasto, um valor persistido fora da grade aparece como está até o slider se mover e o máximo do slider segue 0,45 · fs da taxa atual.
+- Encerramento (`TerminationBarrier`): o quit só responde `reply(toApplicationShouldTerminate:)` depois do `shutdown`; um segundo ⌘Q durante o stop não encurta a espera; um stop pendurado responde no prazo, antes de o stop terminar; um stop que falha também encerra. Os testes esperam o evento de resposta, não um relógio: a suíte divide o ator principal com as demais linhas de UI, cujo trabalho de AppKit segura a thread principal por segundos no runner do CI.
 
 ## Ferramenta de diagnóstico (`micboost-diag`)
 
