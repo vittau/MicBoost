@@ -47,9 +47,26 @@ A fonte em camadas está em `Resources/AppIcon.icon`, com SVGs e variantes clara
 3. `ditto -c -k --keepParent build/MicBoost.app dist/MicBoost-<versão>.zip`.
 4. `shasum -a 256` → `dist/MicBoost-<versão>.zip.sha256`, no formato do `shasum -c` (hash e nome do arquivo).
 5. Verifica, e falha se não passar: `lipo -archs` do executável com `arm64` e `x86_64`; `codesign --verify --strict --deep`; assinatura ad hoc (`Signature=adhoc` em `codesign -dv`); `LC_BUILD_VERSION` com minos igual a `LSMinimumSystemVersion` (14.0) nos dois slices; `CFBundleShortVersionString` igual à versão pedida.
-6. Imprime o tamanho do `.zip`, o checksum e o cask preenchido, lido de `packaging/homebrew/micboost.rb`.
+6. Imprime o tamanho do `.zip`, o checksum e o cask preenchido por `scripts/print-cask.sh`, lido de `packaging/homebrew/micboost.rb`.
 
-Publicação (com `gh release create`, mediante confirmação do mantenedor): anexar `.zip` + `.sha256`. As notas de release seguem o modelo de `packaging/release-notes.md`: instruções de instalação, aviso **"não notarizado"**, instalação do BlackHole, primeira abertura, licença GPL-3.0 com link para `LICENSE` e o checksum da versão. O `.zip` contém só o app; a licença fica no repositório.
+Publicação (com `gh release create`, mediante confirmação do mantenedor): anexar `.zip` + `.sha256`. As notas de release seguem o modelo de `packaging/release-notes.md`, renderizado por `scripts/render-release-notes.sh <versão>`, que troca `X.Y.Z` e o marcador do checksum: instruções de instalação, aviso **"não notarizado"**, instalação do BlackHole, primeira abertura, licença GPL-3.0 com link para `LICENSE` e o checksum da versão. O `.zip` contém só o app; a licença fica no repositório.
+
+## Integração contínua e release automática
+
+`.github/workflows/ci.yml` roda em push para `main` e em pull request: seleciona o Xcode, `swift build`, `swift test` e `swift format lint --strict` em `Sources`, `Tests` e `Package.swift`. O `concurrency` cancela execuções antigas do mesmo ref, e o job tem `timeout-minutes`.
+
+`.github/workflows/release.yml` roda quando o mantenedor empurra uma tag `v*.*.*`:
+1. checkout com `fetch-depth: 0`, porque o build lê as tags e `git rev-list --count`;
+2. `swift test`;
+3. `scripts/package-release.sh "${GITHUB_REF_NAME#v}"`;
+4. falha, com mensagem clara, se já existir release para a tag: nunca sobrescreve;
+5. renderiza as notas com `scripts/render-release-notes.sh`;
+6. `gh release create "$GITHUB_REF_NAME" --draft --verify-tag --notes-file <notas>`, anexando o `.zip` e o `.sha256`;
+7. escreve o cask preenchido, por `scripts/print-cask.sh`, no resumo do job.
+
+A release sai sempre como rascunho: o mantenedor revisa, completa o marcador de mudanças das notas e publica. O tap não é tocado pelo workflow; `Casks/micboost.rb` é atualizado à mão com o trecho do resumo.
+
+Os dois workflows usam `runs-on: macos-26` (GitHub-hosted) e `scripts/select-xcode.sh`, que escolhe o `Xcode_*.app` mais recente em `/Applications` com versão 26 ou posterior: o pacote exige Swift 6 e o ícone exige o `actool` dessa versão. O Xcode escolhido aparece no log. Nenhum segredo é configurado: o token do próprio GitHub (`github.token`) cobre a criação do rascunho.
 
 ## Homebrew (tap próprio)
 
