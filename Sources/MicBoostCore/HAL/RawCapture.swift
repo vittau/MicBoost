@@ -76,16 +76,20 @@ extension CoreAudioHardware {
             UnsafeBufferPointer(start: UnsafeRawPointer(samples).assumingMemoryBound(to: UInt8.self), count: byteCount))
         try wav.write(to: destination, options: .atomic)
         var lines = ["Captured \(frames) frames at \(device.sampleRate) Hz from \(device.name) [\(device.uid)]"]
+        let ceiling = pow(10.0, -1.0 / 20.0)
         for channel in 0..<channels {
             var peak: Double = 0
             var sum: Double = 0
+            var overCeiling = 0
             for frame in 0..<frames {
                 let sample = Double(samples[frame * channels + channel])
                 peak = max(peak, abs(sample))
                 sum += sample * sample
+                if abs(sample) > ceiling { overCeiling += 1 }
             }
             lines.append(
-                "channel \(channel + 1): peak=\(peak) rms=\(frames > 0 ? sqrt(sum / Double(frames)) : 0) nonZero=\(peak > 0)"
+                "channel \(channel + 1): peak=\(peak) rms=\(frames > 0 ? sqrt(sum / Double(frames)) : 0)"
+                    + " nonZero=\(peak > 0) aboveMinus1dBFS=\(overCeiling)"
             )
         }
         return lines.joined(separator: "\n")

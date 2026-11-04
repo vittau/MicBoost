@@ -25,6 +25,41 @@ import Testing
     #expect(split.outputs.1.channel == 0)
 }
 
+@Test func aggregateDescriptionPutsBlackHoleOnTheClock() throws {
+    let description = AggregateBuilder.description(source: "test.source", destination: "BlackHole2ch_UID")
+    #expect(description[kAudioAggregateDeviceNameKey] as? String == "MicBoost Engine")
+    #expect(description[kAudioAggregateDeviceUIDKey] as? String == AggregateBuilder.uid)
+    #expect(description[kAudioAggregateDeviceIsPrivateKey] as? Int == 1)
+    #expect(description[kAudioAggregateDeviceIsStackedKey] as? Int == 0)
+    // BlackHole is the clock master so the drift resampler runs on the input, before the limiter.
+    #expect(description[kAudioAggregateDeviceMainSubDeviceKey] as? String == "BlackHole2ch_UID")
+    let subDevices = try #require(description[kAudioAggregateDeviceSubDeviceListKey] as? [[String: Any]])
+    #expect(subDevices.count == 2)
+    #expect(subDevices.first?[kAudioSubDeviceUIDKey] as? String == "test.source")
+    #expect(subDevices.first?[kAudioSubDeviceDriftCompensationKey] as? Int == 1)
+    #expect(subDevices.last?[kAudioSubDeviceUIDKey] as? String == "BlackHole2ch_UID")
+    #expect(subDevices.last?[kAudioSubDeviceDriftCompensationKey] == nil)
+}
+
+@Test func engineAggregatesWithBlackHoleAsClockMaster() async throws {
+    let fake = FakeAudioHardware()
+    var source = AudioDevice(id: 1, uid: "test.source", name: "Source")
+    source.inputChannels = 1
+    var destination = AudioDevice(id: 2, uid: "BlackHole2ch_UID", name: "BlackHole")
+    destination.inputChannels = 2
+    destination.outputChannels = 2
+    fake.deviceList = [source, destination]
+    let controller = EngineController(hardware: fake)
+    try await controller.start(inputUID: source.uid)
+    #expect(await controller.status().state == .running)
+    #expect(fake.aggregateMainSubDevice == destination.uid)
+    let subDevices = fake.aggregateSubDevices
+    #expect(subDevices.map(\.uid) == [source.uid, destination.uid])
+    #expect(subDevices.map(\.driftCompensation) == [true, false])
+    try await controller.stop()
+    #expect(await controller.status().state == .stopped)
+}
+
 @Test func missingBlackHoleState() async throws {
     let controller = EngineController(hardware: FakeAudioHardware())
     try await controller.start(inputUID: "source")

@@ -24,6 +24,8 @@ final class FakeAudioHardware: AudioHardware, @unchecked Sendable {
     private var stops = 0
     private var storedWrites: [AudioObjectPropertySelector] = []
     private var rateWrites: [(uid: String, rate: Double)] = []
+    private var storedMainSubDevice: String?
+    private var storedSubDevices: [(uid: String, driftCompensation: Bool)] = []
     var engineEvents: FakeEngineEvents?
 
     var deviceList: [AudioDevice] {
@@ -46,6 +48,9 @@ final class FakeAudioHardware: AudioHardware, @unchecked Sendable {
     var ioStarts: Int { lock.withLock { starts } }
     var ioStops: Int { lock.withLock { stops } }
     var appliedRateWrites: [(uid: String, rate: Double)] { lock.withLock { rateWrites } }
+    /// Description of the last aggregate the engine asked for.
+    var aggregateMainSubDevice: String? { lock.withLock { storedMainSubDevice } }
+    var aggregateSubDevices: [(uid: String, driftCompensation: Bool)] { lock.withLock { storedSubDevices } }
 
     var microphoneAllowed: Bool {
         get { lock.withLock { allowed } }
@@ -154,8 +159,18 @@ extension FakeAudioHardware: EngineHardware {
     }
 
     func createAggregate(source: String, destination: String) throws -> AudioObjectID {
-        lock.withLock {
+        let description = AggregateBuilder.description(source: source, destination: destination)
+        let main = description[kAudioAggregateDeviceMainSubDeviceKey] as? String
+        let subDevices = (description[kAudioAggregateDeviceSubDeviceListKey] as? [[String: Any]] ?? []).map {
+            (
+                uid: $0[kAudioSubDeviceUIDKey] as? String ?? "",
+                driftCompensation: ($0[kAudioSubDeviceDriftCompensationKey] as? Int ?? 0) != 0
+            )
+        }
+        return lock.withLock {
             creations += 1
+            storedMainSubDevice = main
+            storedSubDevices = subDevices
             let id = AudioObjectID(900 + creations)
             var device = AudioDevice(id: id, uid: AggregateBuilder.uid, name: "Fake aggregate")
             device.inputChannels = 3

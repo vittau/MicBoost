@@ -53,11 +53,13 @@ the settings window.
 Microphone → 3-band EQ → gain → peak protection → BlackHole 2ch → apps
 ```
 
-The engine creates a **private aggregate device** with two sub-devices: the chosen source as the
-clock master and BlackHole 2ch with drift compensation. A single C IOProc receives the source
+The engine creates a **private aggregate device** with two sub-devices: the chosen source with
+drift compensation and BlackHole 2ch as the clock master. A single C IOProc receives the source
 input and writes the BlackHole output in the same cycle, so nothing is queued between callbacks.
 The added latency is bounded by the buffer and the device safety offsets, and the drift between
-the two clocks is handled by Core Audio's drift resampler instead of a ring buffer that grows.
+the two clocks is handled by Core Audio's drift resampler on the input, before the DSP chain:
+the limiter is the last stage, so BlackHole receives exactly what the engine wrote and the
+−1 dBFS ceiling holds at its output.
 The aggregate is private: other apps never see it, and it disappears with the process.
 
 Gain, mute and the 3-band EQ can be adjusted in the menu bar panel. Peak protection
