@@ -18,6 +18,22 @@ final class FakeAudioHardware: AudioHardware, @unchecked Sendable {
         get { lock.withLock { storedEmitDevicesOnAggregateCreation } }
         set { lock.withLock { storedEmitDevicesOnAggregateCreation = newValue } }
     }
+    private var stopFailure = false
+    var failMonitorStop: Bool {
+        get { lock.withLock { stopFailure } }
+        set { lock.withLock { stopFailure = newValue } }
+    }
+    private var monitorCreates = 0
+    private var monitorStarts = 0
+    private var monitorStops = 0
+    var monitorCounts: (created: Int, started: Int, stopped: Int) {
+        lock.withLock { (monitorCreates, monitorStarts, monitorStops) }
+    }
+    private var storedMonitorError: EngineError?
+    var monitorError: EngineError? {
+        get { lock.withLock { storedMonitorError } }
+        set { lock.withLock { storedMonitorError = newValue } }
+    }
     private var storedOutput: AudioObjectID = 0
     private var storedFailMonitorStart = false
     var output: AudioObjectID {
@@ -156,6 +172,18 @@ final class FakeAudioHardware: AudioHardware, @unchecked Sendable {
 extension FakeAudioHardware: EngineHardware {
     var microphoneAuthorized: Bool { microphoneAllowed }
 
+    func monitorBuffer(_ device: AudioObjectID) throws -> UInt32 { 256 }
+    func createMonitor(_ device: AudioDevice, context: OpaquePointer, rate: Double) throws -> any MonitorSession {
+        if let monitorError { throw monitorError }
+        if failMonitorStart { throw EngineError.halFailure(-321, "Create monitor") }
+        lock.withLock { monitorCreates += 1 }
+        return FakeMonitorSession(
+            onStart: { [self] in lock.withLock { monitorStarts += 1 } },
+            onStop: { [self] in
+                if failMonitorStop { throw EngineError.halFailure(-322, "Stop monitor") }
+                lock.withLock { monitorStops += 1 }
+            })
+    }
     func maximumFrames(_ device: AudioObjectID, buffer: UInt32) throws -> UInt32 { buffer }
     func latencyFrames(_ device: AudioObjectID, scope: AudioObjectPropertyScope) throws -> UInt32 { 0 }
 
@@ -178,8 +206,8 @@ extension FakeAudioHardware: EngineHardware {
         emit(.init(device, kAudioDevicePropertyNominalSampleRate))
     }
 
-    func createAggregate(source: String, destination: String, monitor: String?) throws -> AudioObjectID {
-        let description = AggregateBuilder.description(source: source, destination: destination, monitor: monitor)
+    func createAggregate(source: String, destination: String) throws -> AudioObjectID {
+        let description = AggregateBuilder.description(source: source, destination: destination)
         let main = description[kAudioAggregateDeviceMainSubDeviceKey] as? String
         let subDevices = (description[kAudioAggregateDeviceSubDeviceListKey] as? [[String: Any]] ?? []).map {
             (
@@ -217,7 +245,6 @@ extension FakeAudioHardware: EngineHardware {
     func createIO(_ device: AudioObjectID, context: OpaquePointer) throws -> AudioDeviceIOProcID { mb_ioproc }
 
     func startIO(_ device: AudioObjectID, proc: AudioDeviceIOProcID) throws {
-        if failMonitorStart && aggregateSubDevices.count == 3 { throw EngineError.formatUnsupported }
         lock.withLock { starts += 1 }
     }
 
@@ -251,4 +278,18 @@ final class FakeEngineEvents: @unchecked Sendable {
         }
         if let (queue, handler) = callback { queue.async(execute: handler) }
     }
+}
+
+final class FakeMonitorSession: MonitorSession {
+    var latencySeconds: Double { 0.001 }
+    var outputBufferFrames: UInt32 { 256 }
+    private let onStart: () -> Void
+    private let onStop: () throws -> Void
+    init(onStart: @escaping () -> Void, onStop: @escaping () throws -> Void) {
+        self.onStart = onStart
+        self.onStop = onStop
+    }
+    func start() throws { onStart() }
+    func stop() throws { try onStop() }
+    func setCorrection(_ correction: Double) throws {}
 }

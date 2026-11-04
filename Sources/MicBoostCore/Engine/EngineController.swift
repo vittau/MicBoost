@@ -41,15 +41,30 @@ extension EngineState {
     }
 }
 public enum MonitorUnavailableReason: Sendable, Equatable {
-    case noOutput, outputIsLoopback, formatUnsupported
+    case noOutput, outputIsLoopback, formatUnsupported, startFailed
 }
 public enum MonitorStatus: Sendable, Equatable {
     case off
-    case active(output: AudioDevice, reportedLatencyMs: Double)
+    case active(output: AudioDevice, addedLatencyMs: Double?, totalLatencyMs: Double)
     case unavailable(reason: MonitorUnavailableReason, outputName: String?)
 }
+public struct MonitorFailure: Sendable, Equatable {
+    public var operation: String
+    public var error: EngineError
+    public var output: AudioDevice
+    public var workingRate: Double
+    public init(operation: String, error: EngineError, output: AudioDevice, workingRate: Double) {
+        self.operation = operation
+        self.error = error
+        self.output = output
+        self.workingRate = workingRate
+    }
+}
 public struct EngineStatus: Sendable {
+    public var monitorOutput: AudioDevice?
+    public var lastMonitorFailure: MonitorFailure?
     public var monitor: MonitorStatus = .off
+    public var monitorStats = mb_monitor_stats()
     public var state: EngineState
     public var source: AudioDevice?
     public var blackHole: AudioDevice?
@@ -103,8 +118,17 @@ public actor EngineController {
     private var monitorEnabled = false
     private var diagnosticMonitorSilent = false
     private var monitorOutputUID: String?
+    private var lastMonitorFailure: MonitorFailure?
     private var monitorStatus: MonitorStatus = .off
     private var monitorOutput: AudioDevice?
+    private var monitorContext: OpaquePointer?
+    private var monitorSession: (any MonitorSession)?
+    private var monitorTokens: [UUID] = []
+    private var monitorPending: Task<Void, Never>?
+    private var monitorTimer: Task<Void, Never>?
+    private var monitorPI = mb_monitor_pi()
+    private var monitorCorrection = 0.0
+    private var monitorSettleUntil = Date.distantPast
     /// The resolved candidate is retained even when monitoring is unavailable.
     private var resolvedMonitorOutput: AudioDevice?
     private var resolvedMonitorEligible = false
@@ -224,22 +248,22 @@ public actor EngineController {
         }
     }
     /// Diagnostic override; never changes the system default output.
-    public static func reportedMonitorLatency(
-        inputFrames: UInt32, outputFrames: UInt32, bufferFrames: UInt32, sampleRate: Double
-    ) -> Double {
-        guard sampleRate > 0 else { return 0 }
-        return (Double(inputFrames) + Double(outputFrames) + 2 * Double(bufferFrames)) * 1000 / sampleRate
-    }
     public func setDiagnosticMonitorSilent(_ silent: Bool) { diagnosticMonitorSilent = silent }
     public func setMonitorOutput(uid: String?) { monitorOutputUID = uid }
     public func setMonitorEnabled(_ enabled: Bool) async throws {
         guard monitorEnabled != enabled else { return }
         monitorEnabled = enabled
         guard state == .running, !sleeping else { return }
-        try tearDown()
-        try await build()
+        do {
+            try stopMonitor()
+            if enabled { await startMonitor() }
+        } catch {
+            recordMonitorFailure(error, operation: "Stop monitor")
+            monitorStatus = .unavailable(reason: .startFailed, outputName: resolvedMonitorOutput?.name)
+            logMonitorUnavailable()
+        }
     }
-    private func build(withoutMonitor: Bool = false) async throws {
+    private func build() async throws {
         setState(.starting)
         do {
             guard hardware.microphoneAuthorized else {
@@ -258,51 +282,9 @@ public actor EngineController {
                 setState(hasRun ? .recovering(.sourceLost) : .error(.sourceUnavailable(selected ?? "")))
                 return
             }
-            let previousMonitor = monitorOutput
-            monitorOutput = nil
-            resolvedMonitorOutput = nil
-            resolvedMonitorEligible = false
-            monitorStatus = .off
-            var monitor: AudioDevice?
-            if monitorEnabled {
-                resolvedMonitorOutput = currentMonitorOutput(in: devices)
-                resolvedMonitorEligible = monitorEligible(resolvedMonitorOutput, in: devices)
-                if let output = resolvedMonitorOutput, output.outputChannels > 0 {
-                    if !resolvedMonitorEligible {
-                        monitorStatus = .unavailable(reason: .outputIsLoopback, outputName: output.name)
-                    } else if withoutMonitor {
-                        monitorStatus = .unavailable(reason: .formatUnsupported, outputName: output.name)
-                    } else {
-                        monitor = output
-                    }
-                } else {
-                    monitorStatus = .unavailable(reason: .noOutput, outputName: nil)
-                }
-            }
-            var destinationRates = blackHole.supportedRates
-            if let output = monitor {
-                destinationRates = blackHole.supportedRates.flatMap { a in
-                    output.supportedRates.compactMap { b -> AudioRange? in
-                        let low = max(a.minimum, b.minimum)
-                        let high = min(a.maximum, b.maximum)
-                        return low <= high ? AudioRange(low, high) : nil
-                    }
-                }
-                if Self.workingSampleRate(source: source.supportedRates, destination: destinationRates) == nil {
-                    monitorStatus = .unavailable(reason: .formatUnsupported, outputName: output.name)
-                    monitor = nil
-                    destinationRates = blackHole.supportedRates
-                }
-            }
-            if let previousMonitor, previousMonitor.uid != monitor?.uid {
-                restoreMonitorRate(previousMonitor)
-                let refreshed = try hardware.devices()
-                resolvedMonitorOutput = monitorEnabled ? currentMonitorOutput(in: refreshed) : nil
-                resolvedMonitorEligible = monitorEligible(resolvedMonitorOutput, in: refreshed)
-            }
             guard
                 let working = Self.workingSampleRate(
-                    source: source.supportedRates, destination: destinationRates)
+                    source: source.supportedRates, destination: blackHole.supportedRates)
             else {
                 throw EngineError.formatUnsupported
             }
@@ -316,25 +298,12 @@ public actor EngineController {
                 try hardware.setRate(blackHole.id, rate: working)
                 blackHole.sampleRate = working
             }
-            if var output = monitor {
-                if output.uid == source.uid { output.sampleRate = source.sampleRate }
-                monitorOutput = output
-                if output.sampleRate != working {
-                    recordRate(uid: output.uid, current: output.sampleRate, target: working)
-                    try hardware.setRate(output.id, rate: working)
-                    output.sampleRate = working
-                    monitor = output
-                    monitorOutput = output
-                }
-                monitor = output
-                resolvedMonitorOutput = output
-            }
             self.source = source
             destination = blackHole
             for stale in devices where stale.uid == AggregateBuilder.uid {
                 try hardware.destroyAggregate(stale.id)
             }
-            let id = try hardware.createAggregate(source: source.uid, destination: blackHole.uid, monitor: monitor?.uid)
+            let id = try hardware.createAggregate(source: source.uid, destination: blackHole.uid)
             aggregate = id
             let deadline = Date().addingTimeInterval(2)
             while !(try hardware.devices().contains(where: { $0.id == id && $0.alive })) {
@@ -344,15 +313,10 @@ public actor EngineController {
             buffer = try hardware.setBuffer(id, frames: requested)
             let sourceLayout = try hardware.layout(source.id)
             let destinationLayout = try hardware.layout(blackHole.id)
-            let monitorLayout = try monitor.map { try hardware.layout($0.id) }
-            let extraLayout = monitor?.uid == source.uid ? nil : monitorLayout
-            var routing = try AggregateBuilder.routing(
-                source: sourceLayout, destination: destinationLayout, monitor: monitorLayout,
-                monitorIsSource: monitor?.uid == source.uid)
+            var routing = try AggregateBuilder.routing(source: sourceLayout, destination: destinationLayout)
             guard let context = mb_engine_create(try hardware.maximumFrames(id, buffer: buffer), source.sampleRate)
             else { throw EngineError.formatUnsupported }
             engine = context
-            mb_engine_set_monitor_silent(context, diagnosticMonitorSilent)
             guard mb_engine_configure(context, &routing) == 0 else { throw EngineError.formatUnsupported }
             setChannelSelection(channelSelection)
             applyControls()
@@ -361,15 +325,13 @@ public actor EngineController {
             try hardware.streamUsage(
                 id, proc: io, input: true,
                 enabled: Array(repeating: true, count: sourceLayout.inputStreams)
-                    + Array(repeating: false, count: destinationLayout.inputStreams)
-                    + Array(repeating: false, count: extraLayout?.inputStreams ?? 0))
+                    + Array(repeating: false, count: destinationLayout.inputStreams))
             try hardware.streamUsage(
                 id, proc: io, input: false,
-                enabled: Array(repeating: monitor?.uid == source.uid, count: sourceLayout.outputStreams)
-                    + Array(repeating: true, count: destinationLayout.outputStreams)
-                    + Array(repeating: true, count: extraLayout?.outputStreams ?? 0))
+                enabled: Array(repeating: false, count: sourceLayout.outputStreams)
+                    + Array(repeating: true, count: destinationLayout.outputStreams))
             try hardware.startIO(id, proc: io)
-            for device in [source, blackHole] + (monitor.map { [$0] } ?? []) {
+            for device in [source, blackHole] {
                 tokens.append(
                     try hardware.addListener(.init(device.id, kAudioDevicePropertyDeviceIsAlive), queue: queue) {
                         [weak self] in
@@ -382,7 +344,7 @@ public actor EngineController {
                         Task { await self?.rateChanged(uid: uid) }
                     })
             }
-            for device in [source, blackHole] + (monitor.map { [$0] } ?? []) {
+            for device in [source, blackHole] {
                 for scope in [kAudioObjectPropertyScopeInput, kAudioObjectPropertyScopeOutput] {
                     tokens.append(
                         try hardware.addListener(
@@ -400,32 +362,177 @@ public actor EngineController {
                 try hardware.latencyFrames(source.id, scope: kAudioObjectPropertyScopeInput)
                 + hardware.latencyFrames(blackHole.id, scope: kAudioObjectPropertyScopeOutput)
                 + hardware.latencyFrames(id, scope: kAudioObjectPropertyScopeInput) + buffer
-            if let monitor {
-                let latency = try Self.reportedMonitorLatency(
-                    inputFrames: hardware.latencyFrames(source.id, scope: kAudioObjectPropertyScopeInput),
-                    outputFrames: hardware.latencyFrames(monitor.id, scope: kAudioObjectPropertyScopeOutput),
-                    bufferFrames: buffer, sampleRate: working)
-                monitorStatus = .active(output: monitor, reportedLatencyMs: latency)
-            }
             hasRun = true
             setState(.running)
             settleUntil = Date().addingTimeInterval(0.3)
             try await routingManager.engineDidStart(blackHole: blackHole)
+            await startMonitor()
         } catch {
-            if monitorOutput != nil, !withoutMonitor {
-                try tearDown()
-                try await build(withoutMonitor: true)
-                return
-            }
             setState(.error((error as? EngineError) ?? .invalidArgument(String(describing: error))))
             try tearDown()
             throw error
         }
     }
-    private func monitorChanged() {
+    private func monitorSnapshot() -> MonitorStatus {
+        guard case .active = monitorStatus else { return monitorStatus }
+        guard let output = monitorOutput, let context = monitorContext, let session = monitorSession else {
+            return monitorStatus
+        }
+        var stats = mb_monitor_stats()
+        mb_monitor_read(context, &stats)
+        let added =
+            stats.latency_host > 0
+            ? Self.hostMilliseconds(stats.latency_host) + session.latencySeconds * 1000
+                + Double(session.outputBufferFrames) * 1000 / output.sampleRate : nil
+        let physical = (try? hardware.latencyFrames(source?.id ?? 0, scope: kAudioObjectPropertyScopeInput)) ?? 0
+        let outFrames = (try? hardware.latencyFrames(output.id, scope: kAudioObjectPropertyScopeOutput)) ?? 0
+        let total =
+            Double(physical) * 1000 / (source?.sampleRate ?? 48000)
+            + (added ?? 0) + Double(outFrames) * 1000 / output.sampleRate
+        return .active(output: output, addedLatencyMs: added, totalLatencyMs: total)
+    }
+    private static func hostMilliseconds(_ ticks: UInt64) -> Double {
+        var time = mach_timebase_info_data_t()
+        mach_timebase_info(&time)
+        return Double(ticks) * Double(time.numer) / Double(time.denom) / 1e6
+    }
+    private func startMonitor() async {
+        guard monitorEnabled, state == .running, let engine, monitorContext == nil else { return }
+        lastMonitorFailure = nil
+        var operation = "Resolve monitor output"
+        do {
+            let devices = try hardware.devices()
+            resolvedMonitorOutput = currentMonitorOutput(in: devices)
+            resolvedMonitorEligible = monitorEligible(resolvedMonitorOutput, in: devices)
+            guard let output = resolvedMonitorOutput, output.outputChannels > 0 else {
+                monitorStatus = .unavailable(reason: .noOutput, outputName: resolvedMonitorOutput?.name)
+                logMonitorUnavailable()
+                return
+            }
+            guard resolvedMonitorEligible else {
+                monitorStatus = .unavailable(reason: .outputIsLoopback, outputName: output.name)
+                logMonitorUnavailable()
+                return
+            }
+            guard output.sampleRate > 0, output.sampleRate.isFinite else { throw EngineError.formatUnsupported }
+            operation = "Create monitor ring context"
+            let rate = source?.sampleRate ?? 48000
+            let outputBuffer = try hardware.monitorBuffer(output.id)
+            let target = Double(buffer) + Double(outputBuffer) * rate / output.sampleRate + rate * 0.001
+            guard target > 0, target < 8192,
+                let context = mb_monitor_create(engine, rate, UInt32(target.rounded(.up)))
+            else { throw EngineError.formatUnsupported }
+            monitorContext = context
+            mb_monitor_set_silent(context, diagnosticMonitorSilent)
+            operation = "Create and start monitor units"
+            monitorSession = try hardware.createMonitor(output, context: context, rate: rate)
+            monitorOutput = output
+            monitorPI = mb_monitor_pi()
+            mb_engine_set_monitor_enabled(engine, true)
+            try monitorSession?.start()
+            for selector in [kAudioDevicePropertyDeviceIsAlive, kAudioDevicePropertyNominalSampleRate] {
+                monitorTokens.append(
+                    try hardware.addListener(.init(output.id, selector), queue: queue) { [weak self] in
+                        Task { await self?.monitorChanged() }
+                    })
+            }
+            monitorTokens.append(
+                try hardware.addListener(
+                    .init(output.id, kAudioDevicePropertyStreamConfiguration, kAudioObjectPropertyScopeOutput),
+                    queue: queue
+                ) { [weak self] in
+                    Task { await self?.monitorChanged(force: true) }
+                })
+            monitorSettleUntil = Date().addingTimeInterval(0.3)
+            monitorStatus = .active(output: output, addedLatencyMs: nil, totalLatencyMs: 0)
+            monitorTimer = Task { [weak self] in
+                while !Task.isCancelled {
+                    do { try await Task.sleep(for: .milliseconds(50)) } catch { return }
+                    await self?.monitorTick()
+                }
+            }
+        } catch {
+            recordMonitorFailure(error, operation: operation)
+            do { try stopMonitor() } catch {
+                log.error("Monitor cleanup failed: \(String(describing: error), privacy: .public)")
+            }
+            let reason: MonitorUnavailableReason =
+                (error as? EngineError) == .formatUnsupported ? .formatUnsupported : .startFailed
+            monitorStatus = .unavailable(reason: reason, outputName: resolvedMonitorOutput?.name)
+            logMonitorUnavailable()
+        }
+    }
+    private func recordMonitorFailure(_ error: Error, operation: String) {
+        guard let output = resolvedMonitorOutput else { return }
+        let typed = (error as? EngineError) ?? .invalidArgument(String(describing: error))
+        let op: String
+        if case .halFailure(_, let name) = typed { op = name } else { op = operation }
+        lastMonitorFailure = MonitorFailure(
+            operation: op, error: typed, output: output, workingRate: source?.sampleRate ?? 0)
+        log.error(
+            "Monitor failure operation=\(op, privacy: .public) error=\(typed.description, privacy: .public) uid=\(output.uid, privacy: .public) name=\(output.name, privacy: .public) nominal_rate=\(output.sampleRate, privacy: .public) available_rates=\(String(describing: output.supportedRates), privacy: .public)"
+        )
+    }
+    private func logMonitorUnavailable() {
+        let output = resolvedMonitorOutput
+        log.notice(
+            "Monitor resolved \(String(describing: self.monitorStatus), privacy: .public) output_uid=\(output?.uid ?? "none", privacy: .public) nominal_rate=\(output?.sampleRate ?? 0, privacy: .public) available_rates=\(String(describing: output?.supportedRates ?? []), privacy: .public)"
+        )
+    }
+    private func stopMonitor() throws {
+        monitorPending?.cancel()
+        monitorTimer?.cancel()
+        monitorTimer = nil
+        for token in monitorTokens { try hardware.removeListener(token) }
+        monitorTokens.removeAll()
+        if let context = monitorContext {
+            mb_monitor_fade_out(context)
+            Thread.sleep(forTimeInterval: 0.012)
+        }
+        if let engine { mb_engine_set_monitor_enabled(engine, false) }
+        try monitorSession?.stop()
+        monitorSession = nil
+        if let context = monitorContext { mb_monitor_destroy(context) }
+        monitorContext = nil
+        monitorOutput = nil
+        monitorStatus = .off
+        monitorCorrection = 0
+    }
+    private func monitorChanged(force: Bool = false) {
+        if force && Date() < monitorSettleUntil { return }
         guard monitorEnabled, state == .running else { return }
-        settleUntil = .distantPast
-        changed(force: true)
+        monitorPending?.cancel()
+        monitorPending = Task { [weak self] in
+            do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
+            await self?.reconcileMonitor(force: force)
+        }
+    }
+    private func reconcileMonitor(force: Bool = false) async {
+        guard monitorEnabled, state == .running else { return }
+        let devices = (try? hardware.devices()) ?? []
+        let output = currentMonitorOutput(in: devices)
+        guard
+            force || !sameMonitorDescriptor(resolvedMonitorOutput, output)
+                || resolvedMonitorEligible != monitorEligible(output, in: devices)
+        else { return }
+        do { try stopMonitor() } catch {
+            recordMonitorFailure(error, operation: "Stop monitor")
+            return
+        }
+        await startMonitor()
+    }
+    private func monitorTick() {
+        guard let context = monitorContext, let session = monitorSession else { return }
+        var stats = mb_monitor_stats()
+        mb_monitor_read(context, &stats)
+        monitorCorrection = mb_monitor_pi_update(
+            &monitorPI, Double(stats.fill) - Double(stats.target), source?.sampleRate ?? 48000, 0.05)
+        do { try session.setCorrection(monitorCorrection) } catch {
+            recordMonitorFailure(error, operation: "Monitor drift control")
+            try? stopMonitor()
+            monitorStatus = .unavailable(reason: .startFailed, outputName: resolvedMonitorOutput?.name)
+            logMonitorUnavailable()
+        }
     }
     private func overloaded() { overloads += 1 }
     public func setChannelSelection(_ selection: ChannelSelection) {
@@ -548,12 +655,8 @@ public actor EngineController {
         }
         let sameSource = currentSource.map { current in source?.matchesEngineDescriptor(current) ?? false } ?? false
         let sameDestination = destination?.matchesEngineDescriptor(currentDestination) ?? false
-        let currentOutput = currentMonitorOutput(in: devices)
-        let sameMonitor =
-            !monitorEnabled
-            || (sameMonitorDescriptor(resolvedMonitorOutput, currentOutput)
-                && resolvedMonitorEligible == monitorEligible(currentOutput, in: devices))
-        if state == .running, sameSource, sameDestination, sameMonitor {
+        if state == .running, sameSource, sameDestination {
+            await reconcileMonitor()
             // Right after a build the HAL still reports the engine's own start; a forced
             // notification then is not an external format change.
             let settling = Date() < settleUntil
@@ -588,36 +691,30 @@ public actor EngineController {
             && previous.availableSampleRates == current.availableSampleRates
             && previous.subdeviceUIDs == current.subdeviceUIDs
     }
-    private func restoreMonitorRate(_ output: AudioDevice) {
-        // A duplex source remains in the aggregate when its monitoring role ends.
-        guard output.uid != source?.uid, output.uid != destination?.uid else { return }
-        restoreRates(only: [output.uid])
-    }
     private func recordRate(uid: String, current: Double, target: Double) {
         if previousRates[uid] == nil { previousRates[uid] = current }
         appliedRates[uid] = target
     }
     /// Restore all rates on voluntary stop, or only an output leaving the aggregate.
-    private func restoreRates(only uids: Set<String>? = nil) {
+    private func restoreRates() {
         guard !appliedRates.isEmpty else { return }
         let devices = (try? hardware.devices()) ?? []
-        for (uid, applied) in appliedRates where uids == nil || uids?.contains(uid) == true {
+        for (uid, applied) in appliedRates {
             guard let device = devices.first(where: { $0.uid == uid && $0.alive }),
                 let previous = previousRates[uid], previous != applied, device.sampleRate == applied
             else { continue }
             try? hardware.setRate(device.id, rate: previous)
         }
-        if let uids {
-            for uid in uids {
-                appliedRates.removeValue(forKey: uid)
-                previousRates.removeValue(forKey: uid)
-            }
-        } else {
-            appliedRates.removeAll()
-            previousRates.removeAll()
-        }
+        appliedRates.removeAll()
+        previousRates.removeAll()
     }
     private func tearDown() throws {
+        do { try stopMonitor() } catch {
+            // A failed output cleanup retains its context/ring; the bridge can still stop.
+            recordMonitorFailure(error, operation: "Stop monitor during engine teardown")
+            monitorStatus = .unavailable(reason: .startFailed, outputName: resolvedMonitorOutput?.name)
+            logMonitorUnavailable()
+        }
         for token in tokens { try hardware.removeListener(token) }
         tokens.removeAll()
 
@@ -727,7 +824,13 @@ public actor EngineController {
             bufferFrames: buffer, reportedLatencyMs: rate > 0 ? latency * 1000 / rate : 0,
             overloads: overloads, cycles: counters.cycles, inputMissing: counters.input_missing,
             nonfiniteResets: counters.nonfinite_resets, ioDeltaHost: counters.io_delta_host)
-        result.monitor = state == .running ? monitorStatus : .off
+        if let monitorContext {
+            mb_monitor_read(monitorContext, &result.monitorStats)
+            result.monitorStats.correction = monitorCorrection
+        }
+        result.monitorOutput = resolvedMonitorOutput
+        result.lastMonitorFailure = lastMonitorFailure
+        result.monitor = state == .running ? monitorSnapshot() : .off
         return result
     }
 }

@@ -103,6 +103,13 @@ import SwiftUI
                 LabeledContent(
                     localized("Hear My Voice"),
                     value: model.monitorDescription.isEmpty ? localized("Off") : model.monitorDescription)
+                LabeledContent(localized("Monitor added latency"), value: model.monitorAddedLatency)
+                LabeledContent(localized("Monitor underruns"), value: "\(model.status?.monitorStats.underruns ?? 0)")
+                LabeledContent(localized("Monitor overruns"), value: "\(model.status?.monitorStats.overruns ?? 0)")
+                LabeledContent(
+                    localized("Monitor output rate"),
+                    value: model.status?.monitorOutput.map { "\($0.sampleRate.formatted(.number.locale(locale))) Hz" }
+                        ?? "—")
                 LabeledContent(localized("Audio overloads"), value: "\(model.status?.overloads ?? 0)")
                 LabeledContent(localized("Missing input cycles"), value: "\(model.status?.inputMissing ?? 0)")
                 LabeledContent(localized("Numerical resets"), value: "\(model.status?.nonfiniteResets ?? 0)")

@@ -4,7 +4,7 @@ import Foundation
 import MicBoostCore
 
 let usage =
-    "Usage: micboost-diag devices [--json] | permission | set-rate --device UID --rate HZ | capture --device UID --seconds N --out file.wav | run --input UID [--buffer N] [--seconds N] | latency --input UID [--trials N] [--buffer N] | monitor-latency --input UID [--trials N] [--buffer N] | soak --input UID [--minutes N] [--buffer N]; effects: --monitor --monitor-silent --gain-db N --mute --eq-low F:G --eq-mid F:G:Q --eq-high F:G --eq-off"
+    "Usage: micboost-diag devices [--json] | permission | set-rate --device UID --rate HZ | capture --device UID --seconds N --out file.wav | run --input UID [--buffer N] [--seconds N] | latency --input UID [--trials N] [--buffer N] | monitor-latency --input UID [--output UID] [--seconds N] [--buffer N] | soak --input UID [--minutes N] [--buffer N]; effects: --monitor --monitor-silent --gain-db N --mute --eq-low F:G --eq-mid F:G:Q --eq-high F:G --eq-off"
 do {
     let rawArgs = Array(CommandLine.arguments.dropFirst())
     var args: [String] = []
@@ -83,7 +83,50 @@ do {
                 print("  Alive: \(device.alive), eligible source: \(device.isEligible(in: snapshot.devices))")
             }
         }
-    case "latency", "soak", "monitor-latency":
+    case "monitor-latency":
+        var options: [String: String] = [:]
+        guard args.count % 2 == 1 else { throw EngineError.invalidArgument(usage) }
+        for i in stride(from: 1, to: args.count, by: 2) {
+            guard ["--input", "--output", "--buffer", "--seconds"].contains(args[i]), options[args[i]] == nil else {
+                throw EngineError.invalidArgument(usage)
+            }
+            options[args[i]] = args[i + 1]
+        }
+        guard let uid = options["--input"], let seconds = Int(options["--seconds"] ?? "10"), seconds > 0,
+            seconds <= 3600,
+            let buffer = UInt32(options["--buffer"] ?? "256"), buffer > 0
+        else { throw EngineError.invalidArgument(usage) }
+        let controller = try await diagnosticController(effects: [:])
+        await controller.setDiagnosticMonitorSilent(true)
+        await controller.setMonitorOutput(uid: options["--output"])
+        try await controller.setMonitorEnabled(true)
+        do {
+            try await controller.start(inputUID: uid, bufferFrames: buffer)
+            var values: [Double] = []
+            for second in 1...seconds {
+                try await Task.sleep(for: .seconds(1))
+                let status = await controller.status()
+                guard case .active(let output, let added, let total) = status.monitor, let source = status.source else {
+                    throw EngineError.invalidArgument("Monitor unavailable: \(status.monitor)")
+                }
+                if let added { values.append(added) }
+                let input = try hardware.latencyComponents(source.id, scope: kAudioObjectPropertyScopeInput)
+                let out = try hardware.latencyComponents(output.id, scope: kAudioObjectPropertyScopeOutput)
+                let stats = status.monitorStats
+                report(
+                    "second=\(second) monitor_added_ms=\(added.map(String.init(describing:)) ?? "pending") total_estimate_ms=\(total) fill=\(stats.fill) target=\(stats.target) correction_ppm=\(stats.correction * 1e6) underruns=\(stats.underruns) overruns=\(stats.overruns) input_device_frames=\(input.device) input_safety_frames=\(input.safety) input_stream_frames=\(input.stream) output_device_frames=\(out.device) output_safety_frames=\(out.safety) output_stream_frames=\(out.stream)"
+                )
+            }
+            guard !values.isEmpty else { throw EngineError.invalidArgument("No monitor host timestamps") }
+            values.sort()
+            let median = (values[(values.count - 1) / 2] + values[values.count / 2]) / 2
+            report("monitor_added_ms median=\(median) min=\(values.first ?? 0) max=\(values.last ?? 0)")
+            try await controller.stop()
+        } catch {
+            try await controller.stop()
+            throw error
+        }
+    case "latency", "soak":
         var options: [String: String] = [:]
         guard args.count % 2 == 1 else { throw EngineError.invalidArgument(usage) }
         for i in stride(from: 1, to: args.count, by: 2) {
@@ -101,18 +144,10 @@ do {
             throw EngineError.invalidArgument(usage)
         }
         let controller = try await diagnosticController(effects: effects)
-        if command == "monitor-latency" {
-            await controller.setDiagnosticMonitorSilent(true)
-            await controller.setMonitorOutput(uid: options["--output"])
-            await controller.setDefaultInputManagement(false)
-            try await controller.setMonitorEnabled(true)
-            await controller.setEQEnabled(false)
-        }
         do {
             try await controller.start(inputUID: uid, bufferFrames: buffer)
             try await Task.sleep(for: .seconds(1))
             var values: [Double] = []
-            var physicalValues: [Double] = []
             var measuredRate: Double = 0
             let iterations = command == "soak" ? minutes : trials
             let begin = Date()
@@ -123,22 +158,6 @@ do {
                 }
                 let result = try hardware.measureLatency(source: source, destination: destination)
                 let measured = result.milliseconds
-                if command == "monitor-latency" {
-                    guard case .active(let output, let reported) = status.monitor else {
-                        throw EngineError.invalidArgument("Monitor unavailable: \(status.monitor)")
-                    }
-                    let input = try hardware.latencyComponents(source.id, scope: kAudioObjectPropertyScopeInput)
-                    let inputMs = Double(input.total) * 1000 / status.sampleRate
-                    let parts = try hardware.latencyComponents(output.id, scope: kAudioObjectPropertyScopeOutput)
-                    let outputMs = Double(parts.total) * 1000 / status.sampleRate
-                    let physical = LatencyMeasurement.monitorPhysicalMilliseconds(
-                        sourceToBlackHole: result.milliseconds, input: input, output: parts,
-                        sampleRate: status.sampleRate)
-                    physicalValues.append(physical)
-                    report(
-                        "monitor_added_ms=\(measured) input_device_frames=\(input.device) input_safety_frames=\(input.safety) input_stream_frames=\(input.stream) input_ms=\(inputMs) source_to_BlackHole_ms=\(result.milliseconds) output_device_frames=\(parts.device) output_safety_frames=\(parts.safety) output_stream_frames=\(parts.stream) output_ms=\(outputMs) monitor_physical_estimate_ms=\(physical) monitor_reported_ms=\(reported)"
-                    )
-                }
                 values.append(measured)
                 measuredRate = source.sampleRate
                 let usage = try processUsage()
@@ -154,16 +173,8 @@ do {
             values.sort()
             let median = (values[(values.count - 1) / 2] + values[values.count / 2]) / 2
             report(
-                "\(command == "monitor-latency" ? "monitor_added_ms" : "latency_ms") median=\(median) min=\(values.first ?? 0) max=\(values.last ?? 0) median_frames=\(median * measuredRate / 1000)"
+                "latency_ms median=\(median) min=\(values.first ?? 0) max=\(values.last ?? 0) median_frames=\(median * measuredRate / 1000)"
             )
-            if !physicalValues.isEmpty {
-                physicalValues.sort()
-                let physicalMedian =
-                    (physicalValues[(physicalValues.count - 1) / 2] + physicalValues[physicalValues.count / 2]) / 2
-                report(
-                    "monitor_physical_estimate_ms median=\(physicalMedian) min=\(physicalValues.first ?? 0) max=\(physicalValues.last ?? 0)"
-                )
-            }
             try await controller.stop()
         } catch {
             try await controller.stop()

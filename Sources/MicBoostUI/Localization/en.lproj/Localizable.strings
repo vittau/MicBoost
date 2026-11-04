@@ -80,3 +80,10 @@
 "No audio output." = "No audio output.";
 "Unavailable with %@." = "Unavailable with %@.";
 "Unsupported format for %@." = "Unsupported format for %@.";
+
+"Couldn't use %@ for monitoring." = "Couldn't use %@ for monitoring.";
+
+"Monitor added latency" = "Monitor added latency";
+"Monitor underruns" = "Monitor underruns";
+"Monitor overruns" = "Monitor overruns";
+"Monitor output rate" = "Monitor output rate";
