@@ -104,23 +104,33 @@ processed signal at −1 dBFS.
 
 ## Install
 
-MicBoost is not released yet. **The only way to run it today is to build from source** — see
-[Building from source](#building-from-source).
+1. Install [BlackHole 2ch](https://existential.audio/blackhole/), the virtual audio driver
+   MicBoost sends its audio to:
 
-**Planned, not available:** a Homebrew tap (`vittau/micboost`, cask `micboost`) that depends on
-the `blackhole-2ch` cask, and a `.zip` release on GitHub Releases. Neither exists yet; do not
-expect those commands to work.
+   ```sh
+   brew install --cask blackhole-2ch
+   ```
 
-BlackHole 2ch itself is installable now:
+   or use the installer from the BlackHole site. If BlackHole 2ch does not show up in System
+   Settings → Sound afterwards, restart the Mac.
+2. Download `MicBoost-<version>.zip` from
+   [GitHub Releases](https://github.com/vittau/MicBoost/releases) and, optionally, check it against
+   the published checksum:
 
-```sh
-brew install --cask blackhole-2ch
-```
+   ```sh
+   shasum -a 256 -c MicBoost-<version>.zip.sha256
+   ```
+
+3. Unzip it and drag `MicBoost.app` to **Applications**.
+4. Open it and follow [First launch](#first-launch).
+
+A Homebrew tap is planned but not available yet. You can also
+[build from source](#building-from-source).
 
 ## First launch
 
-A build you compile locally is ad-hoc signed and not quarantined, so it opens normally. The
-"Open Anyway" flow below applies once a downloadable build exists:
+MicBoost is not notarized, so macOS blocks the first launch of a downloaded copy. A build you
+compile yourself is not quarantined and opens normally.
 
 1. Open MicBoost. macOS blocks it because the app is not notarized.
 2. Go to System Settings → Privacy & Security, click **Open Anyway** and confirm with your
@@ -234,15 +244,17 @@ feedback, the calling app is monitoring its own output.
 
 ## Uninstall
 
-MicBoost is not installed anywhere yet. To clean up a local build, quit MicBoost from its menu, then delete the checkout and its
-`build/` directory. Settings are removed with:
+1. Choose **Quit MicBoost** in its menu, so the previous system input is restored.
+2. Delete `MicBoost.app` from **Applications**.
+3. Optionally, remove its settings:
 
-```sh
-defaults delete io.github.vittau.MicBoost
-```
+   ```sh
+   defaults delete io.github.vittau.MicBoost
+   ```
 
 BlackHole is never removed by MicBoost, because other apps may depend on it. Remove it yourself
-with `brew uninstall --cask blackhole-2ch` if you no longer need it.
+with `brew uninstall --cask blackhole-2ch` if you no longer need it. For a build from source, also
+delete the checkout and its `build/` directory.
 
 ## Building from source
 
