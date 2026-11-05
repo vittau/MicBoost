@@ -163,6 +163,23 @@ Preparação para todos os itens: app aberto com processamento ligado, microfone
 
 ## Resultados registrados
 
+### Monitor em campo, 0.2.2 — 05/11/2026
+
+Mesmo Mac, fonte e saída do registro da 0.2.1 (fifine USB a 48 kHz → OpenMove by Shokz em Bluetooth a 44,1 kHz), motor a 48 kHz, buffer 256, cerca de 30 s com o monitor ligado:
+
+| Medida | Valor |
+|---|---|
+| Latência adicionada | 32,2 ms = host 30,83 + Varispeed 1,0 + AUHAL 0,35 (meta < 20 ms: **reprovada**) |
+| Latência total estimada | ≈ 266 ms ("atraso alto"; dominada pelo Bluetooth) |
+| Buffer IO da saída (lido da AUHAL) / preferido teórico | 320 / 235 frames |
+| Maior pull / alvo da fila | 351 / 655 frames (256 + 351 + 48) |
+| Ocupação atual / mín.–máx. da janela de 1 s | 893 / 359–976 frames |
+| Correção da Varispeed | −5000 ppm (no limite) |
+| `monitor_underruns` / `monitor_overruns_full` / `monitor_resets` | 0 / 27 / 1 |
+| Overloads / `input_missing` / `nonfinite_resets` | 0 / 0 / 0 |
+
+Leitura: o componente host decompõe-se em ciclo do motor (5,3 ms), ocupação média da fila (≈ 13,6 ms), buffer da saída (7,3 ms) e o adiantamento restante do HAL. A ocupação oscila 617 frames por janela (bloco do produtor + pull), e o mínimo de 359 frames (7,5 ms) é folga acima do necessário para não faltar áudio. A oscilação satura o termo proporcional do PI, que alterna a correção entre os limites de ±0,5% a cada tique. Os 27 descartes por fila cheia e o reinício único coincidem com a partida da AUHAL Bluetooth, que demora a pedir o primeiro bloco enquanto o produtor já escreve.
+
 ### Monitor em campo, 0.2.1 — 04/11/2026
 
 Mac do mantenedor (não o de referência), release 0.2.1, fonte fifine USB (só 48 kHz, 2 canais, inteiro de 16 bits), saída OpenMove by Shokz em Bluetooth (A2DP a 44,1 kHz; anuncia 16 e 44,1 kHz), motor a 48 kHz, buffer 256, relatório de "Copiar relatório" com o monitor ligado:
