@@ -122,6 +122,8 @@ stopped ──start──▶ starting ──ok──▶ running
 | `bufferFrames` | `256` | Opções 64/128/256/512/1024, limitadas pela faixa do dispositivo |
 | `previousDefaultInputUID` | `nil` | Entrada anterior ao MicBoost assumir a padrão |
 | `defaultInputManaged` | `false` | `true` enquanto a entrada padrão atual foi definida pelo MicBoost |
+| `checkForUpdates` | `true` | Verificação automática de atualizações ([Verificação de atualizações](#verificação-de-atualizações)) |
+| `lastUpdateCheck` | `nil` | Data da última resposta válida da verificação |
 | `loginItemDefaultApplied` | `false` | `true` depois que o padrão "Abrir ao iniciar sessão" foi aplicado uma vez ([Item de início](#item-de-início)) |
 
 Cada campo é decodificado isoladamente (`decodeIfPresent`), então um campo ausente mantém o padrão. Esquemas desconhecidos ou dados corrompidos caem nos padrões, sem crash. Valores fora das faixas documentadas (ganho, buffer, frequência/ganho/Q do EQ) são limitados, e seleções de canal inválidas são descartadas na leitura. Os campos de entrada padrão são gravados imediatamente, sem debounce, porque servem de recuperação após crash.
@@ -133,6 +135,16 @@ O registro como item de início usa `SMAppService.mainApp` (ServiceManagement, m
 O padrão ligado é aplicado uma única vez: na abertura, se `loginItemDefaultApplied` é `false` e o app roda de `/Applications` ou `~/Applications` (caminho do bundle resolvido, sem seguir nomes de volume), o app chama `register()` quando o estado é `notRegistered` e grava `loginItemDefaultApplied = true`, mesmo que o registro falhe. Depois disso o app nunca registra sozinho de novo: se o usuário desligar a chave ou remover o item em Ajustes do Sistema, a escolha dele vale. Uma instalação existente que atualiza para esta versão recebe o padrão na primeira abertura. Fora de Aplicativos a flag não é gravada, para que a cópia instalada depois ainda receba o padrão.
 
 Ao ser aberto pelo login, o app se comporta como numa abertura normal: só o item na barra de menus, sem janela.
+
+## Verificação de atualizações
+
+O app consulta `GET https://api.github.com/repos/vittau/MicBoost/releases/latest` (`URLSession`, cabeçalhos `Accept: application/vnd.github+json` e `User-Agent: MicBoost/<versão>`, tempo limite de 15 s). Esse endpoint ignora rascunhos e pré-releases. Da resposta, usa só `tag_name` (`vX.Y.Z`) e `html_url`. A consulta fica atrás do protocolo `ReleaseFeed` em `MicBoostCore`, com uma implementação falsa nos testes; nenhum teste acessa a rede.
+
+- **Comparação:** a versão instalada é `CFBundleShortVersionString`. As duas versões são comparadas numericamente por componente (`X.Y.Z`); uma tag que não tem esse formato é ignorada. Só uma versão estritamente maior é "nova".
+- **Quando:** com `checkForUpdates` ligado, 30 s depois da abertura e, com o app aberto, a cada 24 h, desde que `lastUpdateCheck` tenha mais de 24 h. O botão "Verificar agora" consulta na hora, mesmo com a chave desligada. Nunca há mais de uma consulta simultânea.
+- **Resultado:** uma versão nova é guardada em memória (versão e URL) e aparece no painel e nos ajustes. `lastUpdateCheck` é gravado depois de cada resposta válida. Falhas de rede, HTTP diferente de 200 e JSON inválido em verificações automáticas só vão para o log (`category: "updates"`) e não mudam o estado mostrado; numa verificação manual, a falha aparece na linha de estado dos ajustes.
+- **Sem instalação:** o app só abre `html_url` no navegador padrão. Não baixa, não substitui o bundle e não mexe em quarentena ([Distribuição](distribution.md)).
+- **Privacidade:** a única informação enviada é a própria requisição (endereço IP e `User-Agent` com a versão). O README informa a verificação e como desligá-la.
 
 ## Interface do app
 

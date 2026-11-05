@@ -33,7 +33,8 @@ Motivação: o VirtuMic tem interface pesada e atraso perceptível (o log dele m
 9. Tela secundária de ajustes avançados (buffer, canais, diagnóstico).
 10. Modo monitor: chave no painel que leva a voz processada também à saída padrão do sistema (fones), em qualquer taxa de amostragem da saída, com latência adicionada pelo MicBoost medida < 20 ms ([audio-engine.md](audio-engine.md#modo-monitor)).
 11. Abrir ao iniciar sessão: o MicBoost se registra como item de início do macOS, ligado por padrão numa cópia instalada, com chave nos ajustes ([ui.md](ui.md#janela-de-ajustes)).
-12. Distribuição: tap Homebrew próprio com dependência do cask `blackhole-2ch` e download direto `.zip` ([distribution.md](distribution.md)).
+12. Aviso de nova versão: o app consulta as releases do GitHub uma vez por dia (desligável) e avisa no painel quando há versão mais nova, com link para a página da release; não baixa nem instala nada ([architecture.md](architecture.md#verificação-de-atualizações)).
+13. Distribuição: tap Homebrew próprio com dependência do cask `blackhole-2ch` e download direto `.zip` ([distribution.md](distribution.md)).
 
 ## Fora de escopo da v1
 

@@ -14,6 +14,7 @@ Status: `não iniciado` · `em andamento` · `concluído`. Uma etapa só é conc
 | 7 | Entrega | não iniciado |
 | 8 | Modo monitor | em andamento |
 | 9 | Abrir ao iniciar sessão | em andamento |
+| 10 | Aviso de nova versão | não iniciado |
 
 ## 0 — Estrutura e diagnóstico
 
@@ -126,6 +127,14 @@ Entregas: [item de início](architecture.md#item-de-início) com `LoginItemServi
 Condições de conclusão:
 - `swift build` e `swift test` verdes, com testes do `LoginItemService` falso: padrão aplicado uma única vez só numa cópia em Aplicativos, nunca fora dela, flag gravada mesmo com falha, sem novo registro depois que o usuário desliga, os quatro estados refletidos na chave, falha de `register`/`unregister` sem mudar o estado mostrado;
 - validação manual com o mantenedor, na release instalada: o item aparece em Itens de Início após a primeira abertura, o app abre na barra de menus ao entrar no Mac, desligar a chave remove o item e a escolha persiste depois de reabrir.
+
+## 10 — Aviso de nova versão
+
+Entregas: [verificação de atualizações](architecture.md#verificação-de-atualizações) com `ReleaseFeed`, item "Nova versão disponível" no [painel](ui.md#painel), chave, botão e linha de estado em Sobre nos [ajustes](ui.md#janela-de-ajustes), campos `checkForUpdates` e `lastUpdateCheck`, strings en/pt-BR, README atualizado.
+
+Condições de conclusão:
+- `swift build` e `swift test` verdes, sem acesso à rede nos testes, cobrindo: comparação de versões (maior, igual, menor, componentes com mais de um dígito, tag inválida), agenda de 30 s e 24 h com relógio injetado, chave desligada sem consultas automáticas, "Verificar agora" com a chave desligada, uma consulta por vez, falha automática silenciosa e falha manual mostrada, item do painel presente só com versão nova e com clique simulado abrindo a URL;
+- validação manual com o mantenedor: uma release instalada mais antiga que a última publicada mostra o aviso no painel e o link abre a página da release.
 
 ## Decisões em aberto
 
