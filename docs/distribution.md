@@ -116,7 +116,7 @@ Comportamento do Homebrew 7 com este cask (verificado no Homebrew 7.0.12, macOS 
 - **Upgrade:** o Homebrew só leva a aprovação do Gatekeeper para a versão nova quando o requisito designado da assinatura não muda. Com assinatura ad hoc ele muda a cada build, então cada `brew upgrade` repete o "Abrir Mesmo Assim", como no download direto. O caveat avisa.
 - **Versão nova:** o `livecheck` usa a última release do GitHub; `brew livecheck --cask vittau/micboost/micboost` mostra se o tap está atrasado.
 
-Validação local registrada (sem instalar nada): `brew style`, `brew audit --cask --strict --online` (download e `sha256` conferidos), `brew livecheck`, `brew install --cask --dry-run` e `brew info` com o tap local da 0.2.3.
+O tap está publicado em `https://github.com/vittau/homebrew-micboost`. Validação registrada (sem instalar nada): `brew style`, `brew audit --cask --strict --online` (download e `sha256` conferidos), `brew livecheck`, `brew install --cask --dry-run` e `brew info` com o tap local da 0.2.3, e `brew install --cask --dry-run vittau/micboost/micboost` a partir do tap publicado, que clona o tap, marca o cask como confiável e resolve a dependência.
 
 Comportamento a validar com o mantenedor numa instalação real:
 - `brew install --cask vittau/micboost/micboost` em uma máquina sem BlackHole instala o `blackhole-2ch`, que pede a senha de administrador (pkg) e pode exigir reiniciar o `coreaudiod`, e depois o MicBoost, num único comando.

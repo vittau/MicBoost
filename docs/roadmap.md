@@ -88,7 +88,7 @@ Entregas implementadas:
 
 Pendências:
 - publicação da release no GitHub (`gh release create`, com anexos `.zip` e `.sha256`);
-- publicação do tap `vittau/homebrew-micboost` (cask e README prontos e auditados localmente, ver [distribution.md](distribution.md#homebrew-tap-próprio)) e instalação real com o mantenedor;
+- instalação real pelo tap `vittau/homebrew-micboost` com o mantenedor (tap publicado; `brew install --cask --dry-run vittau/micboost/micboost` a partir do GitHub encontra, confia e resolve o cask, ver [distribution.md](distribution.md#homebrew-tap-próprio));
 - validação dos cenários de instalação e de primeira abertura em um Mac que não participou do desenvolvimento;
 - variante com o instalador do BlackHole: confirmar a orientação do upstream sobre a redistribuição e validar a instalação em máquina limpa.
 
