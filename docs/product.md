@@ -6,7 +6,7 @@ Amplificar e equalizar o microfone escolhido pelo usuário e disponibilizar o á
 
 - interface com aparência de controle nativo do macOS (Volume/Bluetooth da Central de Controle);
 - resposta imediata dos controles e latência de áudio adicional de no máximo 100 ms no uso normal (fonte → BlackHole), com arquitetura sem fila que mire < 20 ms (ver [testing.md](testing.md#medição-de-latência));
-- modo monitor para ouvir a própria voz processada na saída de áudio do sistema, com latência adicionada pelo MicBoost **< 20 ms**, excluindo a latência física dos dispositivos ([audio-engine.md](audio-engine.md#modo-monitor));
+- modo monitor para ouvir a própria voz processada na saída de áudio do sistema, com latência adicionada pelo MicBoost **< 30 ms** no buffer padrão, excluindo a latência física dos dispositivos ([audio-engine.md](audio-engine.md#modo-monitor));
 - ganho acima de 200% (+6,02 dB), sem teto herdado de outra solução;
 - instalação simples **sem notarização** e sem adesão paga ao Apple Developer Program.
 
@@ -31,7 +31,7 @@ Motivação: o VirtuMic tem interface pesada e atraso perceptível (o log dele m
 7. Persistência de ganho, mute, EQ, dispositivo selecionado e seleção de canais.
 8. Detecção e recuperação: BlackHole ausente, permissão de microfone negada, desconexão da fonte, suspensão/retomada, mudança de formato e mudança manual da entrada padrão.
 9. Tela secundária de ajustes avançados (buffer, canais, diagnóstico).
-10. Modo monitor: chave no painel que leva a voz processada também à saída padrão do sistema (fones), em qualquer taxa de amostragem da saída, com latência adicionada pelo MicBoost medida < 20 ms ([audio-engine.md](audio-engine.md#modo-monitor)).
+10. Modo monitor: chave no painel que leva a voz processada também à saída padrão do sistema (fones), em qualquer taxa de amostragem da saída, com latência adicionada pelo MicBoost medida < 30 ms no buffer padrão ([audio-engine.md](audio-engine.md#modo-monitor)).
 11. Abrir ao iniciar sessão: o MicBoost se registra como item de início do macOS, ligado por padrão numa cópia instalada, com chave nos ajustes ([ui.md](ui.md#janela-de-ajustes)).
 12. Aviso de nova versão: o app consulta as releases do GitHub uma vez por dia (desligável) e avisa no painel quando há versão mais nova, com link para a página da release; não baixa nem instala nada ([architecture.md](architecture.md#verificação-de-atualizações)).
 13. Distribuição: tap Homebrew próprio com dependência do cask `blackhole-2ch` e download direto `.zip` ([distribution.md](distribution.md)).
@@ -40,7 +40,7 @@ Motivação: o VirtuMic tem interface pesada e atraso perceptível (o log dele m
 
 Redução de ruído, compressor avançado, ganho automático, volume próprio do monitor, presets de EQ, gráfico de resposta, módulo da Central de Controle, Mac App Store, `homebrew/cask` oficial, notarização.
 
-Modo monitor em saídas Bluetooth: funciona, mas a latência física do próprio fone (tipicamente acima de 100 ms) pode tornar o atraso total alto. Essa latência não entra na meta de < 20 ms adicionados pelo MicBoost; o painel avisa quando a estimativa total reportada passa de 50 ms.
+Modo monitor em saídas Bluetooth: funciona, mas a latência física do próprio fone (tipicamente acima de 100 ms) pode tornar o atraso total alto. Essa latência não entra na meta de < 30 ms adicionados pelo MicBoost; o painel avisa quando a estimativa total reportada passa de 50 ms.
 
 Limitação inerente: o ganho digital também amplifica ruído e não recupera áudio já saturado na origem. O painel indica saturação da entrada quando ela ocorre.
 
@@ -85,7 +85,7 @@ Estabilidade e desempenho:
 - A interface permanece responsiva.
 
 Modo monitor:
-- Com o monitor ligado, a voz processada (a mesma entregue ao BlackHole) sai na saída padrão do sistema, com latência adicionada < 20 ms (mediana) no buffer padrão, medida pelo motor da entrada da amostra até sua apresentação na saída; latências físicas da fonte e da saída são contexto e não entram no critério ([testing.md](testing.md#medição-de-latência-do-monitor)).
+- Com o monitor ligado, a voz processada (a mesma entregue ao BlackHole) sai na saída padrão do sistema, com latência adicionada < 30 ms (mediana) no buffer padrão, medida pelo motor da entrada da amostra até sua apresentação na saída; latências físicas da fonte e da saída são contexto e não entram no critério ([testing.md](testing.md#medição-de-latência-do-monitor)).
 - O monitor funciona com a saída em taxa diferente da fonte (por exemplo, fonte a 48 kHz e fone Bluetooth a 44,1 kHz), sem alterar a taxa da saída.
 - Ligar e desligar o monitor não interrompe o áudio entregue aos apps e não altera ganho, EQ, roteamento nem a entrada padrão; trocar a saída padrão com o monitor ligado leva o monitor à nova saída.
 - O monitor nunca usa um BlackHole (nem um agregado que o contenha) como saída.

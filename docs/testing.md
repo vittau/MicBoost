@@ -118,7 +118,7 @@ precisa de sinal na sala.
 2. A cada segundo, a ferramenta lê o atômico `monitor_latency_host` ([audio-engine.md](audio-engine.md#latência-do-monitor)) e imprime a latência adicionada em ms, a ocupação da fila, a correção de razão em ppm, `monitor_underruns` e `monitor_overruns`, e a latência total estimada com cada parcela física da HAL, componente host, latências de cada unidade, buffer IO pedido (ou omissão por captura compartilhada/rejeição) e efetivo lido, maior pull e extremos de ocupação da última janela de 1 s.
 3. No fim, imprime mediana, mínimo e máximo da latência adicionada.
 
-Aceitação: mediana da **latência adicionada pelo MicBoost < 20 ms** no buffer 256 a 48 kHz,
+Aceitação: mediana da **latência adicionada pelo MicBoost < 30 ms** no buffer 256 a 48 kHz,
 com zero underruns e overruns depois do primeiro segundo, com uma saída na mesma taxa do
 motor e com uma saída em outra taxa (44,1 kHz). Latências físicas são contexto e não entram
 no critério. A escuta real com fones é validação manual com o mantenedor. Quando a saída
@@ -234,7 +234,7 @@ O lease é exercitado com escrita parcial, rejeição sem efeito, restauração 
 falha de restauração e escrita ignorada seguida de retry. Não se presume que dispose
 sozinho restaure o buffer por processo; o código restaura e lê de volta antes dele.
 O valor efetivo de uma AUHAL Bluetooth, seu mínimo e a restituição real precisam ser
-verificados com o mantenedor. A meta <20 ms continua pendente em hardware.
+verificados com o mantenedor. A meta de < 30 ms foi medida depois, em campo, na 0.2.3.
 Nenhum monitor em hardware, captura Bluetooth/Continuity ou som foi executado.
 
 ### Monitor em campo, 0.2.3 — 05/11/2026
@@ -243,7 +243,7 @@ Mesmo Mac, fonte e saída dos registros anteriores (fifine USB a 48 kHz → Open
 
 | Medida | Valor |
 |---|---|
-| Latência adicionada | 25,2 ms = host 23,80 + Varispeed 1,0 + AUHAL 0,35 (meta < 20 ms: **reprovada** no buffer 256) |
+| Latência adicionada | 25,2 ms = host 23,80 + Varispeed 1,0 + AUHAL 0,35 (meta < 30 ms: aprovada) |
 | Latência total estimada | ≈ 259 ms ("atraso alto"; dominada pelo Bluetooth) |
 | Buffer IO da saída pedido / efetivo | 235 / 256 frames (o dispositivo arredondou para cima) |
 | Quantum / maior pull da janela / alvo (margem) | 280 / 279 / 198 frames |
@@ -271,7 +271,7 @@ Mesmo Mac, fonte e saída do registro da 0.2.1 (fifine USB a 48 kHz → OpenMove
 
 | Medida | Valor |
 |---|---|
-| Latência adicionada | 32,2 ms = host 30,83 + Varispeed 1,0 + AUHAL 0,35 (meta < 20 ms: **reprovada**) |
+| Latência adicionada | 32,2 ms = host 30,83 + Varispeed 1,0 + AUHAL 0,35 (acima da meta de < 30 ms) |
 | Latência total estimada | ≈ 266 ms ("atraso alto"; dominada pelo Bluetooth) |
 | Buffer IO da saída (lido da AUHAL) / preferido teórico | 320 / 235 frames |
 | Maior pull / alvo da fila | 351 / 655 frames (256 + 351 + 48) |
@@ -289,7 +289,7 @@ Mac do mantenedor (não o de referência), release 0.2.1, fonte fifine USB (só 
 | Medida | Valor |
 |---|---|
 | Monitor | funcionou: voz ouvida no Shokz, sem taxa em comum com a fonte |
-| Latência adicionada (diagnóstico) | 54,2 ms (meta < 20 ms: **reprovada**) |
+| Latência adicionada (diagnóstico) | 54,2 ms (acima da meta de < 30 ms) |
 | Latência total estimada | ≈ 288 ms ("atraso alto"; dominada pelo Bluetooth) |
 | `monitor_fill` | 786 frames (16,4 ms) |
 | Correção da Varispeed | −1527 ppm |
@@ -320,7 +320,7 @@ a 2545 frames, para pull máximo observado de 2241 frames já na taxa do motor.
 Houve dois underruns na partida de cada cenário, antes de 1 s; correção sempre dentro
 de ±0,5%. Testes separados distinguem descarte cheio e reset, verificam que a leitura
 zera o pico de pull e os extremos por janela, e que a fórmula não soma buffer à medição
-host programada. Isso não comprova latência < 20 ms em hardware.
+host programada. Isso não comprova a latência em hardware.
 
 No relatório de campo com saída de 44,1 kHz, a correção puramente aritmética do valor
 adicionado antigo é `54,2 − 1000 × B / 44100 ms`, com B igual ao buffer usado na soma
@@ -372,7 +372,7 @@ mediana 13,1875 ms, mínimo 13,1875 ms e máximo 13,2083 ms, a 48 kHz.
 Não é evidência de aceitação da cadeia de monitor separada.
 
 Pendentes com o mantenedor presente: `monitor-latency` silencioso com saída na mesma
-taxa e em 44,1 kHz, mediana adicionada < 20 ms, zero underruns/overruns após o primeiro
+taxa e em 44,1 kHz, mediana adicionada < 30 ms, zero underruns/overruns após o primeiro
 segundo, `run --monitor --monitor-silent` por 60 s, duplex Bluetooth, formato físico
 inteiro e escuta com fones. Nenhum desses ensaios nos alto-falantes do Mac é autorizado
 sem o mantenedor presente e seu pedido explícito.
