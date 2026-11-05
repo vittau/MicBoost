@@ -49,6 +49,7 @@ Roteamento:
 
 Dispositivos:
 - Nada de nomes, UIDs ou formatos de modelos específicos no código, exceto a identificação do BlackHole.
+- O app é agnóstico ao hardware: nenhuma lógica, constante ou limiar ajustado a um aparelho específico (o microfone ou o fone do mantenedor, por exemplo). Tudo deriva do que o dispositivo informa (taxas, buffer e sua faixa, canais, latências, transporte) ou do que se mede em execução. Números de campo entram nos testes como casos de simulação, nunca como parâmetros do código.
 
 Distribuição:
 - Sem notarização, sem Developer ID e sem credenciais pagas.
