@@ -242,13 +242,11 @@ import Testing
     // A real absence shows the banner after the grace.
     model.apply(.init(state: .error(.blackHoleMissing)))
     #expect(model.message == nil)
-    try await Task.sleep(for: .milliseconds(200))
-    #expect(model.statusMessage == .blackHoleMissing)
+    #expect(await eventually { model.statusMessage == .blackHoleMissing })
     // The disconnected source follows the same rule and keeps the last known name.
     model.apply(.init(state: .recovering(.sourceLost)))
     #expect(model.message == nil)
-    try await Task.sleep(for: .milliseconds(200))
-    #expect(model.statusMessage == .sourceLost("fifine Microphone"))
+    #expect(await eventually { model.statusMessage == .sourceLost("fifine Microphone") })
 }
 
 @MainActor @Test func immediateBannersDoNotWaitForTheGrace() {
@@ -285,8 +283,7 @@ import Testing
     // A real loss of the routing information falls back to the unknown row after the grace.
     model.apply(.init(state: .recovering(.serviceRestarted), defaultInput: .unresolved))
     #expect(model.routing.isBlackHole)
-    try await Task.sleep(for: .milliseconds(200))
-    #expect(model.routing == AppModel.Routing())
+    #expect(await eventually { model.routing == AppModel.Routing() })
 }
 
 @MainActor @Test func routingRowNamesMicBoostAndOnlyChecksItWhileRunning() {
@@ -358,8 +355,7 @@ import Testing
     #expect(model.sources.map(\.uid) == ["usb"])
     // A real absence clears the list after the grace.
     model.devices = []
-    try await Task.sleep(for: .milliseconds(200))
-    #expect(model.sources.isEmpty)
+    #expect(await eventually { model.sources.isEmpty })
 }
 
 @MainActor @Test func meterScaleReachesItsEndpoints() {
@@ -448,4 +444,15 @@ import Testing
     #expect(model.report.contains("monitor_host_ms: 30"))
     #expect(model.report.contains("monitor_varispeed_ms: 1"))
     #expect(model.report.contains("monitor_auhal_ms: 2"))
+}
+
+/// Polls a main-actor condition that becomes true once a grace task runs; a loaded main actor
+/// can delay that task well past the grace itself.
+@MainActor func eventually(timeout: Duration = .seconds(2), _ condition: () -> Bool) async -> Bool {
+    let deadline = ContinuousClock.now + timeout
+    while ContinuousClock.now < deadline {
+        if condition() { return true }
+        try? await Task.sleep(for: .milliseconds(10))
+    }
+    return condition()
 }
