@@ -29,8 +29,8 @@ O projeto é um único pacote SwiftPM (sem `.xcodeproj`). O `.app` é montado po
 | Target | Tipo | Responsabilidade |
 |---|---|---|
 | `MicBoostDSP` | C (C17) | Tudo que roda na thread de IO: `mb_ioproc`, processador, biquads, ganho, limitador, medidores e parâmetros atômicos. Sem dependências além de `<CoreAudio/CoreAudioTypes.h>`, `<stdatomic.h>` e `<math.h>`. |
-| `MicBoostCore` | Swift library | Abstração da HAL (`AudioHardware` protocol + implementação real), `DeviceService`, `AggregateBuilder`, `EngineController`, `DefaultInputManager`, `SettingsStore`, modelos de domínio e permissão de microfone. Sem AppKit/SwiftUI. |
-| `MicBoostUI` | Swift library | `AppModel` (`@Observable`), o menu do painel (`PanelMenuController` e as linhas em AppKit), `SettingsView` em SwiftUI, o item de início (`LoginItemService` sobre `SMAppService`) e as localizações. |
+| `MicBoostCore` | Swift library | Abstração da HAL (`AudioHardware` protocol + implementação real), `DeviceService`, `AggregateBuilder`, `EngineController`, `DefaultInputManager`, `SettingsStore`, a consulta de releases (`ReleaseFeed`) e modelos de domínio e permissão de microfone. Sem AppKit/SwiftUI. |
+| `MicBoostUI` | Swift library | `AppModel` (`@Observable`), o menu do painel (`PanelMenuController` e as linhas em AppKit), `SettingsView` em SwiftUI, o item de início (`LoginItemService` sobre `SMAppService`), a agenda da verificação de atualizações e as localizações. |
 | `MicBoostApp` | Swift executable (produto `MicBoost`) | Ciclo de vida do app, item de status, menu do painel, ajustes, mensagens. Depende de `MicBoostUI`. |
 | `micboost-diag` | Swift executable | CLI de diagnóstico e medição ([testing.md](testing.md#ferramenta-de-diagnóstico)). Depende de `MicBoostCore`. |
 | `MicBoostDSPTests` | Swift Testing | Testes offline do processador via API C. |
@@ -46,8 +46,8 @@ Estrutura de diretórios:
 ```text
 Package.swift
 Sources/MicBoostDSP/{include/MicBoostDSP.h, *.c}
-Sources/MicBoostCore/{HAL/, Devices/, Engine/, Routing/, Settings/, Permissions/}
-Sources/MicBoostUI/{AppModel.swift, LoginItemService.swift, Menu/, Views.swift, Localization/}
+Sources/MicBoostCore/{HAL/, Devices/, Engine/, Routing/, Settings/, Updates/, Permissions/}
+Sources/MicBoostUI/{AppModel.swift, LoginItemService.swift, UpdateSchedule.swift, Menu/, Views.swift, Localization/}
 Sources/MicBoostApp/{App/main.swift, StatusItemImage.swift}
 Sources/micboost-diag/
 Tests/MicBoostDSPTests/  Tests/MicBoostCoreTests/
@@ -102,6 +102,7 @@ stopped ──start──▶ starting ──ok──▶ running
 - `DeviceService` publica `[AudioDevice]` de entrada elegíveis (ver exclusões em [audio-engine.md](audio-engine.md#enumeração-e-elegibilidade)), o BlackHole detectado (se houver) e o UID da entrada padrão atual.
 - `Settings`: preferências persistidas, com `EQSettings` (`low`, `mid`, `high`) e `ChannelSelection` (`auto`, `mono(canal)`, `monoMix`, `stereo(primeiroCanal)`, canais baseados em 1). `SettingsStore` é o actor que as lê e grava ([Persistência](#persistência)).
 - `DefaultInputManager`: aplica a [política de entrada padrão](audio-engine.md#política-de-entrada-padrão-defaultinputmanager) sobre `AudioHardware` e `SettingsStore`, e publica `DefaultInputStatus`.
+- `ReleaseFeed`: última release publicada (`tag` e `pageURL`), atrás de um protocolo com a implementação `GitHubReleaseFeed` sobre `URLSession` e uma fake nos testes ([Verificação de atualizações](#verificação-de-atualizações)); `AppVersion` compara a tag com a versão instalada.
 - `EngineStatus` (snapshot enviado à UI): `state`, `source: AudioDevice?`, `blackHole: AudioDevice?`, `defaultInput: DefaultInputStatus` (`isBlackHole`, `divergedByUser`, `unknown`), `sampleRate`, `bufferFrames`, `reportedLatencyMs`, `monitor: MonitorStatus` ([audio-engine.md](audio-engine.md#modo-monitor)), `monitorOutput` (saída resolvida), `monitorStats` (ocupação, correção, underruns/overruns e timestamp de latência), `lastMonitorFailure` (operação, erro tipado e saída), contadores (overloads, eventos NaN).
 
 ## Persistência

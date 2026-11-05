@@ -158,9 +158,32 @@ import SwiftUI
                 }
             }
             Section {
-                LabeledContent(
-                    localized("Version"),
-                    value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0")
+                LabeledContent(localized("Version"), value: model.appVersion)
+                Toggle(
+                    isOn: Binding(
+                        get: { model.controls.checkForUpdates },
+                        set: { model.setCheckForUpdates($0) })
+                ) {
+                    Text(localized("Check for updates automatically"))
+                }
+                .toggleStyle(.switch)
+                HStack {
+                    Spacer()
+                    Button(localized("Check Now")) { model.checkNow() }
+                        .disabled(model.isCheckingUpdate)
+                }
+                if let text = model.updateStatusText {
+                    HStack {
+                        Text(text)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if case .available = model.updateStatus {
+                            Button(localized("Download")) { model.openUpdatePage() }
+                        }
+                        Spacer()
+                    }
+                }
                 LabeledContent(localized("Project")) {
                     Link("GitHub", destination: Self.projectURL)
                 }

@@ -96,3 +96,12 @@
 "Approve in System Settings" = "Aprovar em Ajustes do Sistema";
 "Open Login Items" = "Abrir Itens de Início";
 "Available with MicBoost in Applications" = "Disponível com o MicBoost em Aplicativos";
+
+"Check for updates automatically" = "Verificar atualizações automaticamente";
+"Check Now" = "Verificar agora";
+"Checking…" = "Verificando…";
+"MicBoost is up to date. Last checked on %@." = "O MicBoost está atualizado. Última verificação em %@.";
+"Version %@ available." = "Versão %@ disponível.";
+"Couldn't check for updates." = "Não foi possível verificar atualizações.";
+"Download" = "Baixar";
+"New version available: %@…" = "Nova versão disponível: %@…";
