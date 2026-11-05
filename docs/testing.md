@@ -29,7 +29,9 @@ Em 16, 44,1, 48 e 96 kHz:
 - Fila vazia → silêncio e `monitor_underruns`; produtor rápido demais → descarte e `monitor_overruns_full`; reinício ao se afastar do alvo em `monitor_resets`, separado dos descartes.
 - Fade-in e fade-out de 10 ms sem saltos acima do limite; o modo silencioso entrega zeros sem alterar ocupação nem timing.
 - Mistura para saída de um canal; a latência calculada a partir de host times sintéticos bate com o esperado.
-- Controlador de ocupação (função pura): com drift simulado de ±200 ppm e ±0,3 % entre produtor e consumidor, a ocupação converge ao alvo e fica limitada, com a correção dentro de ±0,5 %.
+- Controlador do mínimo (função pura): drift de −0,3 %, −200 ppm, zero, +200 ppm e +0,3 %, com mínimos por tick combinados em 1 s, filtro e PI com anti-windup; correção limitada a ±0,5 % e slew de 50 ppm/tick.
+- Produtor de 256 frames a 48 kHz contra consumidor a 44,1 kHz: pulls fixos de 320 e irregulares de 1024/2048/1536/2048/1024, jitter de +1/−1/+0,5/−0,5/0 ms. Após 90 s, zero underruns, descartes cheios e resets, erro de correção < 750 ppm, sem saturação; comparar ocupação ao render com referência do controlador por nível instantâneo.
+- Primeiro pull atrasado 300 ms: produtor bloqueado até a primeira chamada, prefill preservado, sem descartes cheios nem resets; contar separadamente faltas da partida (< 1 s), aquisição e regime.
 
 ### Fila e conversão do monitor (`MicBoostCoreTests`)
 
@@ -162,6 +164,59 @@ Preparação para todos os itens: app aberto com processamento ligado, microfone
 | 8 | Sair do app (Sair do MicBoost) | — | a entrada anterior é restaurada e as taxas que o MicBoost mudou voltam às originais |
 
 ## Resultados registrados
+
+### Controle do mínimo da fila e partida do monitor — 05/11/2026
+
+`swift build` aprovado em 1,17 s; `swift test`: 156 testes, UI 57 em 1,268 s,
+DSP 20 em 1,510 s e Core 79 em 4,080 s (6,858 s de execução somada, sem compilação).
+A issue conhecida é a rejeição intencional de escrita da saída padrão pela HAL falsa.
+`swift format lint --recursive Sources Tests` limpo em 1.591 s.
+
+Simulação determinística offline de 180 s, sem dispositivo: produtor de 256 frames a
+48 kHz, consumidor a 44,1 kHz começando aos 300 ms e jitter de +1/−1/+0,5/−0,5/0 ms.
+Pulls fixos de 320 frames ou sequência 1024/2048/1536/2048/1024. Drift positivo significa
+clock consumidor mais lento que o produtor; a correção positiva consome mais frames.
+Compara a fila C real ao modelo de ocupação do controlador por nível instantâneo,
+com os mesmos clocks e jitter (P=1, I=1, alvo buffer+pull+1 ms e escrita antes do primeiro
+render). A média é a ocupação imediatamente antes do render, incluindo o bloco que será
+entregue, e não a ocupação amostrada pelo timer. Janela de regime conservadora: 90–180 s.
+
+M=96 frames (2 ms), janela de mínimo de 1 s, filtro τ=1 s, P=0,5, I=0,125,
+tempo integral 4 s e slew máximo 50 ppm/tick. A margem adicional de 1 ms cobre o maior
+jitter do ensaio; a janela de 1 s evita reagir à fase entre blocos e ticks. Esses ganhos
+mantêm o caso de campo suave e adquirem o drift extremo mais rápido que ganhos menores,
+sem aceitar como meta uma ocupação média inflada pelo tamanho dos blocos.
+
+| Pull de saída | Drift (ppm) | Média anterior frames / ms | Média atual frames / ms | Correção min…max (ppm) | Maior passo (ppm/tick) | Faltas na aquisição |
+|---|---:|---:|---:|---:|---:|---:|
+| 320 | -3000 | 843.28 / 17.57 | 583.70 / 12.16 | -3015.3…-2982.2 | 1.78 | 55 |
+| 320 | -200 | 845.07 / 17.61 | 583.18 / 12.15 | -242.5…-160.8 | 6.48 | 0 |
+| 320 | 0 | 844.06 / 17.58 | 585.17 / 12.19 | -17.3…17.3 | 2.70 | 0 |
+| 320 | 200 | 844.73 / 17.60 | 584.65 / 12.18 | 173.4…231.5 | 2.38 | 0 |
+| 320 | 3000 | 844.93 / 17.60 | 585.75 / 12.20 | 2985.7…3018.7 | 1.85 | 0 |
+| irregular | -3000 | 3006.79 / 62.64 | 2413.34 / 50.28 | -3291.9…-2878.8 | 30.17 | 20 |
+| irregular | -200 | 3340.40 / 69.59 | 2420.26 / 50.42 | -395.7…-6.3 | 16.04 | 2 |
+| irregular | 0 | 3361.32 / 70.03 | 2419.61 / 50.41 | -176.3…214.7 | 19.71 | 2 |
+| irregular | 200 | 3387.47 / 70.57 | 2417.34 / 50.36 | -136.7…545.6 | 30.82 | 2 |
+| irregular | 3000 | 3615.94 / 75.33 | 2417.33 / 50.36 | 2698.5…3592.4 | 32.92 | 2 |
+
+Em todos os dez casos: zero descartes cheios e resets desde a partida e zero underruns
+no regime. Erro de correção < 750 ppm (máximo observado ≈592,4 ppm), sem ficar preso a
+±5000 ppm; maior passo no regime ≈32,92 ppm/tick, contra até 10000 ppm/tick da referência.
+No primeiro segundo houve zero faltas nos pulls de 320 e até quatro nos irregulares.
+A aquisição de −0,3% ainda tem 55 faltas no caso de 320 (última aos 10,65 s) e 20 no
+irregular (última aos 10,15 s); os outros irregulares têm só as duas faltas iniciais,
+até 0,45 s. É uma limitação medida da aquisição com margem curta, não estabilidade
+comprovada desde o primeiro bloco. O teste isolado de atraso de 300 ms confirma prefill
+703 preservado, primeira leitura de 351 frames sem falta e zero descarte/reset.
+
+No caso semelhante ao de campo, a média cai cerca de 259–262 frames (5,40–5,46 ms),
+abaixo dos ~300 esperados: permanecem 96 frames de segurança e a margem de fase da
+janela mínima de 1 s. Retirar outros ~40 frames reduz essa proteção; a simulação não
+justifica prometer esse corte adicional. Aplicando apenas essa redução ao relatório
+de campo, o componente host de 30,83 ms ficaria em cerca de 25,4 ms e a latência
+adicionada de 32,2 ms em cerca de 26,8 ms. É uma extrapolação, não medição nem aprovação
+da meta <20 ms. Pulls grandes mantêm latência maior, mesmo com o PI sem saturação.
 
 ### Monitor em campo, 0.2.2 — 05/11/2026
 
