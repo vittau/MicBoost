@@ -25,6 +25,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public var bufferFrames: Int
     public var previousDefaultInputUID: String?
     public var defaultInputManaged: Bool
+    /// The "Open at login" default was applied once (docs/architecture.md "Item de início").
+    public var loginItemDefaultApplied: Bool
 
     public init(
         schemaVersion: Int = Settings.currentSchemaVersion,
@@ -38,7 +40,8 @@ public struct Settings: Codable, Equatable, Sendable {
         knownSourceNames: [String: String] = [:],
         bufferFrames: Int = 256,
         previousDefaultInputUID: String? = nil,
-        defaultInputManaged: Bool = false
+        defaultInputManaged: Bool = false,
+        loginItemDefaultApplied: Bool = false
     ) {
         self.schemaVersion = schemaVersion
         self.processingEnabled = processingEnabled
@@ -52,6 +55,7 @@ public struct Settings: Codable, Equatable, Sendable {
         self.bufferFrames = bufferFrames
         self.previousDefaultInputUID = previousDefaultInputUID
         self.defaultInputManaged = defaultInputManaged
+        self.loginItemDefaultApplied = loginItemDefaultApplied
     }
 
     /// Defaults per field, so data written by an older build keeps its valid keys.
@@ -78,6 +82,9 @@ public struct Settings: Codable, Equatable, Sendable {
         defaultInputManaged =
             try container.decodeIfPresent(Bool.self, forKey: .defaultInputManaged)
             ?? defaults.defaultInputManaged
+        loginItemDefaultApplied =
+            try container.decodeIfPresent(Bool.self, forKey: .loginItemDefaultApplied)
+            ?? defaults.loginItemDefaultApplied
     }
 
     /// Keeps persisted values inside the documented ranges; used after loading.

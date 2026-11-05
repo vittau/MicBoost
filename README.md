@@ -92,6 +92,8 @@ quit MicBoost, your previous microphone comes back.
   how Bluetooth works, not MicBoost. A USB or built-in microphone sounds better.
 - **The iPhone microphone** (Continuity) adds a noticeable delay of its own.
 - **The MacBook's built-in microphone is off when the lid is closed.**
+- **MicBoost can open when you log in.** When the app is in your Applications folder, it starts in
+  the menu bar at login by default. Turn off **Open at login** in Settings → General if you prefer.
 
 ## Something's wrong?
 

@@ -13,7 +13,7 @@ Status: `não iniciado` · `em andamento` · `concluído`. Uma etapa só é conc
 | 6 | Distribuição | em andamento |
 | 7 | Entrega | não iniciado |
 | 8 | Modo monitor | em andamento |
-| 9 | Abrir ao iniciar sessão | não iniciado |
+| 9 | Abrir ao iniciar sessão | em andamento |
 
 ## 0 — Estrutura e diagnóstico
 
@@ -118,6 +118,8 @@ Condições de conclusão:
 - validação manual com o mantenedor: ouvir a própria voz nos fones sem eco perceptível (incluindo fone Bluetooth em taxa diferente da fonte, e um fone Bluetooth usado como microfone e saída ao mesmo tempo, sem laço de reconstruções), trocar a saída padrão com o monitor ligado e ligar e desligar o monitor sem interromper o áudio entregue aos apps.
 
 ## 9 — Abrir ao iniciar sessão
+
+Status: entregas implementadas; falta a validação manual na release instalada (segunda condição).
 
 Entregas: [item de início](architecture.md#item-de-início) com `LoginItemService`, padrão aplicado uma vez numa cópia instalada, chave na seção Geral dos [ajustes](ui.md#janela-de-ajustes), strings en/pt-BR, README atualizado.
 

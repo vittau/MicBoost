@@ -113,13 +113,17 @@ import SwiftUI
             settings = window
         }
         model.settingsVisible = true
+        model.refreshLoginItemStatus()
         settings?.makeKeyAndOrderFront(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
     func windowWillClose(_ notification: Notification) { model.settingsVisible = false }
     @objc private func sleep() { Task { try? await model.engine.willSleep() } }
     @objc private func wake() { Task { await model.engine.didWake() } }
-    @objc private func activated() { model.applicationDidBecomeActive() }
+    @objc private func activated() {
+        model.applicationDidBecomeActive()
+        model.refreshLoginItemStatus()
+    }
     func applicationWillTerminate(_ notification: Notification) {
         if let optionClickMonitor { NSEvent.removeMonitor(optionClickMonitor) }
     }

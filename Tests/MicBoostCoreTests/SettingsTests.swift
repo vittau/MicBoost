@@ -19,6 +19,7 @@ import Testing
     #expect(settings.bufferFrames == 256)
     #expect(settings.previousDefaultInputUID == nil)
     #expect(!settings.defaultInputManaged)
+    #expect(!settings.loginItemDefaultApplied)
 }
 
 @Test func settingsRoundTrip() throws {
@@ -29,7 +30,8 @@ import Testing
         muted: true,
         bufferFrames: 512,
         previousDefaultInputUID: "internal",
-        defaultInputManaged: true)
+        defaultInputManaged: true,
+        loginItemDefaultApplied: true)
     settings.eq.enabled = false
     settings.eq.low = EQShelfBand(frequency: 80, gainDB: -3)
     settings.eq.mid = EQPeakingBand(frequency: 2500, gainDB: 4.5, q: 2)
@@ -94,6 +96,7 @@ import Testing
     #expect(settings.bufferFrames == 256)
     #expect(settings.eq == EQSettings())
     #expect(settings.knownSourceNames.isEmpty)
+    #expect(!settings.loginItemDefaultApplied)
 }
 
 @Test func knownSourceNamesRoundTripAndDropEmptyEntries() async throws {
