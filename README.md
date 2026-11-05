@@ -20,8 +20,8 @@ app.
 
 - **Makes a quiet microphone loud enough**: raise the mic gain up to 16 times (+24 dB) with a
   simple slider.
-- **No extra hardware needed**: boost mic volume from the MacBook microphone, a USB microphone or
-  a headset, in software.
+- **Works with the microphone you already have**: the MacBook microphone, a USB microphone or a
+  headset. No extra hardware needed.
 - **Makes your voice clearer**: a voice preset removes low rumble and adds a touch of presence,
   without making you sound thin. Bass, mids and treble are adjustable with the equalizer (EQ) if
   you want.
@@ -78,9 +78,8 @@ downloads or installs updates by itself.
 3. Make sure the switch at the top is **on**.
 4. In your call or recording app, choose the microphone **BlackHole 2ch**, or leave it on the
    system default. MicBoost sets itself as the system microphone while it is on.
-5. Speak normally and move the slider to increase the microphone volume on Mac until the
-   **Output** bar moves well with your voice. If **Limiter active** shows up all the time, it is
-   too loud: move the slider down a little.
+5. Speak normally and move the slider until the **Output** bar moves well with your voice. If
+   **Limiter active** shows up all the time, it is too loud: move the slider down a little.
 
 Close the menu whenever you like; MicBoost keeps working. To stop, turn the switch off. When you
 quit MicBoost, your previous microphone comes back.
