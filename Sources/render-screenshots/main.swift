@@ -132,8 +132,30 @@ enum CaptureError: Error { case noMenuWindow, emptyCapture }
     }
 }
 
+/// The screenshot renderer never reaches the network nor the real login item
+/// (AGENTS.md): the panel and the settings window are rendered from fakes.
+private struct ScreenshotReleaseFeed: ReleaseFeed {
+    func latestRelease() async throws -> Release { throw ReleaseFeedError.invalidPayload }
+}
+
+private struct ScreenshotLoginItem: LoginItemService {
+    var status: LoginItemStatus { .enabled }
+    func register() throws {}
+    func unregister() throws {}
+    func openSystemSettings() {}
+}
+
 @MainActor func sampleModel(kind: String) -> AppModel {
-    let model = AppModel(statusGrace: .zero)
+    let model = AppModel(
+        statusGrace: .zero,
+        loginItem: ScreenshotLoginItem(),
+        loginItemBundleURL: URL(fileURLWithPath: "/Applications/MicBoost.app"),
+        updateFeed: ScreenshotReleaseFeed())
+    model.refreshLoginItemStatus()
+    model.updateStatus = .available(
+        AvailableUpdate(
+            version: "0.4.0",
+            url: URL(string: "https://github.com/vittau/MicBoost/releases/tag/v0.4.0")!))
     var source = AudioDevice(id: 2, uid: "usb.microphone", name: "USB Microphone")
     source.inputChannels = 2
     source.sampleRate = 48000

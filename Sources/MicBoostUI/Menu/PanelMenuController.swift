@@ -48,6 +48,8 @@ import MicBoostCore
     private let disconnectedItem = NSMenuItem()
     private let equalizerHeaderItem = NSMenuItem()
     private let equalizerBandsItem = NSMenuItem()
+    private let settingsItem = NSMenuItem()
+    private let updateItem = NSMenuItem()
     private var sourceItems: [NSMenuItem] = []
     private var sourceUIDs: [String] = []
 
@@ -69,16 +71,25 @@ import MicBoostCore
     // MARK: - Menu
 
     private func buildMenu() {
-        let settings = NSMenuItem(
-            title: localized("Settings…"), action: #selector(openSettings), keyEquivalent: ",")
-        settings.target = self
+        settingsItem.title = localized("Settings…")
+        settingsItem.action = #selector(openSettings)
+        settingsItem.keyEquivalent = ","
+        settingsItem.target = self
         let quit = NSMenuItem(
             title: localized("Quit MicBoost"), action: #selector(quit), keyEquivalent: "q")
         quit.target = self
         // Plain text, like the settings item of Apple's own menus: no icon before the title.
         if #available(macOS 27.0, *) {
-            settings.preferredImageVisibility = .hidden
+            settingsItem.preferredImageVisibility = .hidden
             quit.preferredImageVisibility = .hidden
+        }
+        // Item 13 of docs/ui.md "Painel": inserted by `refresh()` only while a newer release
+        // is known, right above the settings item.
+        updateItem.action = #selector(openUpdate)
+        updateItem.target = self
+        updateItem.isEnabled = true
+        if #available(macOS 27.0, *) {
+            updateItem.preferredImageVisibility = .hidden
         }
         // The bare "m" shortcut is native menu item matching, so it only fires while the panel
         // is open (docs/ui.md "Teclado e acessibilidade").
@@ -109,7 +120,7 @@ import MicBoostCore
         menu.addItem(equalizerHeaderItem)
         menu.addItem(equalizerBandsItem)
         menu.addItem(.separator())
-        menu.addItem(settings)
+        menu.addItem(settingsItem)
         menu.addItem(quit)
         menu.addItem(mute)
     }
@@ -205,7 +216,7 @@ import MicBoostCore
 
     private func open(_ string: String) {
         guard let url = URL(string: string) else { return }
-        NSWorkspace.shared.open(url)
+        model.openURL(url)
     }
 
     // MARK: - Refresh
@@ -235,6 +246,19 @@ import MicBoostCore
         equalizerHeaderRow.update(expanded: model.expanded, enabled: model.controls.eq.enabled)
         equalizerBandsRow.update(eq: model.controls.eq, sampleRate: model.status?.sampleRate ?? 48000)
         setBandsVisible(model.expanded)
+        updateUpdateItem()
+    }
+
+    /// The update notice only exists while a newer release is known; it is inserted and
+    /// removed so the menu recalculates its height (docs/ui.md "Painel", item 13).
+    private func updateUpdateItem() {
+        let index = menu.index(of: settingsItem)
+        guard let update = model.availableUpdate, index >= 0 else {
+            setItem(updateItem, present: false, at: 0)
+            return
+        }
+        updateItem.title = String(format: localized("New version available: %@…"), update.version)
+        setItem(updateItem, present: true, at: index)
     }
 
     /// The menu window only takes a new height when the item list changes: AppKit lays the
@@ -341,6 +365,12 @@ import MicBoostCore
     }
 
     @objc private func openSettings() { model.onSettings() }
+
+    @objc private func openUpdate() {
+        guard let url = model.availableUpdate?.url else { return }
+        close()
+        model.openURL(url)
+    }
 
     @objc private func quit() { model.onQuit() }
 
