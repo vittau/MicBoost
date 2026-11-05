@@ -446,13 +446,18 @@ import Testing
     #expect(model.report.contains("monitor_auhal_ms: 2"))
 }
 
-/// Polls a main-actor condition that becomes true once a grace task runs; a loaded main actor
-/// can delay that task well past the grace itself.
-@MainActor func eventually(timeout: Duration = .seconds(2), _ condition: () -> Bool) async -> Bool {
+/// Polls a main-actor condition that becomes true once a grace task runs. A busy main actor (the
+/// first AppKit use on a CI runner can hold it for seconds) delays both that task and this loop,
+/// so the deadline is generous and the grace task gets a last chance to run before giving up.
+@MainActor func eventually(timeout: Duration = .seconds(10), _ condition: () -> Bool) async -> Bool {
     let deadline = ContinuousClock.now + timeout
     while ContinuousClock.now < deadline {
         if condition() { return true }
         try? await Task.sleep(for: .milliseconds(10))
+    }
+    for _ in 0..<10 {
+        if condition() { return true }
+        await Task.yield()
     }
     return condition()
 }
