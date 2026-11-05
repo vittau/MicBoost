@@ -582,7 +582,8 @@ public actor EngineController {
         }
         guard stats.pulling else { return }
         monitorCorrection = mb_monitor_pi_update(
-            &monitorPI, Double(stats.fill_min) - Double(stats.target), source?.sampleRate ?? 48000, 0.05)
+            &monitorPI, Double(stats.fill_min) - Double(stats.target), source?.sampleRate ?? 48000, 0.05,
+            Double(stats.quantum))
         do { try session.setCorrection(monitorCorrection) } catch {
             recordMonitorFailure(error, operation: "Monitor drift control")
             try? stopMonitor()

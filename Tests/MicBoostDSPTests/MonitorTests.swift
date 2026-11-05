@@ -91,7 +91,7 @@ func monitorPIControlsSimulatedDrift(_ drift: Double) {
     var maximum = fill
     var correction = 0.0
     for _ in 0..<3600 {
-        correction = mb_monitor_pi_update(&pi, fill - 560, 48000, 0.05)
+        correction = mb_monitor_pi_update(&pi, fill - 560, 48000, 0.05, 256)
         #expect(abs(correction) <= 0.005)
         fill += 48000 * 0.05 * (1 - (1 + correction) / (1 + drift))
         minimum = min(minimum, fill)
@@ -101,7 +101,7 @@ func monitorPIControlsSimulatedDrift(_ drift: Double) {
         "monitor drift=\(drift) min_fill=\(minimum) max_fill=\(maximum) final_fill=\(fill) correction_ppm=\(correction*1e6)"
     )
     #expect(minimum > 0 && maximum < 1200)
-    #expect(abs(fill - 560) < 0.1)
+    #expect(abs(fill - 560) <= 256.0 / 8 + 0.1)
     #expect(abs(correction - drift) < 0.00001)
 }
 

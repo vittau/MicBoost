@@ -20,7 +20,7 @@ struct mb_ring {
 struct mb_monitor {
     mb_ring *ring;
     double rate, gain;
-    _Atomic unsigned target, swing, prefill, max_pull;
+    _Atomic unsigned target, swing, prefill, max_pull, quantum;
     _Atomic bool silent, fading;
     _Atomic uint64_t latency, underruns;
 };
@@ -169,7 +169,9 @@ void mb_monitor_fade_out(mb_monitor *m) {
     atomic_store(&m->fading, true);
 }
 void mb_monitor_set_target_base(mb_monitor *m, uint32_t engine_buffer, uint32_t initial_pull) {
-    unsigned target = (unsigned)ceil(m->rate * 0.002);
+    unsigned quantum = (unsigned)fmax(engine_buffer, initial_pull);
+    unsigned target = (unsigned)fmin(CAPACITY - 1, ceil(engine_buffer * 0.5 + quantum * 0.25));
+    atomic_store(&m->quantum, quantum);
     unsigned swing = engine_buffer + initial_pull;
     unsigned prefill = (unsigned)fmin(CAPACITY - 1, (double)swing + target);
     atomic_store(&m->swing, engine_buffer);
@@ -192,6 +194,7 @@ void mb_monitor_set_target_base(mb_monitor *m, uint32_t engine_buffer, uint32_t 
 void mb_monitor_peek(const mb_monitor *m, mb_monitor_stats *stats) {
     stats->fill = fill(m->ring);
     stats->target = atomic_load(&m->target);
+    stats->quantum = atomic_load(&m->quantum);
     stats->latency_host = atomic_load(&m->latency);
     stats->underruns = atomic_load(&m->underruns);
     stats->overruns_full = atomic_load(&m->ring->overruns_full);
@@ -214,11 +217,14 @@ void mb_monitor_read(mb_monitor *m, mb_monitor_stats *stats) {
     }
     stats->fill_max = (unsigned)fmax(stats->fill, atomic_exchange(&m->ring->fill_max, stats->fill));
 }
-double mb_monitor_pi_update(mb_monitor_pi *pi, double error, double rate, double seconds) {
-    if (!isfinite(error) || !isfinite(rate) || rate <= 0 || seconds <= 0) {
+double mb_monitor_pi_update(mb_monitor_pi *pi, double error, double rate, double seconds,
+                            double quantum) {
+    if (!isfinite(quantum) || quantum <= 0 || !isfinite(error)
+        || !isfinite(rate) || rate <= 0 || !isfinite(seconds) || seconds <= 0) {
         return 0;
     }
-    // Keep a one-second minimum so a tick between large pulls cannot look like excess fill.
+    // Observe twenty control ticks; scale bandwidth below four audio callback periods.
+    double horizon = fmax(20 * seconds, 4 * quantum / rate);
     pi->minimums[pi->index] = error / rate;
     pi->index = (pi->index + 1) % 20;
     pi->count = pi->count < 20 ? pi->count + 1 : 20;
@@ -226,15 +232,19 @@ double mb_monitor_pi_update(mb_monitor_pi *pi, double error, double rate, double
     for (unsigned i = 1; i < pi->count; i++) {
         low = fmin(low, pi->minimums[i]);
     }
-    pi->filtered += (1 - exp(-seconds)) * (low - pi->filtered);
-    double proportional = 0.5 * pi->filtered;
-    double candidate = pi->integral + 0.125 * pi->filtered * seconds;
-    // Conditional integration prevents windup at either hard limit.
-    if (fabs(proportional + candidate) < 0.005) {
+    // Ignore block quantization inside one eighth of the measured callback quantum.
+    low = copysign(fmax(0, fabs(low) - quantum / rate * 0.125), low);
+    pi->filtered += (1 - exp(-seconds / horizon)) * (low - pi->filtered);
+    double proportional = 0.25 / horizon * pi->filtered;
+    double candidate = pi->integral + 0.025 / (horizon * horizon) * pi->filtered * seconds;
+    // Do not wind up against either the amplitude limit or the slew limiter.
+    double step = 0.001 * seconds / horizon;
+    double excess = proportional + candidate - pi->correction;
+    if (fabs(proportional + candidate) < 0.005
+        && (fabs(excess) <= step || excess * pi->filtered <= 0)) {
         pi->integral = candidate;
     }
     double desired = fmax(-0.005, fmin(0.005, proportional + pi->integral));
-    double step = 0.001 * seconds;
     pi->correction += fmax(-step, fmin(step, desired - pi->correction));
     return pi->correction;
 }
@@ -262,8 +272,11 @@ OSStatus mb_monitor_render(void *context, AudioUnitRenderActionFlags *flags,
     maximum(&m->max_pull, frames);
     unsigned swing = atomic_load(&m->swing);
     if (swing) {
+        maximum(&m->quantum, frames);
+        unsigned quantum = atomic_load(&m->quantum);
+        maximum(&m->target, (unsigned)fmin(CAPACITY - 1, ceil(swing * 0.5 + quantum * 0.25)));
         maximum(&m->prefill, (unsigned)fmin(CAPACITY - 1,
-            (double)swing + frames + atomic_load(&m->target)));
+            (double)swing + quantum + atomic_load(&m->target)));
     }
     unsigned target = atomic_load(&m->prefill);
     unsigned excursion = (unsigned)fmax(CAPACITY / 2, target);
