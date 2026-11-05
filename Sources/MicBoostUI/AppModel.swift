@@ -4,6 +4,7 @@ import CoreAudio
 import MicBoostCore
 import Observation
 import SwiftUI
+import os
 
 @MainActor public func localized(_ key: String) -> String {
     if let language = UILanguage.override, let path = Bundle.module.path(forResource: language, ofType: "lproj"),
@@ -104,6 +105,15 @@ import SwiftUI
     }
     public let store: SettingsStore
     public let engine: EngineController
+    /// Login item registration, replaced by a fake in tests (docs/architecture.md "Item de início").
+    @ObservationIgnored public let loginItem: any LoginItemService
+    /// Status last read from the login item service; the system is the source of truth.
+    public private(set) var loginItemStatus: LoginItemStatus = .notRegistered
+    /// Message of a failed register/unregister, shown under the settings toggle.
+    public private(set) var loginItemError: String?
+    /// Bundle whose location decides whether the login item can be registered.
+    @ObservationIgnored private let loginItemBundleURL: URL
+    private static let loginLogger = Logger(subsystem: "io.github.vittau.MicBoost", category: "loginItem")
     private let statusGrace: Duration
     private var meterTask: Task<Void, Never>?
     private var monitor: Task<Void, Never>?
@@ -115,10 +125,14 @@ import SwiftUI
     private var sourcesTask: Task<Void, Never>?
     public init(
         store: SettingsStore = SettingsStore(storage: UserDefaultsStorage()),
-        statusGrace: Duration = AppModel.absenceGrace
+        statusGrace: Duration = AppModel.absenceGrace,
+        loginItem: any LoginItemService = SystemLoginItemService(),
+        loginItemBundleURL: URL = Bundle.main.bundleURL
     ) {
         self.store = store
         self.statusGrace = statusGrace
+        self.loginItem = loginItem
+        self.loginItemBundleURL = loginItemBundleURL
         engine = EngineController(settings: store)
     }
     public static func gainLabel(_ db: Double, locale: Locale = AppModel.formatLocale) -> String {
@@ -340,6 +354,7 @@ import SwiftUI
     }
     public func launch() async {
         controls = await store.current
+        await applyLoginItemDefaultIfNeeded()
         await refresh()
         if authorization() == .notDetermined {
             _ = await AVCaptureDevice.requestAccess(for: .audio)
@@ -370,6 +385,76 @@ import SwiftUI
         error = nil
         retry()
     }
+    /// The login item toggle reflects the system and is re-read whenever the settings window
+    /// opens and the app becomes active (docs/ui.md "Janela de ajustes").
+    public var loginItemOn: Bool { loginItemStatus.isOn }
+    public var loginItemRequiresApproval: Bool { loginItemStatus == .requiresApproval }
+    /// Registration is only offered from `/Applications` and `~/Applications`.
+    public var loginItemAvailable: Bool { Self.isInApplications(bundleURL: loginItemBundleURL) }
+
+    /// Reads the system state again; a previous error no longer applies.
+    public func refreshLoginItemStatus() {
+        loginItemStatus = loginItem.status
+        loginItemError = nil
+    }
+
+    /// Registers or unregisters the app. A failure keeps the real state and shows the error.
+    public func setLoginItemEnabled(_ enabled: Bool) {
+        guard loginItemAvailable else { return }
+        do {
+            if enabled {
+                try loginItem.register()
+            } else {
+                try loginItem.unregister()
+            }
+            loginItemError = nil
+        } catch {
+            loginItemError = error.localizedDescription
+            Self.loginLogger.error(
+                "Login item change to \(enabled ? "enabled" : "disabled", privacy: .public) failed: \(error.localizedDescription, privacy: .public)"
+            )
+        }
+        loginItemStatus = loginItem.status
+    }
+
+    public func openLoginItemSettings() { loginItem.openSystemSettings() }
+
+    /// Applies the "Open at login" default once, only from an Applications folder
+    /// (docs/architecture.md "Item de início").
+    ///
+    /// The flag is stored even when the registration fails, so the app never registers itself
+    /// again after the user's choice.
+    @discardableResult
+    public func applyLoginItemDefaultIfNeeded() async -> Bool {
+        guard !(await store.current).loginItemDefaultApplied, loginItemAvailable else { return false }
+        if loginItem.status == .notRegistered {
+            do {
+                try loginItem.register()
+            } catch {
+                Self.loginLogger.error(
+                    "Default login item registration failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        loginItemStatus = loginItem.status
+        controls.loginItemDefaultApplied = true
+        await store.update { $0.loginItemDefaultApplied = true }
+        await store.flush()
+        return true
+    }
+
+    /// Whether the bundle sits in `/Applications` or `~/Applications`, resolving symlinks.
+    public static func isInApplications(
+        bundleURL: URL,
+        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
+    ) -> Bool {
+        let parent = bundleURL.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL.path
+        let applications = URL(fileURLWithPath: "/Applications", isDirectory: true)
+            .resolvingSymlinksInPath().standardizedFileURL.path
+        let userApplications = homeDirectory.appendingPathComponent("Applications", isDirectory: true)
+            .resolvingSymlinksInPath().standardizedFileURL.path
+        return parent == applications || parent == userApplications
+    }
+
     public func refresh() async {
         apply(await engine.status())
         devices = (try? await engine.availableDevices()) ?? []
