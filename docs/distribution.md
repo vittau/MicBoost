@@ -168,6 +168,16 @@ As capturas são do próprio menu composto pelo WindowServer — o auxiliar abre
 
 Manutenção: toda mudança visível ao usuário (recurso, instalação, limitação) atualiza o README na mesma mudança; medições ficam em `docs/testing.md`. As capturas são regeneradas quando a UI muda. O cabeçalho é regenerado por `scripts/render-readme-header.sh`, que executa `design/readme/RenderHeader.swift` sobre as prévias do ícone e regrava `docs/design/readme/header-{light,dark}.png`.
 
+## Página do produto
+
+`https://www.vitormach.dev/micboost/` é a página pública do MicBoost para busca e compartilhamento. Fica no repositório do site pessoal do mantenedor (`vittau/vittau.github.io`, Jekyll no GitHub Pages, publicado a partir de `master`) e segue o `DESIGN.md` e o `CLAUDE.md` daquele repositório: mesmos tokens de cor, fontes auto-hospedadas, sem framework, sem CDN e sem dependência em runtime além do GA4 que o site já usa.
+
+- **Idioma e público:** inglês, para o mesmo leitor do README (sem jargão de áudio ou de implementação). O README continua sendo a fonte do texto: a página resume os mesmos benefícios, requisitos, instalação e perguntas, e uma mudança visível ao usuário atualiza os dois.
+- **Conteúdo:** ícone e nome; frase de benefício com as buscas comuns ("make your microphone louder on Mac", "increase mic volume", Zoom, Teams, Meet, Discord); botão de download para `https://github.com/vittau/MicBoost/releases/latest`; capturas do painel e dos ajustes (cópias de `docs/screenshots/`, claras e escuras); o que o app faz; requisitos (macOS 14+, BlackHole 2ch); instalação e primeira abertura sem notarização, como no README; perguntas frequentes; links para o repositório, as releases e o apoio; licença GPL-3.0.
+- **SEO:** `<title>` e `meta description` próprios, `link rel="canonical"`, Open Graph e Twitter Card com uma imagem 1200 × 630 da página, JSON-LD `SoftwareApplication` (`operatingSystem: macOS 14+`, `applicationCategory: UtilitiesApplication`, `offers.price: 0`), um único `<h1>`, textos alternativos nas imagens, e a URL no `sitemap.txt` do site.
+- **Versão:** a página não fixa número de versão; o download aponta sempre para a última release.
+- O repositório do MicBoost aponta para a página no campo "Website" do GitHub.
+
 ## Licenciamento
 
 O MicBoost é licenciado sob a GPL-3.0 (`LICENSE` na raiz, texto integral da FSF). O motivo é o copyleft: versões derivadas distribuídas precisam continuar abertas. O MicBoost não incorpora código do BlackHole; ele o usa como dispositivo Core Audio, e a licença do BlackHole não condiciona a do MicBoost. A redistribuição do instalador do BlackHole está sujeita às regras acima.
