@@ -69,14 +69,16 @@ void mb_engine_set_gain_db(mb_engine * _Nonnull engine, float db);
 typedef struct mb_monitor mb_monitor;
 typedef struct {
     uint64_t latency_host, underruns, overruns_full, resets;
-    uint32_t fill, target, max_pull, fill_min, fill_max;
+    uint32_t fill, target, max_pull, fill_min, fill_max, quantum;
     double correction;
+    bool pulling;
 } mb_monitor_stats;
 typedef struct {
-    double integral;
+    double integral, filtered, correction, minimums[20];
+    unsigned index, count;
 } mb_monitor_pi;
 double mb_monitor_pi_update(mb_monitor_pi * _Nonnull pi, double error, double rate,
-                            double seconds);
+                            double seconds, double quantum_frames);
 mb_monitor * _Nullable mb_monitor_create(mb_engine * _Nonnull engine, double rate,
                                         uint32_t target);
 void mb_monitor_destroy(mb_monitor * _Nonnull monitor);

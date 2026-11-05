@@ -465,8 +465,8 @@ public actor EngineController {
                     context, buffer, UInt32(ceil(Double(session.outputBufferFrames) * rate / output.sampleRate)))
                 var initial = mb_monitor_stats()
                 mb_monitor_peek(context, &initial)
-                monitorSecondMin = initial.target
-                monitorSecondMax = initial.target
+                monitorSecondMin = initial.fill
+                monitorSecondMax = initial.fill
             }
             monitorOutput = output
             monitorPI = mb_monitor_pi()
@@ -580,8 +580,10 @@ public actor EngineController {
             monitorWindowPull = 0
             monitorMetricsDate = Date()
         }
+        guard stats.pulling else { return }
         monitorCorrection = mb_monitor_pi_update(
-            &monitorPI, Double(stats.fill) - Double(stats.target), source?.sampleRate ?? 48000, 0.05)
+            &monitorPI, Double(stats.fill_min) - Double(stats.target), source?.sampleRate ?? 48000, 0.05,
+            Double(stats.quantum))
         do { try session.setCorrection(monitorCorrection) } catch {
             recordMonitorFailure(error, operation: "Monitor drift control")
             try? stopMonitor()
