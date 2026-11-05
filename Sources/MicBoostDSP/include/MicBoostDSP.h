@@ -71,9 +71,11 @@ typedef struct {
     uint64_t latency_host, underruns, overruns_full, resets;
     uint32_t fill, target, max_pull, fill_min, fill_max;
     double correction;
+    bool pulling;
 } mb_monitor_stats;
 typedef struct {
-    double integral;
+    double integral, filtered, correction, minimums[20];
+    unsigned index, count;
 } mb_monitor_pi;
 double mb_monitor_pi_update(mb_monitor_pi * _Nonnull pi, double error, double rate,
                             double seconds);
