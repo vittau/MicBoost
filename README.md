@@ -7,9 +7,10 @@
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ff69b4.svg)](https://github.com/sponsors/vittau)
 
-**Make your microphone louder and clearer in calls and recordings on your Mac.** MicBoost lives
-in the menu bar, boosts and cleans up your voice, and works with any app: Zoom, Google Meet,
-Microsoft Teams, FaceTime, Discord, QuickTime and more.
+**Make your microphone louder on your Mac** and clearer in calls and recordings. MicBoost is a
+free and open source menu bar app for macOS with a microphone boost that works with Zoom, Google
+Meet, Microsoft Teams, FaceTime, Discord, Slack, OBS, QuickTime and any other call or recording
+app.
 
 > [!NOTE]
 > This project is developed and maintained with the help of AI agents, under the direction and
@@ -17,11 +18,15 @@ Microsoft Teams, FaceTime, Discord, QuickTime and more.
 
 ## What it does
 
-- **Makes a quiet microphone loud enough**: up to 16 times louder (+24 dB), with a simple slider.
+- **Makes a quiet microphone loud enough**: raise the mic gain up to 16 times (+24 dB) with a
+  simple slider.
+- **No extra hardware needed**: boost mic volume from the MacBook microphone, a USB microphone or
+  a headset, in software.
 - **Makes your voice clearer**: a voice preset removes low rumble and adds a touch of presence,
-  without making you sound thin. Bass, mids and treble are adjustable if you want.
-- **Keeps loud moments from distorting**: if you laugh, cough or clap, MicBoost holds the level
-  down automatically. A **Limiter active** badge shows when it does.
+  without making you sound thin. Bass, mids and treble are adjustable with the equalizer (EQ) if
+  you want.
+- **Keeps loud moments from distorting**: if you laugh, cough or clap, the peak limiter holds the
+  level down automatically. A **Limiter active** badge shows when it does.
 - **Works with any app**, without setting anything up in each one.
 - **One switch to turn it off** and give your microphone back to the system.
 - **Recovers on its own** if you unplug the microphone or the Mac sleeps.
@@ -32,13 +37,13 @@ Microsoft Teams, FaceTime, Discord, QuickTime and more.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/eq-dark.png">
-    <img src="docs/screenshots/eq-light.png" alt="MicBoost menu with the on/off switch, gain, level meters, microphone list and equalizer" width="320">
+    <img src="docs/screenshots/eq-light.png" alt="MicBoost menu with the on/off switch, volume slider, level meters, microphone list and equalizer" width="320">
   </picture>
   <br>
   <sub>The MicBoost menu: on/off switch, volume, level meters, microphone and equalizer.</sub>
 </p>
 
-Hear your processed voice through your current speakers or headphones with **Hear My Voice**. It works with any output, including Bluetooth headphones that use a different audio rate. Switching monitoring on or off keeps audio flowing to your apps. Use headphones to avoid feedback; monitoring starts off each time you open MicBoost.
+Use **Hear My Voice** to hear your own voice (mic monitoring) through your current speakers or headphones. It works with any output, including Bluetooth headphones that use a different audio rate. Switching monitoring on or off keeps audio flowing to your apps. Use headphones to avoid feedback; monitoring starts off each time you open MicBoost.
 
 When a newer MicBoost is available, the menu shows a link to its download page. MicBoost never
 downloads or installs updates by itself.
@@ -73,8 +78,9 @@ downloads or installs updates by itself.
 3. Make sure the switch at the top is **on**.
 4. In your call or recording app, choose the microphone **BlackHole 2ch**, or leave it on the
    system default. MicBoost sets itself as the system microphone while it is on.
-5. Speak normally and move the slider until the **Output** bar moves well with your voice. If
-   **Limiter active** shows up all the time, it is too loud: move the slider down a little.
+5. Speak normally and move the slider to increase the microphone volume on Mac until the
+   **Output** bar moves well with your voice. If **Limiter active** shows up all the time, it is
+   too loud: move the slider down a little.
 
 Close the menu whenever you like; MicBoost keeps working. To stop, turn the switch off. When you
 quit MicBoost, your previous microphone comes back.
@@ -82,7 +88,7 @@ quit MicBoost, your previous microphone comes back.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/settings-dark.png">
-    <img src="docs/screenshots/settings-light.png" alt="MicBoost settings window with the Audio, Diagnostics and About sections" width="540">
+    <img src="docs/screenshots/settings-light.png" alt="MicBoost settings window showing the audio, diagnostics and about sections" width="540">
   </picture>
   <br>
   <sub>Settings, under "Settings…" in the menu. The defaults are fine for most people.</sub>
@@ -103,6 +109,9 @@ quit MicBoost, your previous microphone comes back.
   browser; it never downloads or installs anything. You can turn this off in Settings → About.
 
 ## Something's wrong?
+
+**Is your mic too quiet in calls?** Check that the **MicBoost** switch is on and move the volume
+slider up. If your microphone has its own volume knob, turn that up first.
 
 If **Hear My Voice** cannot use your output, open Settings → Diagnostics and click **Copy report**. Paste it when you ask for help; it describes your microphone and output without including your voice.
 
