@@ -218,6 +218,17 @@ de campo, o componente host de 30,83 ms ficaria em cerca de 25,4 ms e a latênci
 adicionada de 32,2 ms em cerca de 26,8 ms. É uma extrapolação, não medição nem aprovação
 da meta <20 ms. Pulls grandes mantêm latência maior, mesmo com o PI sem saturação.
 
+### Buffer IO por processo — 05/11/2026
+
+Mac de referência, macOS 27.2, sem som: dois processos de teste (`.scratch/bufprobe`, não versionado) com IOProc próprio no BlackHole 2ch como saída, cada um escrevendo silêncio. O processo B iniciou sem alterar nada; 2 s depois o processo A escreveu `kAudioDevicePropertyBufferFrameSize` = 128 e rodou 4 s.
+
+| Processo | Propriedade lida | Frames por callback |
+|---|---:|---:|
+| A (pediu 128) | 128 | 128 |
+| B (sem pedido), antes, durante e depois de A | 512 | 512 |
+
+O buffer IO é por processo: o pedido de A não alterou o buffer nem o tamanho dos callbacks de B. Não verificado: dispositivos físicos (o BlackHole é virtual; o mecanismo é da HAL) e o mínimo aceito por saídas Bluetooth.
+
 ### Monitor em campo, 0.2.2 — 05/11/2026
 
 Mesmo Mac, fonte e saída do registro da 0.2.1 (fifine USB a 48 kHz → OpenMove by Shokz em Bluetooth a 44,1 kHz), motor a 48 kHz, buffer 256, cerca de 30 s com o monitor ligado:
