@@ -224,6 +224,17 @@ import Testing
         #expect((quietRow?.frame.width ?? 0) > 0)
     }
 
+    @Test func limiterBadgeShowsItsText() {
+        let model = Self.model()
+        model.limitingUntil = .distantFuture
+        let panel = PanelMenuController(model: model)
+        let row = panel.menu.items.first { $0.view is PanelGainRow }?.view
+        let badge = row.flatMap { Self.textFields(in: $0) }?
+            .first { $0.stringValue == localized("Limiter active") }
+        #expect(badge != nil)
+        #expect(badge.map { $0.intrinsicContentSize.width > 0 } == true)
+    }
+
     @Test func gainValueIsReadOnlyText() {
         let model = Self.model()
         let panel = PanelMenuController(model: model)

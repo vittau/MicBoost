@@ -359,7 +359,8 @@ import MicBoostCore
         "", font: .monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular),
         color: .labelColor)
     private let badge = PanelPill(radius: 8)
-    private let badgeLabel = PanelMenuRow.label("", font: .systemFont(ofSize: 11), color: .secondaryLabelColor)
+    private let badgeLabel = PanelMenuRow.label(
+        localized("Limiter active"), font: .systemFont(ofSize: 11), color: .secondaryLabelColor)
 
     var onMute: (() -> Void)?
     var onGain: ((Double) -> Void)?
