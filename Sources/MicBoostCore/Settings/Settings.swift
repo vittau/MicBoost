@@ -25,6 +25,10 @@ public struct Settings: Codable, Equatable, Sendable {
     public var bufferFrames: Int
     public var previousDefaultInputUID: String?
     public var defaultInputManaged: Bool
+    /// Automatic update checks (docs/architecture.md "Verificação de atualizações").
+    public var checkForUpdates: Bool
+    /// Date of the last valid update response, so automatic checks run at most daily.
+    public var lastUpdateCheck: Date?
     /// The "Open at login" default was applied once (docs/architecture.md "Item de início").
     public var loginItemDefaultApplied: Bool
 
@@ -41,6 +45,8 @@ public struct Settings: Codable, Equatable, Sendable {
         bufferFrames: Int = 256,
         previousDefaultInputUID: String? = nil,
         defaultInputManaged: Bool = false,
+        checkForUpdates: Bool = true,
+        lastUpdateCheck: Date? = nil,
         loginItemDefaultApplied: Bool = false
     ) {
         self.schemaVersion = schemaVersion
@@ -55,6 +61,8 @@ public struct Settings: Codable, Equatable, Sendable {
         self.bufferFrames = bufferFrames
         self.previousDefaultInputUID = previousDefaultInputUID
         self.defaultInputManaged = defaultInputManaged
+        self.checkForUpdates = checkForUpdates
+        self.lastUpdateCheck = lastUpdateCheck
         self.loginItemDefaultApplied = loginItemDefaultApplied
     }
 
@@ -82,6 +90,10 @@ public struct Settings: Codable, Equatable, Sendable {
         defaultInputManaged =
             try container.decodeIfPresent(Bool.self, forKey: .defaultInputManaged)
             ?? defaults.defaultInputManaged
+        checkForUpdates =
+            try container.decodeIfPresent(Bool.self, forKey: .checkForUpdates)
+            ?? defaults.checkForUpdates
+        lastUpdateCheck = try container.decodeIfPresent(Date.self, forKey: .lastUpdateCheck)
         loginItemDefaultApplied =
             try container.decodeIfPresent(Bool.self, forKey: .loginItemDefaultApplied)
             ?? defaults.loginItemDefaultApplied

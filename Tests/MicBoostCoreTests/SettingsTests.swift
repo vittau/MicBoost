@@ -19,6 +19,8 @@ import Testing
     #expect(settings.bufferFrames == 256)
     #expect(settings.previousDefaultInputUID == nil)
     #expect(!settings.defaultInputManaged)
+    #expect(settings.checkForUpdates)
+    #expect(settings.lastUpdateCheck == nil)
     #expect(!settings.loginItemDefaultApplied)
 }
 
@@ -31,6 +33,8 @@ import Testing
         bufferFrames: 512,
         previousDefaultInputUID: "internal",
         defaultInputManaged: true,
+        checkForUpdates: false,
+        lastUpdateCheck: Date(timeIntervalSince1970: 1_700_000_000),
         loginItemDefaultApplied: true)
     settings.eq.enabled = false
     settings.eq.low = EQShelfBand(frequency: 80, gainDB: -3)
@@ -96,6 +100,8 @@ import Testing
     #expect(settings.bufferFrames == 256)
     #expect(settings.eq == EQSettings())
     #expect(settings.knownSourceNames.isEmpty)
+    #expect(settings.checkForUpdates)
+    #expect(settings.lastUpdateCheck == nil)
     #expect(!settings.loginItemDefaultApplied)
 }
 
