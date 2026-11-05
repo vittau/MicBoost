@@ -87,9 +87,7 @@ Entregas implementadas:
 - evidência local de Gatekeeper: [distribution.md](distribution.md#verificação-local-por-spctl).
 
 Pendências:
-- publicação da release no GitHub (`gh release create`, com anexos `.zip` e `.sha256`);
-- instalação real pelo tap `vittau/homebrew-micboost` com o mantenedor (tap publicado; `brew install --cask --dry-run vittau/micboost/micboost` a partir do GitHub encontra, confia e resolve o cask, ver [distribution.md](distribution.md#homebrew-tap-próprio));
-- validação dos cenários de instalação e de primeira abertura em um Mac que não participou do desenvolvimento;
+- registrar em [distribution.md](distribution.md) os cenários de instalação já validados no segundo Mac do mantenedor, que não compila o projeto (download direto desde a 0.2.0 e Homebrew em 05/11/2026), e os ainda não observados (BlackHole por pkg, `brew uninstall`);
 - variante com o instalador do BlackHole: confirmar a orientação do upstream sobre a redistribuição e validar a instalação em máquina limpa.
 
 Condições de conclusão:
@@ -143,4 +141,3 @@ Condições de conclusão:
 | Decisão | Recomendação atual | Quando |
 |---|---|---|
 | Queda lenta de latência no ensaio longo | ensaio de várias horas para confirmar que se estabiliza | antes da etapa 6 |
-| Homebrew 7 / macOS 27 com cask sem notarização | auditoria, confiança no tap e quarentena verificadas ([distribution.md](distribution.md#homebrew-tap-próprio)); falta a instalação real: permissão de microfone após `brew upgrade`, BlackHole instalado por pkg, `brew uninstall` | na publicação do tap |

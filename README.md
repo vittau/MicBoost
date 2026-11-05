@@ -56,6 +56,20 @@ downloads or installs updates by itself.
 
 ## Install
 
+### With Homebrew
+
+If you use [Homebrew](https://brew.sh), one command installs MicBoost and BlackHole 2ch (it asks
+for your Mac password for BlackHole):
+
+```sh
+brew install --cask vittau/micboost/micboost
+```
+
+Then open MicBoost and follow steps 4 and 5 below. To update later, run
+`brew upgrade --cask micboost`.
+
+### Step by step
+
 1. **Install BlackHole 2ch.** Download the installer from the
    [BlackHole website](https://existential.audio/blackhole/) and run it. It asks for your Mac
    password. If you use Homebrew, `brew install --cask blackhole-2ch` does the same.
@@ -68,7 +82,8 @@ downloads or installs updates by itself.
    2. Scroll down to the message about MicBoost and click **Open Anyway**.
    3. Confirm with your password or Touch ID.
 
-   You only do this once. Never follow advice to turn off Mac security features to open an app.
+   You do this the first time and again after each update. Never follow advice to turn off Mac
+   security features to open an app.
 5. **Allow microphone access** when macOS asks.
 
 ## How to use
@@ -131,7 +146,8 @@ unplugged, plug it back in; MicBoost picks it up again on its own.
 ## Uninstall
 
 1. Choose **Quit MicBoost** in its menu, so your previous microphone comes back.
-2. Drag `MicBoost.app` from Applications to the Trash.
+2. Drag `MicBoost.app` from Applications to the Trash, or run
+   `brew uninstall --cask micboost` if you installed it with Homebrew.
 
 BlackHole stays installed, because other apps may use it. To remove it, follow the instructions on
 the [BlackHole website](https://existential.audio/blackhole/).

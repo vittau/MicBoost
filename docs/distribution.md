@@ -118,7 +118,7 @@ Comportamento do Homebrew 7 com este cask (verificado no Homebrew 7.0.12, macOS 
 
 O tap está publicado em `https://github.com/vittau/homebrew-micboost`. Validação registrada (sem instalar nada): `brew style`, `brew audit --cask --strict --online` (download e `sha256` conferidos), `brew livecheck`, `brew install --cask --dry-run` e `brew info` com o tap local da 0.2.3, e `brew install --cask --dry-run vittau/micboost/micboost` a partir do tap publicado, que clona o tap, marca o cask como confiável e resolve a dependência.
 
-Comportamento a validar com o mantenedor numa instalação real:
+Instalação real validada pelo mantenedor em 05/11/2026 (`brew install --cask vittau/micboost/micboost` no Mac de campo, funcionou). Ainda a observar quando ocorrerem:
 - `brew install --cask vittau/micboost/micboost` em uma máquina sem BlackHole instala o `blackhole-2ch`, que pede a senha de administrador (pkg) e pode exigir reiniciar o `coreaudiod`, e depois o MicBoost, num único comando.
 - Com o BlackHole já instalado pelo Homebrew, nada é duplicado. Com o BlackHole instalado manualmente (pkg), o Homebrew tenta instalar o cask; validar se o pkg reinstala sobre o existente sem conflito e documentar o resultado aqui.
 - `brew upgrade` substitui o app. As configurações (UserDefaults) permanecem.
@@ -172,7 +172,7 @@ Estrutura, nesta ordem:
 2. Título, badges (macOS 14+, Apple Silicon + Intel, licença GPL-3.0, Sponsor) e uma frase do benefício, citando apps de chamada conhecidos.
 3. Callout `> [!NOTE]`: o projeto é desenvolvido e mantido com ajuda de agentes de IA, sob direção e revisão do mantenedor. O README não fala de status, validação ou etapas; isso fica em [roadmap.md](roadmap.md).
 4. **What it does:** benefícios em linguagem simples, seguidos da captura do menu com o EQ aberto (`eq-*.png`), centralizada, com legenda abaixo.
-5. **What you need** e **Install:** passos numerados: instalar o BlackHole (instalador do site; Homebrew como alternativa), baixar o `.zip` das releases, arrastar para Aplicativos, primeira abertura com "Abrir Mesmo Assim" ([Primeira abertura](#primeira-abertura-sem-notarização), sem `xattr` nem remoção de quarentena) e permissão de microfone. O tap só entra depois de validado.
+5. **What you need** e **Install:** passos numerados: instalar o BlackHole (instalador do site; Homebrew como alternativa), baixar o `.zip` das releases, arrastar para Aplicativos, primeira abertura com "Abrir Mesmo Assim" ([Primeira abertura](#primeira-abertura-sem-notarização), sem `xattr` nem remoção de quarentena) e permissão de microfone. Uma seção "With Homebrew" vem antes dos passos manuais, com o comando de instalação e o de atualização.
 6. **How to use:** passos numerados (ícone, microfone, chave, escolher "BlackHole 2ch" ou o padrão no app de chamada, ajustar o slider pela barra de saída e pelo selo do limitador), seguidos da captura dos ajustes (`settings-*.png`) com legenda.
 7. **Good to know** (ruído junto com o ganho, Bluetooth, iPhone, tampa fechada, abrir ao iniciar sessão, verificação de atualizações e como desligá-la), **Something's wrong?** (perguntas e respostas curtas), **Uninstall**, **Support** (GitHub Sponsors e Buy Me a Coffee), **For developers** (um parágrafo, link para `docs/` e comandos de build), **License**, **Credits** (BlackHole e as referências, deixando claro que é uma implementação independente).
 
