@@ -34,7 +34,8 @@ public protocol EngineHardware: AudioHardware {
     func setRate(_ device: AudioObjectID, rate: Double) throws
     func createAggregate(source: String, destination: String) throws -> AudioObjectID
     func monitorBuffer(_ device: AudioObjectID) throws -> UInt32
-    func createMonitor(_ device: AudioDevice, context: OpaquePointer, rate: Double) throws -> any MonitorSession
+    func createMonitor(_ device: AudioDevice, context: OpaquePointer, rate: Double, bufferPolicy: MonitorBufferPolicy)
+        throws -> any MonitorSession
     func destroyAggregate(_ device: AudioObjectID) throws
     func setBuffer(_ device: AudioObjectID, frames: UInt32) throws -> UInt32
     func createIO(_ device: AudioObjectID, context: OpaquePointer) throws -> AudioDeviceIOProcID
@@ -161,12 +162,13 @@ extension CoreAudioHardware: EngineHardware {
     public func monitorBuffer(_ device: AudioObjectID) throws -> UInt32 {
         try scalar(.init(device, kAudioDevicePropertyBufferFrameSize), as: UInt32.self)
     }
-    public func createMonitor(_ device: AudioDevice, context: OpaquePointer, rate: Double) throws -> any MonitorSession
-    {
+    public func createMonitor(
+        _ device: AudioDevice, context: OpaquePointer, rate: Double, bufferPolicy: MonitorBufferPolicy
+    ) throws -> any MonitorSession {
         try MonitorAudioUnits(
             context: context, rate: rate, channels: min(2, device.outputChannels),
             device: device.id, outputRate: device.sampleRate, buffer: monitorBuffer(device.id),
-            physicalChannels: device.outputChannels)
+            physicalChannels: device.outputChannels, bufferPolicy: bufferPolicy)
     }
     public func destroyAggregate(_ device: AudioObjectID) throws {
         try checkHAL(AudioHardwareDestroyAggregateDevice(device), "Destroy aggregate")

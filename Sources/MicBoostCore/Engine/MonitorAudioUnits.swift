@@ -5,6 +5,7 @@ import MicBoostDSP
 import os
 
 public protocol MonitorSession: AnyObject {
+    var bufferRequestResult: String { get }
     var latencySeconds: Double { get }
     var outputBufferFrames: UInt32 { get }
     var outputBufferReadFromAUHAL: Bool { get }
@@ -17,6 +18,7 @@ public protocol MonitorSession: AnyObject {
 }
 
 extension MonitorSession {
+    public var bufferRequestResult: String { "none (offline)" }
     public func refreshMetrics() {}
     public var outputBufferReadFromAUHAL: Bool { false }
     public var varispeedLatencySeconds: Double { 0 }
@@ -27,6 +29,8 @@ extension MonitorSession {
 final class MonitorAudioUnits: MonitorSession {
     private var output: AudioUnit?
     private var speed: AudioUnit?
+    private var bufferLease: MonitorBufferLease?
+    var bufferRequestResult: String { bufferLease?.result ?? "none (offline)" }
     private var started = false
     private var hasDevice = false
     private(set) var outputBufferReadFromAUHAL = false
@@ -37,7 +41,8 @@ final class MonitorAudioUnits: MonitorSession {
 
     init(
         context: OpaquePointer, rate: Double, channels: UInt32, device: AudioObjectID?,
-        outputRate: Double, buffer: UInt32, physicalChannels: UInt32? = nil
+        outputRate: Double, buffer: UInt32, physicalChannels: UInt32? = nil,
+        bufferPolicy: MonitorBufferPolicy = .sharedWithSource
     ) throws {
         outputBufferFrames = buffer
         do {
@@ -51,6 +56,14 @@ final class MonitorAudioUnits: MonitorSession {
                 try Self.property(output, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, UInt32(0))
                 try Self.property(output, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, 0, UInt32(1))
                 try Self.property(output, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, device)
+                bufferLease = MonitorBufferLease(
+                    policy: bufferPolicy,
+                    read: { try Self.readBuffer(output) },
+                    write: { frames in
+                        try Self.property(
+                            output, AudioUnitPropertyID(kAudioDevicePropertyBufferFrameSize),
+                            kAudioUnitScope_Output, 0, frames)
+                    })
             }
             let format = Self.format(rate: rate, channels: channels)
             for scope in [kAudioUnitScope_Input, kAudioUnitScope_Output] {
@@ -116,7 +129,7 @@ final class MonitorAudioUnits: MonitorSession {
         guard let unit else { throw EngineError.formatUnsupported }
         return unit
     }
-    private static func property<T>(
+    private static func property<T: BitwiseCopyable>(
         _ unit: AudioUnit, _ id: AudioUnitPropertyID, _ scope: AudioUnitScope,
         _ element: AudioUnitElement, _ value: T
     ) throws {
@@ -125,20 +138,22 @@ final class MonitorAudioUnits: MonitorSession {
             AudioUnitSetProperty(unit, id, scope, element, &value, UInt32(MemoryLayout<T>.size)),
             "Monitor unit property \(id)")
     }
-    func refreshMetrics() {
-        guard hasDevice, let output else { return }
+    private static func readBuffer(_ unit: AudioUnit) throws -> UInt32 {
         var frames: UInt32 = 0
         var size = UInt32(MemoryLayout<UInt32>.size)
+        try checkHAL(
+            AudioUnitGetProperty(
+                unit, AudioUnitPropertyID(kAudioDevicePropertyBufferFrameSize),
+                kAudioUnitScope_Output, 0, &frames, &size), "Read AUHAL IO buffer")
+        guard frames > 0 else { throw EngineError.formatUnsupported }
+        return frames
+    }
+    func refreshMetrics() {
+        guard hasDevice, let output else { return }
         do {
-            try checkHAL(
-                AudioUnitGetProperty(
-                    output, AudioUnitPropertyID(kAudioDevicePropertyBufferFrameSize),
-                    kAudioUnitScope_Output, 0, &frames, &size), "Read AUHAL IO buffer")
-            guard frames > 0 else { throw EngineError.formatUnsupported }
-            outputBufferFrames = frames
+            outputBufferFrames = try Self.readBuffer(output)
             outputBufferReadFromAUHAL = true
         } catch {
-            // A diagnostic query must not silence a working output; retain the last read value.
             Logger(subsystem: "io.github.vittau.MicBoost", category: "engine").warning(
                 "AUHAL buffer read failed; retaining device/previous value: \(String(describing: error), privacy: .public)"
             )
@@ -169,6 +184,7 @@ final class MonitorAudioUnits: MonitorSession {
                 try checkHAL(AudioOutputUnitStop(output), "Stop monitor AUHAL")
                 started = false
             }
+            try bufferLease?.restore()
             try checkHAL(AudioUnitUninitialize(output), "Uninitialize monitor output")
             try checkHAL(AudioComponentInstanceDispose(output), "Dispose monitor output")
             self.output = nil

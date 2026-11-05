@@ -72,13 +72,21 @@ typedef struct {
     uint32_t fill, target, max_pull, fill_min, fill_max, quantum;
     double correction;
     bool pulling;
+    uint64_t producer_frames, producer_host, consumer_host;
+    double consumer_frames, host_ticks_per_second;
 } mb_monitor_stats;
 typedef struct {
     double integral, filtered, correction, minimums[20];
     unsigned index, count;
+    uint64_t producer_anchor, producer_time, consumer_time;
+    double consumer_anchor;
+    bool clock_anchor, clock_acquired, acquiring;
 } mb_monitor_pi;
 double mb_monitor_pi_update(mb_monitor_pi * _Nonnull pi, double error, double rate,
                             double seconds, double quantum_frames);
+bool mb_monitor_pi_observe_clock(mb_monitor_pi * _Nonnull pi,
+    const mb_monitor_stats * _Nonnull stats, double rate, double seconds);
+void mb_monitor_set_correction(mb_monitor * _Nonnull monitor, double correction);
 mb_monitor * _Nullable mb_monitor_create(mb_engine * _Nonnull engine, double rate,
                                         uint32_t target);
 void mb_monitor_destroy(mb_monitor * _Nonnull monitor);

@@ -10,12 +10,17 @@ typedef struct {
     _Atomic float left, right;
     _Atomic uint64_t host, tag;
 } monitor_frame;
+typedef struct {
+    _Atomic uint64_t sequence, frames, host;
+} clock_point;
 struct mb_ring {
     monitor_frame frames[CAPACITY];
     _Atomic uint64_t read, write, overruns_full, resets;
     _Atomic unsigned writers, reset_target, owners, fill_min, fill_max;
     _Atomic bool enabled, wait_for_pull, pulling;
     double ticks;
+    clock_point clock;
+    uint64_t produced;
 };
 struct mb_monitor {
     mb_ring *ring;
@@ -23,7 +28,33 @@ struct mb_monitor {
     _Atomic unsigned target, swing, prefill, max_pull, quantum;
     _Atomic bool silent, fading;
     _Atomic uint64_t latency, underruns;
+    _Atomic double correction;
+    clock_point clock;
+    uint64_t consumed;
 };
+static void clock_record(clock_point *point, uint64_t frames, uint64_t host) {
+    if (!host || host <= atomic_load(&point->host)) {
+        return;
+    }
+    atomic_fetch_add_explicit(&point->sequence, 1, memory_order_acq_rel);
+    atomic_store(&point->frames, frames);
+    atomic_store(&point->host, host);
+    atomic_fetch_add_explicit(&point->sequence, 1, memory_order_release);
+}
+static void clock_read(const clock_point *point, uint64_t *frames, uint64_t *host) {
+    // Bounded engine-queue snapshot; audio writers never wait for the reader.
+    *frames = *host = 0;
+    for (unsigned i = 0; i < 8; i++) {
+        uint64_t sequence = atomic_load_explicit(&point->sequence, memory_order_acquire);
+        uint64_t f = atomic_load(&point->frames);
+        uint64_t h = atomic_load(&point->host);
+        if (!(sequence & 1) && sequence == atomic_load(&point->sequence)) {
+            *frames = f;
+            *host = h;
+            return;
+        }
+    }
+}
 static void advance(_Atomic uint64_t *index, uint64_t value) {
     uint64_t old = atomic_load_explicit(index, memory_order_acquire);
     while (old < value && !atomic_compare_exchange_weak_explicit(
@@ -88,8 +119,13 @@ void mb_ring_enable(mb_ring *r, bool enabled) {
 void mb_ring_push(mb_ring *r, const float *left, const float *right,
                   uint32_t frames, uint64_t host) {
     atomic_fetch_add_explicit(&r->writers, 1, memory_order_acq_rel);
-    if (!atomic_load_explicit(&r->enabled, memory_order_acquire)
-        || (atomic_load(&r->wait_for_pull) && !atomic_load(&r->pulling))) {
+    if (!atomic_load_explicit(&r->enabled, memory_order_acquire)) {
+        atomic_fetch_sub_explicit(&r->writers, 1, memory_order_release);
+        return;
+    }
+    clock_record(&r->clock, r->produced, host);
+    r->produced += frames;
+    if (atomic_load(&r->wait_for_pull) && !atomic_load(&r->pulling)) {
         atomic_fetch_sub_explicit(&r->writers, 1, memory_order_release);
         return;
     }
@@ -135,12 +171,20 @@ mb_monitor *mb_monitor_create(mb_engine *engine, double rate, uint32_t target) {
     if (!m) {
         return NULL;
     }
+    if (!atomic_is_lock_free(&m->correction)) {
+        free(m);
+        return NULL;
+    }
     m->ring = mb_engine_ring(engine);
     atomic_fetch_add(&m->ring->owners, 1);
     m->rate = rate;
+    mb_ring_enable(m->ring, false);
+    m->ring->produced = 0;
+    atomic_store(&m->ring->clock.sequence, 0);
+    atomic_store(&m->ring->clock.frames, 0);
+    atomic_store(&m->ring->clock.host, 0);
     atomic_store(&m->target, target);
     atomic_store(&m->prefill, target);
-    mb_ring_enable(m->ring, false);
     atomic_store(&m->ring->read, 0);
     atomic_store(&m->ring->write, target);
     atomic_store(&m->ring->overruns_full, 0);
@@ -206,7 +250,12 @@ void mb_monitor_peek(const mb_monitor *m, mb_monitor_stats *stats) {
     }
     stats->fill_max = (unsigned)fmax(stats->fill, atomic_load(&m->ring->fill_max));
     stats->pulling = atomic_load(&m->ring->pulling);
-    stats->correction = 0;
+    clock_read(&m->ring->clock, &stats->producer_frames, &stats->producer_host);
+    uint64_t consumer_frames;
+    clock_read(&m->clock, &consumer_frames, &stats->consumer_host);
+    stats->consumer_frames = consumer_frames / 65536.0;
+    stats->host_ticks_per_second = m->ring->ticks * m->rate;
+    stats->correction = atomic_load(&m->correction);
 }
 void mb_monitor_read(mb_monitor *m, mb_monitor_stats *stats) {
     mb_monitor_peek(m, stats);
@@ -216,6 +265,54 @@ void mb_monitor_read(mb_monitor *m, mb_monitor_stats *stats) {
         stats->fill_min = stats->fill;
     }
     stats->fill_max = (unsigned)fmax(stats->fill, atomic_exchange(&m->ring->fill_max, stats->fill));
+}
+void mb_monitor_set_correction(mb_monitor *m, double correction) {
+    atomic_store(&m->correction, isfinite(correction)
+        ? fmax(-0.005, fmin(0.005, correction)) : 0);
+}
+bool mb_monitor_pi_observe_clock(mb_monitor_pi *pi, const mb_monitor_stats *stats,
+                                 double rate, double seconds) {
+    if (pi->clock_acquired || !stats->producer_host || !stats->consumer_host
+        || !isfinite(rate) || rate <= 0 || !isfinite(seconds) || seconds <= 0
+        || !isfinite(stats->host_ticks_per_second) || stats->host_ticks_per_second <= 0
+        || !stats->quantum) {
+        return false;
+    }
+    if (!pi->clock_anchor) {
+        pi->producer_anchor = stats->producer_frames;
+        pi->producer_time = stats->producer_host;
+        pi->consumer_anchor = stats->consumer_frames;
+        pi->consumer_time = stats->consumer_host;
+        pi->clock_anchor = true;
+        return false;
+    }
+    if (stats->producer_host <= pi->producer_time || stats->consumer_host <= pi->consumer_time) {
+        return false;
+    }
+    double ptime = (stats->producer_host - pi->producer_time) / stats->host_ticks_per_second;
+    double ctime = (stats->consumer_host - pi->consumer_time) / stats->host_ticks_per_second;
+    double window = fmax(2 * seconds, 4 * stats->quantum / rate);
+    if (ptime < window || ctime < window) {
+        return false;
+    }
+    if (stats->producer_frames <= pi->producer_anchor
+        || stats->consumer_frames <= pi->consumer_anchor) {
+        return false;
+    }
+    double producer = (stats->producer_frames - pi->producer_anchor) / ptime;
+    double consumer = (stats->consumer_frames - pi->consumer_anchor) / ctime;
+    if (consumer <= 0 || !isfinite(producer / consumer)) {
+        return false;
+    }
+    double estimate = producer / consumer - 1;
+    if (fabs(estimate) > 0.005) {
+        return false;
+    }
+    pi->integral = estimate;
+    pi->filtered = 0;
+    pi->index = pi->count = 0;
+    pi->clock_acquired = pi->acquiring = true;
+    return true;
 }
 double mb_monitor_pi_update(mb_monitor_pi *pi, double error, double rate, double seconds,
                             double quantum) {
@@ -238,13 +335,18 @@ double mb_monitor_pi_update(mb_monitor_pi *pi, double error, double rate, double
     double proportional = 0.25 / horizon * pi->filtered;
     double candidate = pi->integral + 0.025 / (horizon * horizon) * pi->filtered * seconds;
     // Do not wind up against either the amplitude limit or the slew limiter.
-    double step = 0.001 * seconds / horizon;
+    double step = pi->acquiring
+        ? 0.005 * seconds / fmax(2 * seconds, 4 * quantum / rate)
+        : 0.001 * seconds / horizon;
     double excess = proportional + candidate - pi->correction;
     if (fabs(proportional + candidate) < 0.005
         && (fabs(excess) <= step || excess * pi->filtered <= 0)) {
         pi->integral = candidate;
     }
     double desired = fmax(-0.005, fmin(0.005, proportional + pi->integral));
+    if (fabs(desired - pi->correction) <= step) {
+        pi->acquiring = false;
+    }
     pi->correction += fmax(-step, fmin(step, desired - pi->correction));
     return pi->correction;
 }
@@ -269,6 +371,11 @@ OSStatus mb_monitor_render(void *context, AudioUnitRenderActionFlags *flags,
     if (frames) {
         atomic_store_explicit(&r->pulling, true, memory_order_release);
     }
+    if (time && (time->mFlags & kAudioTimeStampHostTimeValid)) {
+        clock_record(&m->clock, m->consumed, time->mHostTime);
+    }
+    double correction = atomic_load(&m->correction);
+    m->consumed += (uint64_t)llround(frames * 65536.0 / (1 + correction));
     maximum(&m->max_pull, frames);
     unsigned swing = atomic_load(&m->swing);
     if (swing) {

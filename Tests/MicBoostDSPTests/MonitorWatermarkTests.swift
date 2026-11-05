@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import MicBoostDSP
 import Testing
@@ -13,40 +14,10 @@ private struct QueueResult {
     var startupUnderruns: UInt64 = 0
     var settlingUnderruns: UInt64 = 0
     var lastUnderrunTime = 0.0
+    var afterTwoSeconds: UInt64 = 0
 }
 
-/// Occupancy-only reference for the released sampled-level controller, using identical clocks.
-private struct ReleasedQueue {
-    var fill: Double
-    var target: Double
-    var integral = 0.0
-    var full: UInt64 = 0
-    var resets: UInt64 = 0
-    var underruns: UInt64 = 0
-    mutating func push() {
-        fill += 256
-        if fill > 8192 {
-            full += 1
-            fill = 8192
-        }
-    }
-    mutating func pull(_ frames: Int) {
-        target = max(target, Double(256 + frames + 48))
-        if fill > target + max(4096, target) {
-            fill = target
-            resets += 1
-        }
-        if fill < Double(frames) { underruns += 1 }
-        fill = max(0, fill - Double(frames))
-    }
-    mutating func correction() -> Double {
-        let error = (fill - target) / 48000
-        integral = max(-0.005, min(0.005, integral + error * 0.05))
-        return max(-0.005, min(0.005, error + integral))
-    }
-}
-
-private func queueSimulation(drift: Double, scenario: Int, released: Bool) throws -> QueueResult {
+private func queueSimulation(drift: Double, scenario: Int, acquire: Bool) throws -> QueueResult {
     let engine = try #require(mb_engine_create(256, 48000))
     defer { mb_engine_destroy(engine) }
     let outputRate = scenario == 2 ? 48000.0 : 44100.0
@@ -59,7 +30,11 @@ private func queueSimulation(drift: Double, scenario: Int, released: Bool) throw
     let jitter = [0.001, -0.001, 0.0005, -0.0005, 0.0]
     let initialPull = Int(ceil(Double(blocks[0]) * 48000 / outputRate))
     let initial = 256 + initialPull + 48
-    var legacy = ReleasedQueue(fill: Double(initial), target: Double(initial))
+    var timebase = mach_timebase_info_data_t()
+    mach_timebase_info(&timebase)
+    let ticks = 1e9 * Double(timebase.denom) / Double(timebase.numer)
+    func host(_ seconds: Double) -> UInt64 { 1_000_000_000 + UInt64((seconds * ticks).rounded()) }
+    var outputPosition = 0.0
     let context = try #require(mb_monitor_create(engine, 48000, UInt32(initial)))
     defer {
         mb_engine_set_monitor_enabled(engine, false)
@@ -79,10 +54,11 @@ private func queueSimulation(drift: Double, scenario: Int, released: Bool) throw
     var result = QueueResult()
     var renders = 0
     var previousUnderruns: UInt64 = 0
+    var twoSecondUnderruns: UInt64 = 0
     while min(producer, consumer, controller) < 300 {
         let now = min(producer, consumer, controller)
         if producer <= now {
-            if released { legacy.push() } else { monitorPush(engine, frames: 256) }
+            monitorPush(engine, frames: 256, host: host(producer))
             producer += 256.0 / 48000
         }
         if consumer <= now {
@@ -92,10 +68,13 @@ private func queueSimulation(drift: Double, scenario: Int, released: Bool) throw
             fraction = requested - Double(pull)
             if now >= 180 {
                 mb_monitor_peek(context, &stats)
-                result.mean += released ? legacy.fill : Double(stats.fill)
+                result.mean += Double(stats.fill)
                 renders += 1
             }
-            if released { legacy.pull(pull) } else { _ = monitorRender(context, frames: pull) }
+            // HAL timestamps describe scheduled audio time; callback jitter changes invocation time only.
+            let scheduled = 0.3 + outputPosition / outputRate * (1 + drift) + Double(blocks[0]) / outputRate
+            _ = monitorRender(context, frames: pull, host: host(scheduled))
+            outputPosition += Double(frames)
             // Positive drift means the consumer clock is slower than the producer's clock.
             consumer += Double(frames) / outputRate * (1 + drift) + jitter[block % jitter.count]
             block += 1
@@ -104,12 +83,14 @@ private func queueSimulation(drift: Double, scenario: Int, released: Bool) throw
             mb_monitor_read(context, &stats)
             if stats.underruns > previousUnderruns { result.lastUnderrunTime = now }
             previousUnderruns = stats.underruns
+            if acquire { mb_monitor_pi_observe_clock(&pi, &stats, 48000, 0.05) }
             let next =
-                released
-                ? legacy.correction()
-                : stats.pulling
-                    ? mb_monitor_pi_update(
-                        &pi, Double(stats.fill_min) - Double(stats.target), 48000, 0.05, Double(stats.quantum)) : 0
+                stats.pulling
+                ? mb_monitor_pi_update(
+                    &pi, Double(stats.fill_min) - Double(stats.target), 48000, 0.05,
+                    Double(stats.quantum)) : 0
+            mb_monitor_set_correction(context, next)
+            if now < 2 { twoSecondUnderruns = stats.underruns }
             if now < 1 { result.startupUnderruns = stats.underruns }
             if now < 180 {
                 baseline = stats
@@ -123,20 +104,21 @@ private func queueSimulation(drift: Double, scenario: Int, released: Bool) throw
         }
     }
     mb_monitor_peek(context, &stats)
+    result.afterTwoSeconds = stats.underruns - twoSecondUnderruns
     result.mean /= Double(renders)
-    result.underruns = released ? legacy.underruns : stats.underruns - baseline.underruns
+    result.underruns = stats.underruns - baseline.underruns
     result.settlingUnderruns = baseline.underruns
-    result.full = released ? legacy.full : stats.overruns_full
-    result.resets = released ? legacy.resets : stats.resets
+    result.full = stats.overruns_full
+    result.resets = stats.resets
     return result
 }
 
-@Test(arguments: [-0.003, -0.0002, 0, 0.0002, 0.003], [0, 1, 2, 3])
+@Test(arguments: [-0.003, -0.0015, -0.0002, 0, 0.0002, 0.003], [0, 1, 2, 3])
 func watermarkControllerHandlesDriftAndDelayedIrregularConsumer(_ drift: Double, _ scenario: Int) throws {
-    let before = try queueSimulation(drift: drift, scenario: scenario, released: true)
-    let after = try queueSimulation(drift: drift, scenario: scenario, released: false)
+    let before = try queueSimulation(drift: drift, scenario: scenario, acquire: false)
+    let after = try queueSimulation(drift: drift, scenario: scenario, acquire: true)
     print(
-        "watermark scenario=\(scenario) drift=\(drift) before_frames=\(before.mean) after_frames=\(after.mean) before_ms=\(before.mean/48) after_ms=\(after.mean/48) correction_ppm=\(after.minimumCorrection*1e6)...\(after.maximumCorrection*1e6) step_ppm=\(after.maximumStep*1e6) before_step_ppm=\(before.maximumStep*1e6) full=\(after.full) resets=\(after.resets) underruns=\(after.underruns) startup_underruns=\(after.startupUnderruns) settling_underruns=\(after.settlingUnderruns) last_underrun_s=\(after.lastUnderrunTime)"
+        "watermark scenario=\(scenario) drift=\(drift) before_frames=\(before.mean) after_frames=\(after.mean) before_ms=\(before.mean/48) after_ms=\(after.mean/48) correction_ppm=\(after.minimumCorrection*1e6)...\(after.maximumCorrection*1e6) step_ppm=\(after.maximumStep*1e6) before_step_ppm=\(before.maximumStep*1e6) before_acquisition=\(before.settlingUnderruns) after_2s=\(after.afterTwoSeconds) full=\(after.full) resets=\(after.resets) underruns=\(after.underruns) startup_underruns=\(after.startupUnderruns) settling_underruns=\(after.settlingUnderruns) last_underrun_s=\(after.lastUnderrunTime)"
     )
     #expect(after.full == 0 && after.resets == 0 && after.underruns == 0)
     #expect(after.startupUnderruns <= 4)
@@ -145,7 +127,8 @@ func watermarkControllerHandlesDriftAndDelayedIrregularConsumer(_ drift: Double,
     #expect(abs(after.maximumCorrection - drift) < 0.00075)
     #expect(after.maximumStep <= 0.000050001)
     #expect(abs(after.minimumCorrection) < 0.004 && abs(after.maximumCorrection) < 0.004)
-    if scenario != 1 { #expect(before.mean > after.mean) }
+    #expect(after.mean <= before.mean * 1.05)
+    #expect(after.afterTwoSeconds == 0)
 }
 
 @Test func monitorPIClampsWithoutWindupAndLimitsSlew() {
@@ -210,4 +193,37 @@ func watermarkControllerHandlesDriftAndDelayedIrregularConsumer(_ drift: Double,
     #expect(abs(normal - 0.00005) < 1e-10)
     #expect(abs(longCallback - 0.0000125) < 1e-10)
     #expect(fast.integral == 0 && slow.integral == 0)
+}
+
+@Test func clockFeedForwardUsesTimestampIntervalsAndBoundsAcquisitionSlew() {
+    var pi = mb_monitor_pi()
+    var stats = mb_monitor_stats()
+    stats.quantum = 351
+    stats.host_ticks_per_second = 1_000_000
+    #expect(!mb_monitor_pi_observe_clock(&pi, &stats, 48000, 0.05))
+    stats.producer_host = 1_000_000
+    stats.consumer_host = 5_000_000  // Arbitrary input/output latency offsets cancel.
+    #expect(!mb_monitor_pi_observe_clock(&pi, &stats, 48000, 0.05))
+    stats.producer_host += 100_000
+    stats.consumer_host += 100_000
+    stats.producer_frames = 4800
+    stats.consumer_frames = 4800 / (1 - 0.003)
+    #expect(mb_monitor_pi_observe_clock(&pi, &stats, 48000, 0.05))
+    #expect(abs(pi.integral + 0.003) < 1e-10)
+    let first = mb_monitor_pi_update(&pi, 0, 48000, 0.05, 351)
+    #expect(abs(first + 0.0025) < 1e-10)
+    let second = mb_monitor_pi_update(&pi, 0, 48000, 0.05, 351)
+    #expect(abs(second + 0.003) < 1e-10 && !pi.acquiring)
+    #expect(!mb_monitor_pi_observe_clock(&pi, &stats, 48000, 0.05))
+
+    var invalid = mb_monitor_pi()
+    stats.producer_frames = 0
+    stats.consumer_frames = 0
+    #expect(!mb_monitor_pi_observe_clock(&invalid, &stats, 48000, 0.05))
+    stats.producer_host += 100_000
+    stats.consumer_host += 100_000
+    stats.producer_frames = 4800
+    stats.consumer_frames = 4000  // Outside the specified clock-correction budget.
+    #expect(!mb_monitor_pi_observe_clock(&invalid, &stats, 48000, 0.05))
+    #expect(!invalid.clock_acquired && invalid.integral == 0)
 }

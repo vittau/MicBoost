@@ -97,7 +97,7 @@ quit MicBoost, your previous microphone comes back.
 
 ## Something's wrong?
 
-If **Hear My Voice** cannot use your output, open Settings → Diagnostics and use **Copy report**. It includes your microphone and output details, queue statistics (including the observed control quantum) and timing components, and the last monitoring error to help investigate the problem.
+If **Hear My Voice** cannot use your output, open Settings → Diagnostics and use **Copy report**. It includes your microphone and output details, output-buffer requests and their results, queue statistics (including the observed control quantum) and timing components, and the last monitoring error to help investigate the problem.
 
 **macOS says it can't open MicBoost.** See step 4 of [Install](#install).
 
