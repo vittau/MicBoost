@@ -32,11 +32,12 @@ Motivação: o VirtuMic tem interface pesada e atraso perceptível (o log dele m
 8. Detecção e recuperação: BlackHole ausente, permissão de microfone negada, desconexão da fonte, suspensão/retomada, mudança de formato e mudança manual da entrada padrão.
 9. Tela secundária de ajustes avançados (buffer, canais, diagnóstico).
 10. Modo monitor: chave no painel que leva a voz processada também à saída padrão do sistema (fones), em qualquer taxa de amostragem da saída, com latência adicionada pelo MicBoost medida < 20 ms ([audio-engine.md](audio-engine.md#modo-monitor)).
-11. Distribuição: tap Homebrew próprio com dependência do cask `blackhole-2ch` e download direto `.zip` ([distribution.md](distribution.md)).
+11. Abrir ao iniciar sessão: o MicBoost se registra como item de início do macOS, ligado por padrão numa cópia instalada, com chave nos ajustes ([ui.md](ui.md#janela-de-ajustes)).
+12. Distribuição: tap Homebrew próprio com dependência do cask `blackhole-2ch` e download direto `.zip` ([distribution.md](distribution.md)).
 
 ## Fora de escopo da v1
 
-Redução de ruído, compressor avançado, ganho automático, volume próprio do monitor, presets de EQ, gráfico de resposta, módulo da Central de Controle, Mac App Store, `homebrew/cask` oficial, notarização, iniciar no login.
+Redução de ruído, compressor avançado, ganho automático, volume próprio do monitor, presets de EQ, gráfico de resposta, módulo da Central de Controle, Mac App Store, `homebrew/cask` oficial, notarização.
 
 Modo monitor em saídas Bluetooth: funciona, mas a latência física do próprio fone (tipicamente acima de 100 ms) pode tornar o atraso total alto. Essa latência não entra na meta de < 20 ms adicionados pelo MicBoost; o painel avisa quando a estimativa total reportada passa de 50 ms.
 

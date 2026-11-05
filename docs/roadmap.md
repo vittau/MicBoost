@@ -13,6 +13,7 @@ Status: `não iniciado` · `em andamento` · `concluído`. Uma etapa só é conc
 | 6 | Distribuição | em andamento |
 | 7 | Entrega | não iniciado |
 | 8 | Modo monitor | em andamento |
+| 9 | Abrir ao iniciar sessão | não iniciado |
 
 ## 0 — Estrutura e diagnóstico
 
@@ -115,6 +116,14 @@ Condições de conclusão:
 - latência adicionada pelo MicBoost medida por `monitor-latency` ([testing.md](testing.md#medição-de-latência-do-monitor)): mediana < 20 ms no buffer 256 a 48 kHz, sem underruns nem overruns, numa saída na taxa do motor e numa em 44,1 kHz; registrar em [testing.md](testing.md#resultados-registrados);
 - `micboost-diag run --monitor --monitor-silent` por 60 s sem overload nem `input_missing`, com o pico no BlackHole ≤ −1 dBFS;
 - validação manual com o mantenedor: ouvir a própria voz nos fones sem eco perceptível (incluindo fone Bluetooth em taxa diferente da fonte, e um fone Bluetooth usado como microfone e saída ao mesmo tempo, sem laço de reconstruções), trocar a saída padrão com o monitor ligado e ligar e desligar o monitor sem interromper o áudio entregue aos apps.
+
+## 9 — Abrir ao iniciar sessão
+
+Entregas: [item de início](architecture.md#item-de-início) com `LoginItemService`, padrão aplicado uma vez numa cópia instalada, chave na seção Geral dos [ajustes](ui.md#janela-de-ajustes), strings en/pt-BR, README atualizado.
+
+Condições de conclusão:
+- `swift build` e `swift test` verdes, com testes do `LoginItemService` falso: padrão aplicado uma única vez só numa cópia em Aplicativos, nunca fora dela, flag gravada mesmo com falha, sem novo registro depois que o usuário desliga, os quatro estados refletidos na chave, falha de `register`/`unregister` sem mudar o estado mostrado;
+- validação manual com o mantenedor, na release instalada: o item aparece em Itens de Início após a primeira abertura, o app abre na barra de menus ao entrar no Mac, desligar a chave remove o item e a escolha persiste depois de reabrir.
 
 ## Decisões em aberto
 

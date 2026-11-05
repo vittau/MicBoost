@@ -122,8 +122,17 @@ stopped ──start──▶ starting ──ok──▶ running
 | `bufferFrames` | `256` | Opções 64/128/256/512/1024, limitadas pela faixa do dispositivo |
 | `previousDefaultInputUID` | `nil` | Entrada anterior ao MicBoost assumir a padrão |
 | `defaultInputManaged` | `false` | `true` enquanto a entrada padrão atual foi definida pelo MicBoost |
+| `loginItemDefaultApplied` | `false` | `true` depois que o padrão "Abrir ao iniciar sessão" foi aplicado uma vez ([Item de início](#item-de-início)) |
 
 Cada campo é decodificado isoladamente (`decodeIfPresent`), então um campo ausente mantém o padrão. Esquemas desconhecidos ou dados corrompidos caem nos padrões, sem crash. Valores fora das faixas documentadas (ganho, buffer, frequência/ganho/Q do EQ) são limitados, e seleções de canal inválidas são descartadas na leitura. Os campos de entrada padrão são gravados imediatamente, sem debounce, porque servem de recuperação após crash.
+
+## Item de início
+
+O registro como item de início usa `SMAppService.mainApp` (ServiceManagement, macOS 13+), atrás do protocolo `LoginItemService` (`status`, `register()`, `unregister()`, `openSystemSettings()`), com a implementação real em `MicBoostUI` e uma falsa nos testes. Nenhum teste nem agente registra o app real: o registro de uma cópia fora de Aplicativos colocaria um build de desenvolvimento no login do mantenedor.
+
+O padrão ligado é aplicado uma única vez: na abertura, se `loginItemDefaultApplied` é `false` e o app roda de `/Applications` ou `~/Applications` (caminho do bundle resolvido, sem seguir nomes de volume), o app chama `register()` quando o estado é `notRegistered` e grava `loginItemDefaultApplied = true`, mesmo que o registro falhe. Depois disso o app nunca registra sozinho de novo: se o usuário desligar a chave ou remover o item em Ajustes do Sistema, a escolha dele vale. Uma instalação existente que atualiza para esta versão recebe o padrão na primeira abertura. Fora de Aplicativos a flag não é gravada, para que a cópia instalada depois ainda receba o padrão.
+
+Ao ser aberto pelo login, o app se comporta como numa abertura normal: só o item na barra de menus, sem janela.
 
 ## Interface do app
 
