@@ -74,7 +74,7 @@ O `.github/actionlint.yaml` declara o rótulo `xcode-27`: o actionlint 1.7.12 é
 
 ## Homebrew (tap próprio)
 
-`packaging/homebrew/micboost.rb` é o modelo do cask, publicado como `Casks/micboost.rb` no tap. `version` e `sha256` ficam como marcadores (`X.Y.Z` e `SHA256`); `scripts/package-release.sh` imprime o arquivo com os dois valores da release, e esse é o texto a copiar para o tap:
+O tap é o repositório `vittau/homebrew-micboost`, com o cask em `Casks/micboost.rb` e um README curto de instalação. `packaging/homebrew/micboost.rb` é o modelo do cask; `version` e `sha256` ficam como marcadores (`X.Y.Z` e `SHA256`), e `scripts/package-release.sh` imprime o arquivo com os dois valores da release: esse é o texto a copiar para o tap a cada release.
 
 ```ruby
 cask "micboost" do
@@ -83,35 +83,47 @@ cask "micboost" do
 
   url "https://github.com/vittau/MicBoost/releases/download/v#{version}/MicBoost-#{version}.zip"
   name "MicBoost"
-  desc "Menu bar microphone booster and EQ that routes to BlackHole"
-  homepage "https://github.com/vittau/MicBoost"
+  desc "Menu bar microphone booster with EQ and peak limiter"
+  homepage "https://www.vitormach.dev/micboost/"
 
-  depends_on macos: ">= :sonoma"
+  livecheck do
+    url :url
+    strategy :github_latest
+  end
+
   depends_on cask: "blackhole-2ch"
+  depends_on macos: :sonoma
 
   app "MicBoost.app"
 
   uninstall quit: "io.github.vittau.MicBoost"
 
-  zap trash: [
-    "~/Library/Preferences/io.github.vittau.MicBoost.plist",
-  ]
+  zap trash: "~/Library/Preferences/io.github.vittau.MicBoost.plist"
 
   caveats <<~EOS
-    MicBoost is not notarized. On first launch macOS will block it:
-    open System Settings › Privacy & Security and click "Open Anyway".
-    BlackHole 2ch is installed as a dependency and is NOT removed when
-    MicBoost is uninstalled (other apps may use it).
+    MicBoost is not notarized. On first launch, and after each upgrade, macOS
+    blocks it: open System Settings > Privacy & Security and click "Open Anyway".
+
+    BlackHole 2ch is installed as a dependency and is not removed when MicBoost
+    is uninstalled (other apps may use it).
   EOS
 end
 ```
 
-Comportamento a validar (etapa 7):
+Comportamento do Homebrew 7 com este cask (verificado no Homebrew 7.0.12, macOS 27):
+- **Sem notarização:** a exigência de assinatura e notarização da auditoria vale só para o tap oficial `homebrew/cask`; num tap próprio, `brew audit --cask --strict --online` passa. O Homebrew aplica a quarentena ao download, e a primeira abertura segue o fluxo de [Primeira abertura](#primeira-abertura-sem-notarização).
+- **Confiança no tap:** o Homebrew 7 recusa carregar casks de taps de terceiros que o usuário não marcou como confiáveis. `brew install --cask vittau/micboost/micboost`, com o nome completo, marca o cask como confiável na própria instalação, e os `brew upgrade` seguintes funcionam. Um `brew tap vittau/micboost` seguido de `brew install micboost` exige antes `brew trust vittau/micboost`; por isso as instruções sempre usam o nome completo.
+- **Upgrade:** o Homebrew só leva a aprovação do Gatekeeper para a versão nova quando o requisito designado da assinatura não muda. Com assinatura ad hoc ele muda a cada build, então cada `brew upgrade` repete o "Abrir Mesmo Assim", como no download direto. O caveat avisa.
+- **Versão nova:** o `livecheck` usa a última release do GitHub; `brew livecheck --cask vittau/micboost/micboost` mostra se o tap está atrasado.
+
+Validação local registrada (sem instalar nada): `brew style`, `brew audit --cask --strict --online` (download e `sha256` conferidos), `brew livecheck`, `brew install --cask --dry-run` e `brew info` com o tap local da 0.2.3.
+
+Comportamento a validar com o mantenedor numa instalação real:
 - `brew install --cask vittau/micboost/micboost` em uma máquina sem BlackHole instala o `blackhole-2ch`, que pede a senha de administrador (pkg) e pode exigir reiniciar o `coreaudiod`, e depois o MicBoost, num único comando.
 - Com o BlackHole já instalado pelo Homebrew, nada é duplicado. Com o BlackHole instalado manualmente (pkg), o Homebrew tenta instalar o cask; validar se o pkg reinstala sobre o existente sem conflito e documentar o resultado aqui.
 - `brew upgrade` substitui o app. As configurações (UserDefaults) permanecem.
-- `brew uninstall micboost` remove só o app; o BlackHole permanece.
-- O Homebrew aplica quarentena ao app baixado, e o fluxo de primeira abertura é o mesmo do download direto. Não usar nem recomendar opções que removam a quarentena.
+- `brew uninstall --cask micboost` remove só o app; o BlackHole permanece.
+- Não usar nem recomendar opções que removam a quarentena.
 
 ## Primeira abertura (sem notarização)
 
