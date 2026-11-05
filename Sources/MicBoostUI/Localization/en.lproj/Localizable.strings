@@ -89,3 +89,10 @@
 "Monitor output rate" = "Monitor output rate";
 
 "Monitor resets" = "Monitor resets";
+
+"General" = "General";
+"Open at login" = "Open at login";
+"MicBoost opens in the menu bar when you log in to your Mac." = "MicBoost opens in the menu bar when you log in to your Mac.";
+"Approve in System Settings" = "Approve in System Settings";
+"Open Login Items" = "Open Login Items";
+"Available with MicBoost in Applications" = "Available with MicBoost in Applications";

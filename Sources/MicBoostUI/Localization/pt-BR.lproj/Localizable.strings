@@ -89,3 +89,10 @@
 "Monitor output rate" = "Taxa da saída do monitor";
 
 "Monitor resets" = "Reinícios da fila do monitor";
+
+"General" = "Geral";
+"Open at login" = "Abrir ao iniciar sessão";
+"MicBoost opens in the menu bar when you log in to your Mac." = "O MicBoost abre na barra de menus quando você entra no Mac.";
+"Approve in System Settings" = "Aprovar em Ajustes do Sistema";
+"Open Login Items" = "Abrir Itens de Início";
+"Available with MicBoost in Applications" = "Disponível com o MicBoost em Aplicativos";

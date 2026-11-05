@@ -12,6 +12,41 @@ import SwiftUI
     public init(model: AppModel) { self.model = model }
     public var body: some View {
         Form {
+            Section(localized("General")) {
+                Toggle(
+                    isOn: Binding(get: { model.loginItemOn }, set: { model.setLoginItemEnabled($0) })
+                ) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(localized("Open at login"))
+                        Text(localized("MicBoost opens in the menu bar when you log in to your Mac."))
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }.fixedSize(horizontal: false, vertical: true)
+                }
+                .toggleStyle(.switch)
+                .disabled(!model.loginItemAvailable)
+                if !model.loginItemAvailable {
+                    Text(localized("Available with MicBoost in Applications"))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if model.loginItemRequiresApproval {
+                    HStack {
+                        Text(localized("Approve in System Settings"))
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button(localized("Open Login Items")) { model.openLoginItemSettings() }
+                    }
+                }
+                if let error = model.loginItemError {
+                    Text(error)
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             Section(localized("Audio")) {
                 Toggle(isOn: $model.controls.manageDefaultInput) {
                     VStack(alignment: .leading, spacing: 4) {
