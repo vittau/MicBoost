@@ -29,8 +29,8 @@ Em 16, 44,1, 48 e 96 kHz:
 - Fila vazia → silêncio e `monitor_underruns`; produtor rápido demais → descarte e `monitor_overruns_full`; reinício ao se afastar do alvo em `monitor_resets`, separado dos descartes.
 - Fade-in e fade-out de 10 ms sem saltos acima do limite; o modo silencioso entrega zeros sem alterar ocupação nem timing.
 - Mistura para saída de um canal; a latência calculada a partir de host times sintéticos bate com o esperado.
-- Controlador do mínimo (função pura): drift de −0,3 %, −200 ppm, zero, +200 ppm e +0,3 %, com mínimos por tick combinados em 1 s, filtro e PI com anti-windup; correção limitada a ±0,5 % e slew de 50 ppm/tick.
-- Produtor de 256 frames a 48 kHz contra consumidor a 44,1 kHz: pulls fixos de 320 e irregulares de 1024/2048/1536/2048/1024, jitter de +1/−1/+0,5/−0,5/0 ms. Após 90 s, zero underruns, descartes cheios e resets, erro de correção < 750 ppm, sem saturação; comparar ocupação ao render com referência do controlador por nível instantâneo.
+- Controlador do mínimo (função pura): drift de −0,3 %, −200 ppm, zero, +200 ppm e +0,3 %, com mínimos por tick, banda morta derivada do quantum, horizonte derivado da taxa/pull/cadência e PI com anti-windup de amplitude e slew; sem parâmetros por modelo de dispositivo.
+- Produtor de 256 frames a 48 kHz contra consumidor a 44,1 kHz: pulls fixos de 320 e irregulares de 1024/2048/1536/2048/1024, jitter de +1/−1/+0,5/−0,5/0 ms. Após 180 s, zero underruns, descartes cheios e resets, erro de correção < 750 ppm, sem saturação; comparar ocupação ao render com referência do controlador por nível instantâneo.
 - Primeiro pull atrasado 300 ms: produtor bloqueado até a primeira chamada, prefill preservado, sem descartes cheios nem resets; contar separadamente faltas da partida (< 1 s), aquisição e regime.
 
 ### Fila e conversão do monitor (`MicBoostCoreTests`)
@@ -167,56 +167,69 @@ Preparação para todos os itens: app aberto com processamento ligado, microfone
 
 ### Controle do mínimo da fila e partida do monitor — 05/11/2026
 
-`swift build` aprovado em 1,17 s; `swift test`: 156 testes, UI 57 em 1,268 s,
-DSP 20 em 1,510 s e Core 79 em 4,080 s (6,858 s de execução somada, sem compilação).
+`swift build` aprovado em 1,15 s; `swift test`: 157 testes, UI 57 em 1,142 s,
+DSP 21 em 3,828 s e Core 79 em 4,094 s (9,064 s de execução somada, sem compilação).
 A issue conhecida é a rejeição intencional de escrita da saída padrão pela HAL falsa.
-`swift format lint --recursive Sources Tests` limpo em 1.591 s.
+`swift format lint --recursive Sources Tests` limpo.
 
-Simulação determinística offline de 180 s, sem dispositivo: produtor de 256 frames a
-48 kHz, consumidor a 44,1 kHz começando aos 300 ms e jitter de +1/−1/+0,5/−0,5/0 ms.
-Pulls fixos de 320 frames ou sequência 1024/2048/1536/2048/1024. Drift positivo significa
-clock consumidor mais lento que o produtor; a correção positiva consome mais frames.
-Compara a fila C real ao modelo de ocupação do controlador por nível instantâneo,
-com os mesmos clocks e jitter (P=1, I=1, alvo buffer+pull+1 ms e escrita antes do primeiro
-render). A média é a ocupação imediatamente antes do render, incluindo o bloco que será
-entregue, e não a ocupação amostrada pelo timer. Janela de regime conservadora: 90–180 s.
+Simulação determinística offline de 300 s, sem dispositivo: produtor de 256 frames a
+48 kHz; consumidor começa aos 300 ms, com jitter de +1/−1/+0,5/−0,5/0 ms. Quatro
+combinações: 44,1 kHz/pulls de 320; 44,1 kHz/pulls 1024/2048/1536/2048/1024;
+48 kHz/pulls de 512; 44,1 kHz/pulls de 1024. Drift positivo significa consumidor
+mais lento. Dados de aparelhos são apenas entradas de simulação, nunca parâmetros
+do app. Compara a fila C real com o modelo do controlador por nível instantâneo
+(P=1, I=1 e alvo buffer+pull+1 ms), com os mesmos clocks e jitter. Média imediatamente
+antes do render, incluindo o bloco a entregar; regime conservador entre 180–300 s.
 
-M=96 frames (2 ms), janela de mínimo de 1 s, filtro τ=1 s, P=0,5, I=0,125,
-tempo integral 4 s e slew máximo 50 ppm/tick. A margem adicional de 1 ms cobre o maior
-jitter do ensaio; a janela de 1 s evita reagir à fase entre blocos e ticks. Esses ganhos
-mantêm o caso de campo suave e adquirem o drift extremo mais rápido que ganhos menores,
-sem aceitar como meta uma ocupação média inflada pelo tamanho dos blocos.
+A configuração é a fórmula de [audio-engine.md](audio-engine.md#fila-e-conversão-tempo-real):
+M=⌈B/2+Q/4⌉ e banda morta Q/8. Os tempos e ganhos escalam com T=max(20Δ,4Q/taxa).
+Nestas combinações T=1 s; P=0,25 e I=0,025, com anti-windup também no slew, e
+passo limitado a 50 ppm/tick. Teste de geometria cobre também taxas de 44,1 e 96 kHz
+e buffers de 128 e 512; teste puro verifica que callbacks longos ampliam T e reduzem
+a variação da correção, sem perfis por hardware.
 
-| Pull de saída | Drift (ppm) | Média anterior frames / ms | Média atual frames / ms | Correção min…max (ppm) | Maior passo (ppm/tick) | Faltas na aquisição |
+| Saída kHz / pull | Drift ppm | Média anterior frames / ms | Média atual frames / ms | Correção min…max ppm | Passo máximo ppm/tick | Faltas na aquisição |
 |---|---:|---:|---:|---:|---:|---:|
-| 320 | -3000 | 843.28 / 17.57 | 583.70 / 12.16 | -3015.3…-2982.2 | 1.78 | 55 |
-| 320 | -200 | 845.07 / 17.61 | 583.18 / 12.15 | -242.5…-160.8 | 6.48 | 0 |
-| 320 | 0 | 844.06 / 17.58 | 585.17 / 12.19 | -17.3…17.3 | 2.70 | 0 |
-| 320 | 200 | 844.73 / 17.60 | 584.65 / 12.18 | 173.4…231.5 | 2.38 | 0 |
-| 320 | 3000 | 844.93 / 17.60 | 585.75 / 12.20 | 2985.7…3018.7 | 1.85 | 0 |
-| irregular | -3000 | 3006.79 / 62.64 | 2413.34 / 50.28 | -3291.9…-2878.8 | 30.17 | 20 |
-| irregular | -200 | 3340.40 / 69.59 | 2420.26 / 50.42 | -395.7…-6.3 | 16.04 | 2 |
-| irregular | 0 | 3361.32 / 70.03 | 2419.61 / 50.41 | -176.3…214.7 | 19.71 | 2 |
-| irregular | 200 | 3387.47 / 70.57 | 2417.34 / 50.36 | -136.7…545.6 | 30.82 | 2 |
-| irregular | 3000 | 3615.94 / 75.33 | 2417.33 / 50.36 | 2698.5…3592.4 | 32.92 | 2 |
+| 44,1 / 320 | -3000 | 843.16 / 17.57 | 697.36 / 14.53 | -3004.1…-3004.1 | 0.00 | 134 |
+| 44,1 / 320 | -200 | 844.95 / 17.60 | 709.57 / 14.78 | -205.0…-205.0 | 0.00 | 0 |
+| 44,1 / 320 | 0 | 846.57 / 17.64 | 674.92 / 14.06 | -1.6…-1.6 | 0.00 | 0 |
+| 44,1 / 320 | 200 | 845.43 / 17.61 | 710.12 / 14.79 | 203.6…203.6 | 0.00 | 0 |
+| 44,1 / 320 | 3000 | 845.43 / 17.61 | 676.38 / 14.09 | 2998.0…2998.0 | 0.00 | 0 |
+| 44,1 / irregular | -3000 | 3007.27 / 62.65 | 3080.02 / 64.17 | -3035.5…-3035.5 | 0.00 | 12 |
+| 44,1 / irregular | -200 | 3338.00 / 69.54 | 3075.34 / 64.07 | -177.0…-177.0 | 0.00 | 2 |
+| 44,1 / irregular | 0 | 3366.35 / 70.13 | 3051.58 / 63.57 | 24.9…24.9 | 0.00 | 2 |
+| 44,1 / irregular | 200 | 3386.45 / 70.55 | 3044.54 / 63.43 | 224.7…224.7 | 0.00 | 2 |
+| 44,1 / irregular | 3000 | 3614.07 / 75.29 | 2773.39 / 57.78 | 2948.2…3066.4 | 3.30 | 2 |
+| 48 / 512 | -3000 | 1089.08 / 22.69 | 850.49 / 17.72 | -3010.3…-3002.3 | 0.50 | 15 |
+| 48 / 512 | -200 | 1096.65 / 22.85 | 815.96 / 17.00 | -594.6…82.7 | 32.79 | 0 |
+| 48 / 512 | 0 | 1170.88 / 24.39 | 705.00 / 14.69 | -0.0…-0.0 | 0.00 | 0 |
+| 48 / 512 | 200 | 1096.40 / 22.84 | 787.24 / 16.40 | -66.4…508.3 | 32.36 | 0 |
+| 48 / 512 | 3000 | 1092.25 / 22.76 | 861.53 / 17.95 | 2994.8…3007.4 | 3.23 | 0 |
+| 44,1 / 1024 | -3000 | 1829.61 / 38.12 | 1657.47 / 34.53 | -3014.5…-3014.5 | 0.00 | 45 |
+| 44,1 / 1024 | -200 | 1997.48 / 41.61 | 1633.39 / 34.03 | -212.4…-212.4 | 0.00 | 0 |
+| 44,1 / 1024 | 0 | 1997.72 / 41.62 | 1692.09 / 35.25 | 3.1…3.1 | 0.00 | 0 |
+| 44,1 / 1024 | 200 | 1998.09 / 41.63 | 1710.25 / 35.63 | 208.6…208.6 | 0.00 | 0 |
+| 44,1 / 1024 | 3000 | 2109.08 / 43.94 | 1539.42 / 32.07 | 2956.6…3018.7 | 2.05 | 0 |
 
-Em todos os dez casos: zero descartes cheios e resets desde a partida e zero underruns
-no regime. Erro de correção < 750 ppm (máximo observado ≈592,4 ppm), sem ficar preso a
-±5000 ppm; maior passo no regime ≈32,92 ppm/tick, contra até 10000 ppm/tick da referência.
-No primeiro segundo houve zero faltas nos pulls de 320 e até quatro nos irregulares.
-A aquisição de −0,3% ainda tem 55 faltas no caso de 320 (última aos 10,65 s) e 20 no
-irregular (última aos 10,15 s); os outros irregulares têm só as duas faltas iniciais,
-até 0,45 s. É uma limitação medida da aquisição com margem curta, não estabilidade
-comprovada desde o primeiro bloco. O teste isolado de atraso de 300 ms confirma prefill
-703 preservado, primeira leitura de 351 frames sem falta e zero descarte/reset.
+Nos 20 casos: zero descartes cheios e resets desde a partida, zero underruns no regime,
+erro de correção <750 ppm e sem saturação; passo de correção ≤50 ppm/tick. No primeiro
+segundo, zero faltas em pulls fixos e até quatro nos irregulares. As faltas da coluna
+incluem toda a aquisição; não representam regime sem interrupções desde o primeiro
+bloco. A aquisição de drift extremo negativo ainda causa faltas transitórias. O teste
+isolado de atraso de 300 ms preserva 823 frames de prefill (B=256, pull inicial=351,
+M=216), com primeira leitura de 351 sem falta nem descarte/reset; callback vazio não
+libera o produtor.
 
-No caso semelhante ao de campo, a média cai cerca de 259–262 frames (5,40–5,46 ms),
-abaixo dos ~300 esperados: permanecem 96 frames de segurança e a margem de fase da
-janela mínima de 1 s. Retirar outros ~40 frames reduz essa proteção; a simulação não
-justifica prometer esse corte adicional. Aplicando apenas essa redução ao relatório
-de campo, o componente host de 30,83 ms ficaria em cerca de 25,4 ms e a latência
-adicionada de 32,2 ms em cerca de 26,8 ms. É uma extrapolação, não medição nem aprovação
-da meta <20 ms. Pulls grandes mantêm latência maior, mesmo com o PI sem saturação.
+A proteção contra quantização introduz uma faixa, não uma ocupação pontual. Por isso
+a redução de fila não é universal: no irregular com −3000 ppm há aumento de cerca de
+73 frames em relação ao controlador de referência saturado, embora o controle atual
+não sature nem perca áudio em regime. Isso é custo de margem e estabilidade, não uma
+melhoria de latência em todos os cenários. No caso de 320 frames sem drift, a média cai
+846,57→674,92 frames (−171,65 frames, −3,58 ms): menos que os ~300 frames sugeridos,
+pois a margem deriva agora de ambos os blocos e preserva uma banda contra quantização.
+Aplicar apenas esse delta ao relatório de campo daria componente host ≈27,25 ms e
+latência adicionada ≈28,62 ms. É extrapolação, não medição nem aprovação da meta <20 ms.
+Nenhum monitor em hardware, captura Bluetooth/Continuity ou som foi executado.
 
 ### Buffer IO por processo — 05/11/2026
 
