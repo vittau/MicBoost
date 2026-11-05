@@ -114,6 +114,26 @@ import os
     /// Bundle whose location decides whether the login item can be registered.
     @ObservationIgnored private let loginItemBundleURL: URL
     private static let loginLogger = Logger(subsystem: "io.github.vittau.MicBoost", category: "loginItem")
+    /// Version installed, compared with the release tag (docs/architecture.md "Verificação de atualizações").
+    public let appVersion: String
+    /// Releases, replaced by a fake in tests and in the screenshot renderer.
+    @ObservationIgnored public let updateFeed: any ReleaseFeed
+    /// Clock and waits of the update schedule, replaced in tests.
+    @ObservationIgnored public let updateScheduler: any UpdateScheduler
+    /// Opens links, replaced in tests to check the URL without the browser.
+    @ObservationIgnored public var openURL: @MainActor (URL) -> Void = { NSWorkspace.shared.open($0) }
+    /// What the settings status line and the panel item show.
+    public var updateStatus: UpdateStatus = .idle
+    /// A newer release known by the check, if any.
+    public var availableUpdate: AvailableUpdate? {
+        guard case .available(let update) = updateStatus else { return nil }
+        return update
+    }
+    public var isCheckingUpdate: Bool { updateTask != nil || updateInFlight }
+    private static let updateLogger = Logger(subsystem: "io.github.vittau.MicBoost", category: "updates")
+    private var updateScheduleTask: Task<Void, Never>?
+    private var updateTask: Task<Void, Never>?
+    private var updateInFlight = false
     private let statusGrace: Duration
     private var meterTask: Task<Void, Never>?
     private var monitor: Task<Void, Never>?
@@ -127,12 +147,18 @@ import os
         store: SettingsStore = SettingsStore(storage: UserDefaultsStorage()),
         statusGrace: Duration = AppModel.absenceGrace,
         loginItem: any LoginItemService = SystemLoginItemService(),
-        loginItemBundleURL: URL = Bundle.main.bundleURL
+        loginItemBundleURL: URL = Bundle.main.bundleURL,
+        appVersion: String = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0",
+        updateFeed: (any ReleaseFeed)? = nil,
+        updateScheduler: any UpdateScheduler = SystemUpdateScheduler()
     ) {
         self.store = store
         self.statusGrace = statusGrace
         self.loginItem = loginItem
         self.loginItemBundleURL = loginItemBundleURL
+        self.appVersion = appVersion
+        self.updateFeed = updateFeed ?? GitHubReleaseFeed(appVersion: appVersion)
+        self.updateScheduler = updateScheduler
         engine = EngineController(settings: store)
     }
     public static func gainLabel(_ db: Double, locale: Locale = AppModel.formatLocale) -> String {
@@ -355,6 +381,7 @@ import os
     public func launch() async {
         controls = await store.current
         await applyLoginItemDefaultIfNeeded()
+        startUpdateSchedule()
         await refresh()
         if authorization() == .notDetermined {
             _ = await AVCaptureDevice.requestAccess(for: .audio)
@@ -453,6 +480,105 @@ import os
         let userApplications = homeDirectory.appendingPathComponent("Applications", isDirectory: true)
             .resolvingSymlinksInPath().standardizedFileURL.path
         return parent == applications || parent == userApplications
+    }
+
+    // MARK: - Update check
+
+    /// Text of the settings status line (docs/ui.md "Janela de ajustes", "Sobre").
+    public var updateStatusText: String? {
+        switch updateStatus {
+        case .idle:
+            return nil
+        case .checking:
+            return localized("Checking…")
+        case .upToDate(let date):
+            let formatted = date.formatted(
+                Date.FormatStyle(date: .abbreviated, time: .shortened, locale: UILanguage.locale))
+            return String(format: localized("MicBoost is up to date. Last checked on %@."), formatted)
+        case .available(let update):
+            return String(format: localized("Version %@ available."), update.version)
+        case .failed:
+            return localized("Couldn't check for updates.")
+        }
+    }
+
+    public func setCheckForUpdates(_ enabled: Bool) {
+        controls.checkForUpdates = enabled
+        Task { await store.update { $0.checkForUpdates = enabled } }
+    }
+
+    /// "Check Now": checks even with the automatic check off and shows a failure
+    /// (docs/architecture.md "Verificação de atualizações").
+    public func checkNow() {
+        guard updateTask == nil, !updateInFlight else { return }
+        updateStatus = .checking
+        updateTask = Task { [weak self] in
+            guard let self else { return }
+            await self.performUpdateCheck(manual: true)
+            self.updateTask = nil
+        }
+    }
+
+    /// Awaits the check started by "Check Now"; the tests and the UI use it as a join point.
+    public func finishUpdateCheck() async { await updateTask?.value }
+
+    public func openUpdatePage() {
+        guard let update = availableUpdate else { return }
+        openURL(update.url)
+    }
+
+    /// One request at a time. An automatic failure keeps the state shown; a manual failure
+    /// replaces the status line.
+    @discardableResult
+    public func performUpdateCheck(manual: Bool) async -> Bool {
+        guard !updateInFlight else { return false }
+        updateInFlight = true
+        let previousStatus = updateStatus
+        updateStatus = .checking
+        defer { updateInFlight = false }
+        do {
+            let release = try await updateFeed.latestRelease()
+            let now = updateScheduler.now
+            controls.lastUpdateCheck = now
+            await store.update { $0.lastUpdateCheck = now }
+            if AppVersion.isNewer(tag: release.tag, than: appVersion),
+                let version = AppVersion.displayVersion(ofTag: release.tag)
+            {
+                updateStatus = .available(AvailableUpdate(version: version, url: release.pageURL))
+            } else {
+                updateStatus = .upToDate(now)
+            }
+            Self.updateLogger.info(
+                "Update check returned \(release.tag, privacy: .public) for \(self.appVersion, privacy: .public)")
+            return true
+        } catch {
+            Self.updateLogger.error(
+                "Update check failed: \(error.localizedDescription, privacy: .public)")
+            updateStatus = manual ? .failed : previousStatus
+            return false
+        }
+    }
+
+    /// 30 s after launch and then every 24 h, while the app runs, at most once a day
+    /// (docs/architecture.md "Verificação de atualizações").
+    func runUpdateSchedule() async {
+        guard await updateScheduler.sleep(for: .seconds(30)) else { return }
+        while !Task.isCancelled {
+            if controls.checkForUpdates, lastCheckIsOlderThanADay {
+                await performUpdateCheck(manual: false)
+            }
+            guard await updateScheduler.sleep(for: .seconds(86_400)) else { return }
+        }
+    }
+
+    func startUpdateSchedule() {
+        updateScheduleTask?.cancel()
+        updateScheduleTask = Task { [weak self] in await self?.runUpdateSchedule() }
+    }
+
+    private var lastCheckIsOlderThanADay: Bool {
+        guard let last = controls.lastUpdateCheck else { return true }
+        return updateScheduler.now.timeIntervalSince(last) >= 86_400
     }
 
     public func refresh() async {
@@ -632,6 +758,8 @@ import os
     public func shutdown() async throws {
         monitor?.cancel()
         meterTask?.cancel()
+        updateScheduleTask?.cancel()
+        updateTask?.cancel()
         await command?.value
         try await engine.stop()
         await store.flush()

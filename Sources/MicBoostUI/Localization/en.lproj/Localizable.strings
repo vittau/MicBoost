@@ -96,3 +96,12 @@
 "Approve in System Settings" = "Approve in System Settings";
 "Open Login Items" = "Open Login Items";
 "Available with MicBoost in Applications" = "Available with MicBoost in Applications";
+
+"Check for updates automatically" = "Check for updates automatically";
+"Check Now" = "Check Now";
+"Checking…" = "Checking…";
+"MicBoost is up to date. Last checked on %@." = "MicBoost is up to date. Last checked on %@.";
+"Version %@ available." = "Version %@ available.";
+"Couldn't check for updates." = "Couldn't check for updates.";
+"Download" = "Download";
+"New version available: %@…" = "New version available: %@…";
