@@ -52,6 +52,7 @@ Renderização offline da cadeia do sistema, sem dispositivo: `mb_monitor_render
 - Taxa de trabalho: seleção com 48 kHz disponível, só 16/24/32 kHz (picks 32 kHz quando o destino os oferece), só 88,2/96 kHz e sem taxa em comum; aplicação nas duas pontas; restauração no stop voluntário e na troca de fonte; nada restaurado após mudança externa, nem em erro do motor.
 - Mapa de canais: fontes com 1, 2 e 8 canais, streams intercalados e não intercalados, fonte com saídas próprias.
 - Settings: valores padrão, round-trip (incluindo todas as `ChannelSelection`), esquema desconhecido e dados corrompidos → padrões, campos ausentes mantendo o padrão, valores fora de faixa limitados, debounce de 300 ms coalescendo várias mudanças numa gravação e gravação imediata dos campos de entrada padrão.
+- Atualizações: comparação de `vX.Y.Z` com a versão instalada (maior, igual, menor, componentes com mais de um dígito) e tag inválida ignorada.
 
 ### `MicBoostUITests`
 
@@ -61,6 +62,7 @@ Renderização offline da cadeia do sistema, sem dispositivo: `mb_monitor_render
 - Linha de entrada do sistema: BlackHole como entrada padrão mostra "MicBoost" com marcação só com o motor rodando; divergência mostra o nome com "Usar MicBoost" habilitado quando o clique funciona; entrada desconhecida não mostra botão.
 - Catálogo de strings: toda chave passada a `localized(...)` ou `String(localized:)` em `MicBoostUI` e `MicBoostApp` existe nos dois `.strings`, os dois catálogos têm exatamente as mesmas chaves e cada tradução preserva os placeholders da chave.
 - Item de início, com o serviço falso e sem tocar no `SMAppService`: o padrão é aplicado uma única vez só de `/Applications` ou `~/Applications`, nunca fora delas (a chave não registra nada nesse caso), a flag `loginItemDefaultApplied` é gravada mesmo com falha de `register` e nenhum registro novo acontece depois que o usuário desliga; os quatro estados (`enabled`, `requiresApproval`, `notRegistered`, `notFound`) mapeiam a chave, falhas de `register`/`unregister` mantêm o estado real e mostram a mensagem, e ligar/desligar chama `register`/`unregister`.
+- Verificação de atualizações, com `ReleaseFeed` e relógio falsos e sem rede: agenda de 30 s e 24 h, consulta automática pulada com a chave desligada e quando a última resposta tem menos de 24 h, "Verificar agora" com a chave desligada, uma consulta por vez, falha automática silenciosa e falha manual na linha de estado, data da última resposta válida gravada, versão nova exposta nos ajustes e no item do painel, item presente só com versão nova e clique simulado abrindo `html_url` pelo abridor injetado.
 - Permissão reavaliada ao ativar o app: negada mantém a faixa, concedida limpa e tenta iniciar de novo.
 - Linha do monitor: o clique no switch (`mouseUp`) liga e desliga o monitor no `AppModel`; a linha de texto aparece e some com o switch e mostra cada `MonitorStatus`, inclusive o aviso de atraso acima de 50 ms; o switch fica desabilitado com o processamento desligado.
 - Formatação de ganho e escala dos medidores; o medidor ignora o mouse e o foco, e os valores de ganho e de frequência são texto somente leitura.

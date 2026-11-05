@@ -14,7 +14,7 @@ Status: `não iniciado` · `em andamento` · `concluído`. Uma etapa só é conc
 | 7 | Entrega | não iniciado |
 | 8 | Modo monitor | em andamento |
 | 9 | Abrir ao iniciar sessão | em andamento |
-| 10 | Aviso de nova versão | não iniciado |
+| 10 | Aviso de nova versão | em andamento |
 
 ## 0 — Estrutura e diagnóstico
 
@@ -129,6 +129,8 @@ Condições de conclusão:
 - validação manual com o mantenedor, na release instalada: o item aparece em Itens de Início após a primeira abertura, o app abre na barra de menus ao entrar no Mac, desligar a chave remove o item e a escolha persiste depois de reabrir.
 
 ## 10 — Aviso de nova versão
+
+Status: entregas implementadas; falta a validação manual na release instalada (segunda condição).
 
 Entregas: [verificação de atualizações](architecture.md#verificação-de-atualizações) com `ReleaseFeed`, item "Nova versão disponível" no [painel](ui.md#painel), chave, botão e linha de estado em Sobre nos [ajustes](ui.md#janela-de-ajustes), campos `checkForUpdates` e `lastUpdateCheck`, strings en/pt-BR, README atualizado.
 

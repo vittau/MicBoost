@@ -25,6 +25,7 @@ Microsoft Teams, FaceTime, Discord, QuickTime and more.
 - **Works with any app**, without setting anything up in each one.
 - **One switch to turn it off** and give your microphone back to the system.
 - **Recovers on its own** if you unplug the microphone or the Mac sleeps.
+- **Starts with your Mac** in the menu bar, if you want it to.
 - **Adds almost no delay**: about 15 milliseconds with a USB microphone, far below what anyone
   can notice in a call.
 
@@ -38,6 +39,9 @@ Microsoft Teams, FaceTime, Discord, QuickTime and more.
 </p>
 
 Hear your processed voice through your current speakers or headphones with **Hear My Voice**. It works with any output, including Bluetooth headphones that use a different audio rate. Switching monitoring on or off keeps audio flowing to your apps. Use headphones to avoid feedback; monitoring starts off each time you open MicBoost.
+
+When a newer MicBoost is available, the menu shows a link to its download page. MicBoost never
+downloads or installs updates by itself.
 
 ## What you need
 
@@ -81,7 +85,7 @@ quit MicBoost, your previous microphone comes back.
     <img src="docs/screenshots/settings-light.png" alt="MicBoost settings window with the Audio, Diagnostics and About sections" width="540">
   </picture>
   <br>
-  <sub>Settings, under "Settings…" in the menu. You rarely need it.</sub>
+  <sub>Settings, under "Settings…" in the menu. The defaults are fine for most people.</sub>
 </p>
 
 ## Good to know
@@ -94,10 +98,13 @@ quit MicBoost, your previous microphone comes back.
 - **The MacBook's built-in microphone is off when the lid is closed.**
 - **MicBoost can open when you log in.** When the app is in your Applications folder, it starts in
   the menu bar at login by default. Turn off **Open at login** in Settings → General if you prefer.
+- **MicBoost can tell you about new versions.** Once a day it asks GitHub for the latest release
+  and, if there is a newer one, shows a link in its menu. It only opens the release page in your
+  browser; it never downloads or installs anything. You can turn this off in Settings → About.
 
 ## Something's wrong?
 
-If **Hear My Voice** cannot use your output, open Settings → Diagnostics and use **Copy report**. It includes your microphone and output details, output-buffer requests and their results, queue statistics (including the observed control quantum) and timing components, and the last monitoring error to help investigate the problem.
+If **Hear My Voice** cannot use your output, open Settings → Diagnostics and click **Copy report**. Paste it when you ask for help; it describes your microphone and output without including your voice.
 
 **macOS says it can't open MicBoost.** See step 4 of [Install](#install).
 
