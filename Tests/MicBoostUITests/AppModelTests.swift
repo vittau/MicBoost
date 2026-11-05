@@ -413,6 +413,13 @@ import Testing
     #expect(model.report.contains("Start IO: OSStatus -123"))
 }
 
+@MainActor @Test func reportNamesAnOffMonitor() {
+    let model = AppModel()
+    model.apply(EngineStatus(state: .running))
+    #expect(model.monitorDescription.isEmpty)
+    #expect(model.report.contains("Monitor: off\n"))
+}
+
 @MainActor @Test func monitorPanelUsesTotalAndReportSeparatesAddedLatency() {
     let model = AppModel()
     let output = AudioDevice(id: 2, uid: "output", name: "Output")
