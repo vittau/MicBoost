@@ -584,10 +584,14 @@ public actor EngineController {
             monitorMetricsDate = Date()
         }
         guard stats.pulling else { return }
+        mb_monitor_pi_observe_clock(&monitorPI, &stats, source?.sampleRate ?? 48000, 0.05)
         monitorCorrection = mb_monitor_pi_update(
             &monitorPI, Double(stats.fill_min) - Double(stats.target), source?.sampleRate ?? 48000, 0.05,
             Double(stats.quantum))
-        do { try session.setCorrection(monitorCorrection) } catch {
+        do {
+            try session.setCorrection(monitorCorrection)
+            mb_monitor_set_correction(context, monitorCorrection)
+        } catch {
             recordMonitorFailure(error, operation: "Monitor drift control")
             try? stopMonitor()
             monitorStatus = .unavailable(reason: .startFailed, outputName: resolvedMonitorOutput?.name)

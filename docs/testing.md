@@ -31,7 +31,10 @@ Em 16, 44,1, 48 e 96 kHz:
 - Mistura para saída de um canal; a latência calculada a partir de host times sintéticos bate com o esperado.
 - Controlador do mínimo (função pura): drift de −0,3 %, −200 ppm, zero, +200 ppm e +0,3 %, com mínimos por tick, banda morta derivada do quantum, horizonte derivado da taxa/pull/cadência e PI com anti-windup de amplitude e slew; sem parâmetros por modelo de dispositivo.
 - Produtor de 256 frames a 48 kHz contra consumidor a 44,1 kHz: pulls fixos de 320 e irregulares de 1024/2048/1536/2048/1024, jitter de +1/−1/+0,5/−0,5/0 ms. Após 180 s, zero underruns, descartes cheios e resets, erro de correção < 750 ppm, sem saturação; comparar ocupação ao render com referência do controlador por nível instantâneo.
+- Aquisição por contadores e host times sintéticos: incluir −1500 ppm e comparar com o mesmo PI sem feed-forward; zero underruns após 2 s em todas as combinações, ocupação de regime no máximo 5% maior e slew de regime inalterado. Jitter muda o instante de invocação, não o timestamp de áudio programado da HAL.
 - Primeiro pull atrasado 300 ms: produtor bloqueado até a primeira chamada, prefill preservado, sem descartes cheios nem resets; contar separadamente faltas da partida (< 1 s), aquisição e regime.
+
+- Pedido de buffer pela AUHAL: valor limitado à faixa, saída distinta como único alvo, omissão por identidade ou folhas de agregado compartilhadas, rejeição não fatal e restauração verificada do valor anterior, incluindo efeito parcial e retry de falha.
 
 ### Fila e conversão do monitor (`MicBoostCoreTests`)
 
@@ -109,7 +112,7 @@ monitor silencioso: fila, resampler e timing idênticos, saída zerada. Não emi
 precisa de sinal na sala.
 
 1. O motor roda com o monitor ligado (ganho 0 dB, EQ desligado) pelo tempo pedido (padrão 10 s).
-2. A cada segundo, a ferramenta lê o atômico `monitor_latency_host` ([audio-engine.md](audio-engine.md#latência-do-monitor)) e imprime a latência adicionada em ms, a ocupação da fila, a correção de razão em ppm, `monitor_underruns` e `monitor_overruns`, e a latência total estimada com cada parcela física da HAL, componente host, latências de cada unidade, buffer IO lido (nenhuma requisição), maior pull e extremos de ocupação da última janela de 1 s.
+2. A cada segundo, a ferramenta lê o atômico `monitor_latency_host` ([audio-engine.md](audio-engine.md#latência-do-monitor)) e imprime a latência adicionada em ms, a ocupação da fila, a correção de razão em ppm, `monitor_underruns` e `monitor_overruns`, e a latência total estimada com cada parcela física da HAL, componente host, latências de cada unidade, buffer IO pedido (ou omissão por captura compartilhada/rejeição) e efetivo lido, maior pull e extremos de ocupação da última janela de 1 s.
 3. No fim, imprime mediana, mínimo e máximo da latência adicionada.
 
 Aceitação: mediana da **latência adicionada pelo MicBoost < 20 ms** no buffer 256 a 48 kHz,
@@ -167,68 +170,68 @@ Preparação para todos os itens: app aberto com processamento ligado, microfone
 
 ### Controle do mínimo da fila e partida do monitor — 05/11/2026
 
-`swift build` aprovado em 1,15 s; `swift test`: 157 testes, UI 57 em 1,142 s,
-DSP 21 em 3,828 s e Core 79 em 4,094 s (9,064 s de execução somada, sem compilação).
+`swift build` aprovado em 2,39 s; `swift test`: 165 testes, UI 57 em 1,198 s,
+DSP 22 em 9,637 s e Core 86 em 4,088 s (14,923 s de execução somada, sem compilação).
 A issue conhecida é a rejeição intencional de escrita da saída padrão pela HAL falsa.
-`swift format lint --recursive Sources Tests` limpo.
+`swift format lint --recursive Sources Tests` limpo em 0.663 s.
 
 Simulação determinística offline de 300 s, sem dispositivo: produtor de 256 frames a
 48 kHz; consumidor começa aos 300 ms, com jitter de +1/−1/+0,5/−0,5/0 ms. Quatro
 combinações: 44,1 kHz/pulls de 320; 44,1 kHz/pulls 1024/2048/1536/2048/1024;
 48 kHz/pulls de 512; 44,1 kHz/pulls de 1024. Drift positivo significa consumidor
-mais lento. Dados de aparelhos são apenas entradas de simulação, nunca parâmetros
-do app. Compara a fila C real com o modelo do controlador por nível instantâneo
-(P=1, I=1 e alvo buffer+pull+1 ms), com os mesmos clocks e jitter. Média imediatamente
-antes do render, incluindo o bloco a entregar; regime conservador entre 180–300 s.
+mais lento. Os 24 casos incluem −3000, −1500, −200, zero, +200 e +3000 ppm.
+Dados de aparelhos são só entradas dos testes. Os host times sintéticos representam
+os instantes de áudio programados: o jitter altera a invocação do callback, não o
+clock do áudio. A contagem do render retira a correção aplicada da Varispeed.
 
-A configuração é a fórmula de [audio-engine.md](audio-engine.md#fila-e-conversão-tempo-real):
-M=⌈B/2+Q/4⌉ e banda morta Q/8. Os tempos e ganhos escalam com T=max(20Δ,4Q/taxa).
-Nestas combinações T=1 s; P=0,25 e I=0,025, com anti-windup também no slew, e
-passo limitado a 50 ppm/tick. Teste de geometria cobre também taxas de 44,1 e 96 kHz
-e buffers de 128 e 512; teste puro verifica que callbacks longos ampliam T e reduzem
-a variação da correção, sem perfis por hardware.
+Compara a mesma fila C e PI com e sem aquisição por timestamps, sem pedido de buffer
+real. Média imediatamente antes do render, incluindo o bloco a entregar; regime
+conservador entre 180–300 s. Margem, banda morta e PI são as fórmulas de
+[audio-engine.md](audio-engine.md#fila-e-conversão-tempo-real). O estimador requer
+W=max(2Δ,4Q/taxa); offsets constantes entre fonte e saída cancelam. Testes puros cobrem
+entrada sem timestamps, razão fora do orçamento, slew de aquisição e retorno ao lento.
 
-| Saída kHz / pull | Drift ppm | Média anterior frames / ms | Média atual frames / ms | Correção min…max ppm | Passo máximo ppm/tick | Faltas na aquisição |
+| Saída kHz / pull | Drift ppm | Faltas aquisição sem→com estimativa | Faltas após 2 s | Média frames sem→com | Variação média | Passo máximo em regime ppm |
 |---|---:|---:|---:|---:|---:|---:|
-| 44,1 / 320 | -3000 | 843.16 / 17.57 | 697.36 / 14.53 | -3004.1…-3004.1 | 0.00 | 134 |
-| 44,1 / 320 | -200 | 844.95 / 17.60 | 709.57 / 14.78 | -205.0…-205.0 | 0.00 | 0 |
-| 44,1 / 320 | 0 | 846.57 / 17.64 | 674.92 / 14.06 | -1.6…-1.6 | 0.00 | 0 |
-| 44,1 / 320 | 200 | 845.43 / 17.61 | 710.12 / 14.79 | 203.6…203.6 | 0.00 | 0 |
-| 44,1 / 320 | 3000 | 845.43 / 17.61 | 676.38 / 14.09 | 2998.0…2998.0 | 0.00 | 0 |
-| 44,1 / irregular | -3000 | 3007.27 / 62.65 | 3080.02 / 64.17 | -3035.5…-3035.5 | 0.00 | 12 |
-| 44,1 / irregular | -200 | 3338.00 / 69.54 | 3075.34 / 64.07 | -177.0…-177.0 | 0.00 | 2 |
-| 44,1 / irregular | 0 | 3366.35 / 70.13 | 3051.58 / 63.57 | 24.9…24.9 | 0.00 | 2 |
-| 44,1 / irregular | 200 | 3386.45 / 70.55 | 3044.54 / 63.43 | 224.7…224.7 | 0.00 | 2 |
-| 44,1 / irregular | 3000 | 3614.07 / 75.29 | 2773.39 / 57.78 | 2948.2…3066.4 | 3.30 | 2 |
-| 48 / 512 | -3000 | 1089.08 / 22.69 | 850.49 / 17.72 | -3010.3…-3002.3 | 0.50 | 15 |
-| 48 / 512 | -200 | 1096.65 / 22.85 | 815.96 / 17.00 | -594.6…82.7 | 32.79 | 0 |
-| 48 / 512 | 0 | 1170.88 / 24.39 | 705.00 / 14.69 | -0.0…-0.0 | 0.00 | 0 |
-| 48 / 512 | 200 | 1096.40 / 22.84 | 787.24 / 16.40 | -66.4…508.3 | 32.36 | 0 |
-| 48 / 512 | 3000 | 1092.25 / 22.76 | 861.53 / 17.95 | 2994.8…3007.4 | 3.23 | 0 |
-| 44,1 / 1024 | -3000 | 1829.61 / 38.12 | 1657.47 / 34.53 | -3014.5…-3014.5 | 0.00 | 45 |
-| 44,1 / 1024 | -200 | 1997.48 / 41.61 | 1633.39 / 34.03 | -212.4…-212.4 | 0.00 | 0 |
-| 44,1 / 1024 | 0 | 1997.72 / 41.62 | 1692.09 / 35.25 | 3.1…3.1 | 0.00 | 0 |
-| 44,1 / 1024 | 200 | 1998.09 / 41.63 | 1710.25 / 35.63 | 208.6…208.6 | 0.00 | 0 |
-| 44,1 / 1024 | 3000 | 2109.08 / 43.94 | 1539.42 / 32.07 | 2956.6…3018.7 | 2.05 | 0 |
+| 44,1 / 320 | -3000 | 134→0 | 0 | 697.36→677.60 | -2.83% | 0.00 |
+| 44,1 / 320 | -1500 | 17→0 | 0 | 712.54→688.33 | -3.40% | 0.00 |
+| 44,1 / 320 | -200 | 0→0 | 0 | 709.57→706.70 | -0.40% | 0.00 |
+| 44,1 / 320 | 0 | 0→0 | 0 | 674.92→679.42 | +0.67% | 0.00 |
+| 44,1 / 320 | 200 | 0→0 | 0 | 710.12→681.20 | -4.07% | 0.00 |
+| 44,1 / 320 | 3000 | 0→0 | 0 | 676.38→684.95 | +1.27% | 0.00 |
+| 44,1 / irregular | -3000 | 12→3 | 0 | 3080.02→2988.14 | -2.98% | 0.00 |
+| 44,1 / irregular | -1500 | 5→3 | 0 | 3137.32→3011.86 | -4.00% | 0.00 |
+| 44,1 / irregular | -200 | 2→2 | 0 | 3075.34→3036.05 | -1.28% | 0.00 |
+| 44,1 / irregular | 0 | 2→2 | 0 | 3051.58→3052.16 | +0.02% | 0.00 |
+| 44,1 / irregular | 200 | 2→2 | 0 | 3044.54→3035.16 | -0.31% | 0.00 |
+| 44,1 / irregular | 3000 | 2→2 | 0 | 2773.39→2798.50 | +0.91% | 1.62 |
+| 48 / 512 | -3000 | 15→0 | 0 | 850.49→846.64 | -0.45% | 0.61 |
+| 48 / 512 | -1500 | 4→0 | 0 | 833.38→832.46 | -0.11% | 9.05 |
+| 48 / 512 | -200 | 0→0 | 0 | 815.96→815.96 | +0.00% | 32.79 |
+| 48 / 512 | 0 | 0→0 | 0 | 705.00→705.00 | -0.00% | 0.22 |
+| 48 / 512 | 200 | 0→0 | 0 | 787.24→787.24 | -0.00% | 32.36 |
+| 48 / 512 | 3000 | 0→0 | 0 | 861.53→850.93 | -1.23% | 0.83 |
+| 44,1 / 1024 | -3000 | 45→0 | 0 | 1657.47→1570.34 | -5.26% | 0.00 |
+| 44,1 / 1024 | -1500 | 0→0 | 0 | 1680.16→1559.06 | -7.21% | 0.00 |
+| 44,1 / 1024 | -200 | 0→0 | 0 | 1633.39→1573.49 | -3.67% | 0.00 |
+| 44,1 / 1024 | 0 | 0→0 | 0 | 1692.09→1584.27 | -6.37% | 0.00 |
+| 44,1 / 1024 | 200 | 0→0 | 0 | 1710.25→1572.48 | -8.06% | 0.00 |
+| 44,1 / 1024 | 3000 | 0→0 | 0 | 1539.42→1563.51 | +1.56% | 0.00 |
 
-Nos 20 casos: zero descartes cheios e resets desde a partida, zero underruns no regime,
-erro de correção <750 ppm e sem saturação; passo de correção ≤50 ppm/tick. No primeiro
-segundo, zero faltas em pulls fixos e até quatro nos irregulares. As faltas da coluna
-incluem toda a aquisição; não representam regime sem interrupções desde o primeiro
-bloco. A aquisição de drift extremo negativo ainda causa faltas transitórias. O teste
-isolado de atraso de 300 ms preserva 823 frames de prefill (B=256, pull inicial=351,
-M=216), com primeira leitura de 351 sem falta nem descarte/reset; callback vazio não
-libera o produtor.
+Nos 24 casos: zero faltas após 2 s, zero descartes cheios e resets em toda a execução,
+zero underruns no regime. A maior variação de média é 1.56% (limite +5%); o maior
+passo em regime é 32.79 ppm/tick (limite 50). O pior caso tem três faltas antes
+de 0.80 s nos pulls irregulares; pulls fixos não têm faltas com a aquisição.
+A medição não demonstra aquisição instantânea nem garante o comportamento dos
+timestamps de um driver físico. Sem timestamps válidos o PI mantém o caminho normal.
 
-A proteção contra quantização introduz uma faixa, não uma ocupação pontual. Por isso
-a redução de fila não é universal: no irregular com −3000 ppm há aumento de cerca de
-73 frames em relação ao controlador de referência saturado, embora o controle atual
-não sature nem perca áudio em regime. Isso é custo de margem e estabilidade, não uma
-melhoria de latência em todos os cenários. No caso de 320 frames sem drift, a média cai
-846,57→674,92 frames (−171,65 frames, −3,58 ms): menos que os ~300 frames sugeridos,
-pois a margem deriva agora de ambos os blocos e preserva uma banda contra quantização.
-Aplicar apenas esse delta ao relatório de campo daria componente host ≈27,25 ms e
-latência adicionada ≈28,62 ms. É extrapolação, não medição nem aprovação da meta <20 ms.
+A HAL falsa e sessões falsas verificam pedido restrito à saída, duração limitada à faixa,
+omissão por identidade/folhas recursivas compartilhadas e rejeição não fatal reportada.
+O lease é exercitado com escrita parcial, rejeição sem efeito, restauração idempotente,
+falha de restauração e escrita ignorada seguida de retry. Não se presume que dispose
+sozinho restaure o buffer por processo; o código restaura e lê de volta antes dele.
+O valor efetivo de uma AUHAL Bluetooth, seu mínimo e a restituição real precisam ser
+verificados com o mantenedor. A meta <20 ms continua pendente em hardware.
 Nenhum monitor em hardware, captura Bluetooth/Continuity ou som foi executado.
 
 ### Buffer IO por processo — 05/11/2026
