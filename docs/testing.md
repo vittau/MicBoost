@@ -237,6 +237,23 @@ O valor efetivo de uma AUHAL Bluetooth, seu mínimo e a restituição real preci
 verificados com o mantenedor. A meta <20 ms continua pendente em hardware.
 Nenhum monitor em hardware, captura Bluetooth/Continuity ou som foi executado.
 
+### Monitor em campo, 0.2.3 — 05/11/2026
+
+Mesmo Mac, fonte e saída dos registros anteriores (fifine USB a 48 kHz → OpenMove by Shokz em Bluetooth a 44,1 kHz), motor a 48 kHz, buffer 256, monitor ligado durante a coleta:
+
+| Medida | Valor |
+|---|---|
+| Latência adicionada | 25,2 ms = host 23,80 + Varispeed 1,0 + AUHAL 0,35 (meta < 20 ms: **reprovada** no buffer 256) |
+| Latência total estimada | ≈ 259 ms ("atraso alto"; dominada pelo Bluetooth) |
+| Buffer IO da saída pedido / efetivo | 235 / 256 frames (o dispositivo arredondou para cima) |
+| Quantum / maior pull da janela / alvo (margem) | 280 / 279 / 198 frames |
+| Ocupação atual / mín.–máx. da janela de 1 s | 325 / 164–697 frames |
+| Correção da Varispeed | −0,23 ppm |
+| `monitor_underruns` / `monitor_overruns_full` / `monitor_resets` | 0 / 0 / 0 |
+| Overloads / `input_missing` / `nonfinite_resets` | 0 / 0 / 0 |
+
+Leitura: o componente host decompõe-se em ciclo do motor (5,3 ms), ocupação média da fila (≈ 430 frames, 9,0 ms: metade da oscilação de 256 + 279 frames mais a margem), buffer da saída (256 frames a 44,1 kHz, 5,8 ms) e ≈ 3,7 ms de adiantamento do HAL. Com buffer 256, só a oscilação mínima da fila (≈ 5,6 ms), o ciclo do motor e o buffer da saída somam cerca de 17 ms antes da margem e do adiantamento, então < 20 ms no buffer 256 não é alcançável com uma saída de relógio próprio; o buffer 128 reduz o ciclo do motor, a oscilação e a margem.
+
 ### Buffer IO por processo — 05/11/2026
 
 Mac de referência, macOS 27.2, sem som: dois processos de teste (`.scratch/bufprobe`, não versionado) com IOProc próprio no BlackHole 2ch como saída, cada um escrevendo silêncio. O processo B iniciou sem alterar nada; 2 s depois o processo A escreveu `kAudioDevicePropertyBufferFrameSize` = 128 e rodou 4 s.

@@ -108,7 +108,7 @@ Condições de conclusão:
 
 ## 8 — Modo monitor
 
-Status: caminho próprio com conversão do sistema implementado e funcionando em campo (fifine 48 kHz → Shokz Bluetooth 44,1 kHz, release 0.2.1). Pendentes: latência adicionada medida acima da meta (32,2 ms na 0.2.2), correção do PI saturada pela oscilação da fila e descartes na partida da saída Bluetooth ([testing.md](testing.md#monitor-em-campo-022--05112026)), fone com fio, microfone Bluetooth como fonte e saída, e o ensaio de 60 s. Ensaios destinados aos alto-falantes do Mac, mesmo silenciosos, exigem a presença e o pedido explícito do mantenedor.
+Status: caminho próprio com conversão do sistema implementado e funcionando em campo (fifine 48 kHz → Shokz Bluetooth 44,1 kHz, release 0.2.1). Pendentes: latência adicionada medida acima da meta (25,2 ms na 0.2.3, buffer 256, sem faltas nem descartes; [testing.md](testing.md#monitor-em-campo-023--05112026)), fone com fio, microfone Bluetooth como fonte e saída, e o ensaio de 60 s. Ensaios destinados aos alto-falantes do Mac, mesmo silenciosos, exigem a presença e o pedido explícito do mantenedor.
 
 Entregas: [modo monitor](audio-engine.md#modo-monitor) em caminho próprio (fila SPSC, Varispeed e AUHAL do sistema na saída padrão), `MonitorStatus`, linha do monitor no painel e no diagnóstico ([ui.md](ui.md#painel)), testes com a HAL falsa e de UI, `micboost-diag monitor-latency` e README atualizado.
 
