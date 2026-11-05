@@ -2,13 +2,25 @@ import AudioToolbox
 import CoreAudio
 import Foundation
 import MicBoostDSP
+import os
 
 public protocol MonitorSession: AnyObject {
     var latencySeconds: Double { get }
     var outputBufferFrames: UInt32 { get }
+    var outputBufferReadFromAUHAL: Bool { get }
+    var varispeedLatencySeconds: Double { get }
+    var auhalLatencySeconds: Double { get }
+    func refreshMetrics()
     func start() throws
     func setCorrection(_ correction: Double) throws
     func stop() throws
+}
+
+extension MonitorSession {
+    public func refreshMetrics() {}
+    public var outputBufferReadFromAUHAL: Bool { false }
+    public var varispeedLatencySeconds: Double { 0 }
+    public var auhalLatencySeconds: Double { latencySeconds }
 }
 
 /// Owns units on the engine queue; all callbacks and sample access stay in C.
@@ -16,8 +28,12 @@ final class MonitorAudioUnits: MonitorSession {
     private var output: AudioUnit?
     private var speed: AudioUnit?
     private var started = false
-    let outputBufferFrames: UInt32
+    private var hasDevice = false
+    private(set) var outputBufferReadFromAUHAL = false
+    private(set) var outputBufferFrames: UInt32
     private(set) var latencySeconds = 0.0
+    private(set) var varispeedLatencySeconds = 0.0
+    private(set) var auhalLatencySeconds = 0.0
 
     init(
         context: OpaquePointer, rate: Double, channels: UInt32, device: AudioObjectID?,
@@ -30,6 +46,7 @@ final class MonitorAudioUnits: MonitorSession {
                 device == nil ? kAudioUnitType_FormatConverter : kAudioUnitType_Output,
                 device == nil ? kAudioUnitSubType_AUConverter : kAudioUnitSubType_HALOutput)
             guard let output, let speed else { throw EngineError.formatUnsupported }
+            hasDevice = device != nil
             if let device {
                 try Self.property(output, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, UInt32(0))
                 try Self.property(output, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, 0, UInt32(1))
@@ -65,6 +82,7 @@ final class MonitorAudioUnits: MonitorSession {
             try Self.property(output, kAudioUnitProperty_MakeConnection, kAudioUnitScope_Input, 0, connection)
             try checkHAL(AudioUnitInitialize(speed), "Initialize monitor Varispeed")
             try checkHAL(AudioUnitInitialize(output), "Initialize monitor output")
+            refreshMetrics()
             for unit in [speed, output] {
                 var latency: Float64 = 0
                 var size = UInt32(MemoryLayout<Float64>.size)
@@ -72,6 +90,7 @@ final class MonitorAudioUnits: MonitorSession {
                     AudioUnitGetProperty(
                         unit, kAudioUnitProperty_Latency, kAudioUnitScope_Global,
                         0, &latency, &size), "Monitor unit latency")
+                if unit == speed { varispeedLatencySeconds = latency } else { auhalLatencySeconds = latency }
                 latencySeconds += latency
             }
 
@@ -105,6 +124,25 @@ final class MonitorAudioUnits: MonitorSession {
         try checkHAL(
             AudioUnitSetProperty(unit, id, scope, element, &value, UInt32(MemoryLayout<T>.size)),
             "Monitor unit property \(id)")
+    }
+    func refreshMetrics() {
+        guard hasDevice, let output else { return }
+        var frames: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        do {
+            try checkHAL(
+                AudioUnitGetProperty(
+                    output, AudioUnitPropertyID(kAudioDevicePropertyBufferFrameSize),
+                    kAudioUnitScope_Output, 0, &frames, &size), "Read AUHAL IO buffer")
+            guard frames > 0 else { throw EngineError.formatUnsupported }
+            outputBufferFrames = frames
+            outputBufferReadFromAUHAL = true
+        } catch {
+            // A diagnostic query must not silence a working output; retain the last read value.
+            Logger(subsystem: "io.github.vittau.MicBoost", category: "engine").warning(
+                "AUHAL buffer read failed; retaining device/previous value: \(String(describing: error), privacy: .public)"
+            )
+        }
     }
     func start() throws {
         guard let output else { throw EngineError.formatUnsupported }

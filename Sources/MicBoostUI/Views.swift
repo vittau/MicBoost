@@ -105,7 +105,8 @@ import SwiftUI
                     value: model.monitorDescription.isEmpty ? localized("Off") : model.monitorDescription)
                 LabeledContent(localized("Monitor added latency"), value: model.monitorAddedLatency)
                 LabeledContent(localized("Monitor underruns"), value: "\(model.status?.monitorStats.underruns ?? 0)")
-                LabeledContent(localized("Monitor overruns"), value: "\(model.status?.monitorStats.overruns ?? 0)")
+                LabeledContent(localized("Monitor overruns"), value: "\(model.status?.monitorStats.overruns_full ?? 0)")
+                LabeledContent(localized("Monitor resets"), value: "\(model.status?.monitorStats.resets ?? 0)")
                 LabeledContent(
                     localized("Monitor output rate"),
                     value: model.status?.monitorOutput.map { "\($0.sampleRate.formatted(.number.locale(locale))) Hz" }

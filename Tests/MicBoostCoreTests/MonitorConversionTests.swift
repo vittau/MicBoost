@@ -91,6 +91,7 @@ func systemMonitorConversionOffline(_ correction: Double) throws {
         var stats = mb_monitor_stats()
         mb_monitor_read(context, &stats)
         #expect(stats.underruns == 0)
-        #expect(stats.overruns == 0)
+        #expect(stats.overruns_full == 0)
+        #expect(stats.resets == 0)
     }
 }

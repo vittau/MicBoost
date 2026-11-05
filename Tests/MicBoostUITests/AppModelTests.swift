@@ -419,10 +419,23 @@ import Testing
     var status = EngineStatus(state: .running)
     status.monitor = .active(output: output, addedLatencyMs: 12, totalLatencyMs: 80)
     status.monitorStats.underruns = 2
-    status.monitorStats.overruns = 3
+    status.monitorStats.overruns_full = 3
+    status.monitorStats.resets = 4
+    status.monitorStats.max_pull = 2048
+    status.monitorOutputBufferFrames = 512
+    status.monitorHostLatencyMs = 30
+    status.monitorVarispeedLatencyMs = 1
+    status.monitorAUHALLatencyMs = 2
     model.apply(status)
     #expect(model.monitorDescription.contains("80 ms"))
     #expect(model.monitorAddedLatency.contains("12"))
     #expect(model.report.contains("monitor_underruns: 2"))
-    #expect(model.report.contains("monitor_overruns: 3"))
+    #expect(model.report.contains("monitor_overruns_full: 3"))
+    #expect(model.report.contains("monitor_resets: 4"))
+    #expect(model.report.contains("monitor_max_pull: 2048"))
+    #expect(model.report.contains("monitor_output_buffer_requested: none (read-only)"))
+    #expect(model.report.contains("monitor_output_buffer_actual: 512"))
+    #expect(model.report.contains("monitor_host_ms: 30"))
+    #expect(model.report.contains("monitor_varispeed_ms: 1"))
+    #expect(model.report.contains("monitor_auhal_ms: 2"))
 }
