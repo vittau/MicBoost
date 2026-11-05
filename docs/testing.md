@@ -26,7 +26,7 @@ Em 16, 44,1, 48 e 96 kHz:
 
 ### Fila do monitor (`MicBoostDSPTests`)
 
-- Fila vazia → silêncio e `monitor_underruns`; produtor rápido demais → descarte e `monitor_overruns`; reinício ao se afastar do alvo.
+- Fila vazia → silêncio e `monitor_underruns`; produtor rápido demais → descarte e `monitor_overruns_full`; reinício ao se afastar do alvo em `monitor_resets`, separado dos descartes.
 - Fade-in e fade-out de 10 ms sem saltos acima do limite; o modo silencioso entrega zeros sem alterar ocupação nem timing.
 - Mistura para saída de um canal; a latência calculada a partir de host times sintéticos bate com o esperado.
 - Controlador de ocupação (função pura): com drift simulado de ±200 ppm e ±0,3 % entre produtor e consumidor, a ocupação converge ao alvo e fica limitada, com a correção dentro de ±0,5 %.
@@ -107,7 +107,7 @@ monitor silencioso: fila, resampler e timing idênticos, saída zerada. Não emi
 precisa de sinal na sala.
 
 1. O motor roda com o monitor ligado (ganho 0 dB, EQ desligado) pelo tempo pedido (padrão 10 s).
-2. A cada segundo, a ferramenta lê o atômico `monitor_latency_host` ([audio-engine.md](audio-engine.md#latência-do-monitor)) e imprime a latência adicionada em ms, a ocupação da fila, a correção de razão em ppm, `monitor_underruns` e `monitor_overruns`, e a latência total estimada com cada parcela física da HAL.
+2. A cada segundo, a ferramenta lê o atômico `monitor_latency_host` ([audio-engine.md](audio-engine.md#latência-do-monitor)) e imprime a latência adicionada em ms, a ocupação da fila, a correção de razão em ppm, `monitor_underruns` e `monitor_overruns`, e a latência total estimada com cada parcela física da HAL, componente host, latências de cada unidade, buffer IO lido (nenhuma requisição), maior pull e extremos de ocupação da última janela de 1 s.
 3. No fim, imprime mediana, mínimo e máximo da latência adicionada.
 
 Aceitação: mediana da **latência adicionada pelo MicBoost < 20 ms** no buffer 256 a 48 kHz,
@@ -162,6 +162,38 @@ Preparação para todos os itens: app aberto com processamento ligado, microfone
 | 8 | Sair do app (Sair do MicBoost) | — | a entrada anterior é restaurada e as taxas que o MicBoost mudou voltam às originais |
 
 ## Resultados registrados
+
+### Pulls irregulares e contadores do monitor — 05/11/2026
+
+`swift build` aprovado; `swift test`: 152 testes, UI 55 em 1,140 s, DSP 18 em 0,242 s
+e Core 79 em 4,063 s (5,445 s de execução somada). A issue conhecida é a rejeição
+intencional de escrita da saída padrão pela HAL falsa.
+`swift format lint --recursive Sources Tests` sem ocorrências.
+
+Simulação offline: produtor de 256 frames a 48 kHz e consumidor a 44,1 kHz em blocos
+1024/2048/1536/2048/1024, jitter de +1/−1/+0,5/−0,5/0 ms e PI a 20 Hz por 60 s.
+O alvo começa em 1419 frames (buffer de saída inicial de 1024 a 44,1 kHz) e se adapta
+a 2545 frames, para pull máximo observado de 2241 frames já na taxa do motor.
+
+| Drift | Fill mínimo após 1 s | Máximo | Descartes cheios após 1 s | Resets após 1 s | Underruns após 1 s |
+|---|---:|---:|---:|---:|---:|
+| −0,3% | 394 | 3863 | 0 | 0 | 0 |
+| −200 ppm | 141 | 3659 | 0 | 0 | 0 |
+| +200 ppm | 141 | 3599 | 0 | 0 | 0 |
+| +0,3% | 16 | 3171 | 0 | 0 | 0 |
+
+Houve dois underruns na partida de cada cenário, antes de 1 s; correção sempre dentro
+de ±0,5%. Testes separados distinguem descarte cheio e reset, verificam que a leitura
+zera o pico de pull e os extremos por janela, e que a fórmula não soma buffer à medição
+host programada. Isso não comprova latência < 20 ms em hardware.
+
+No relatório de campo com saída de 44,1 kHz, a correção puramente aritmética do valor
+adicionado antigo é `54,2 − 1000 × B / 44100 ms`, com B igual ao buffer usado na soma
+antiga. Exemplos condicionais: B=512 → 42,59 ms; B=1024 → 30,98 ms. O relatório antigo
+não traz B, por isso não permite um número corrigido único nem inferir B pelo fill de
+786 frames. É necessário repetir a coleta no Mac do mantenedor com os novos campos;
+a adaptação da fila pode alterar também o componente host, além da correção da fórmula.
+Nenhum comando de monitor ou captura Bluetooth foi executado nesta mudança.
 
 ### Fila e conversão do monitor — 04/11/2026
 
