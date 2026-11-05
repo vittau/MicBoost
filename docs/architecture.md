@@ -30,7 +30,7 @@ O projeto é um único pacote SwiftPM (sem `.xcodeproj`). O `.app` é montado po
 |---|---|---|
 | `MicBoostDSP` | C (C17) | Tudo que roda na thread de IO: `mb_ioproc`, processador, biquads, ganho, limitador, medidores e parâmetros atômicos. Sem dependências além de `<CoreAudio/CoreAudioTypes.h>`, `<stdatomic.h>` e `<math.h>`. |
 | `MicBoostCore` | Swift library | Abstração da HAL (`AudioHardware` protocol + implementação real), `DeviceService`, `AggregateBuilder`, `EngineController`, `DefaultInputManager`, `SettingsStore`, modelos de domínio e permissão de microfone. Sem AppKit/SwiftUI. |
-| `MicBoostUI` | Swift library | `AppModel` (`@Observable`), o menu do painel (`PanelMenuController` e as linhas em AppKit), `SettingsView` em SwiftUI e as localizações. |
+| `MicBoostUI` | Swift library | `AppModel` (`@Observable`), o menu do painel (`PanelMenuController` e as linhas em AppKit), `SettingsView` em SwiftUI, o item de início (`LoginItemService` sobre `SMAppService`) e as localizações. |
 | `MicBoostApp` | Swift executable (produto `MicBoost`) | Ciclo de vida do app, item de status, menu do painel, ajustes, mensagens. Depende de `MicBoostUI`. |
 | `micboost-diag` | Swift executable | CLI de diagnóstico e medição ([testing.md](testing.md#ferramenta-de-diagnóstico)). Depende de `MicBoostCore`. |
 | `MicBoostDSPTests` | Swift Testing | Testes offline do processador via API C. |
@@ -47,7 +47,7 @@ Estrutura de diretórios:
 Package.swift
 Sources/MicBoostDSP/{include/MicBoostDSP.h, *.c}
 Sources/MicBoostCore/{HAL/, Devices/, Engine/, Routing/, Settings/, Permissions/}
-Sources/MicBoostUI/{AppModel.swift, Menu/, Views.swift, Localization/}
+Sources/MicBoostUI/{AppModel.swift, LoginItemService.swift, Menu/, Views.swift, Localization/}
 Sources/MicBoostApp/{App/main.swift, StatusItemImage.swift}
 Sources/micboost-diag/
 Tests/MicBoostDSPTests/  Tests/MicBoostCoreTests/
@@ -57,7 +57,7 @@ packaging/homebrew/micboost.rb      # modelo do cask publicado no tap
 docs/
 ```
 
-Frameworks linkados: CoreAudio, AudioToolbox, AVFoundation (só para `AVCaptureDevice.authorizationStatus/requestAccess`), AppKit, SwiftUI.
+Frameworks linkados: CoreAudio, AudioToolbox, AVFoundation (só para `AVCaptureDevice.authorizationStatus/requestAccess`), AppKit, SwiftUI, ServiceManagement (só para o item de início).
 
 ## Threads e regras de concorrência
 
