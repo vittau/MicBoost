@@ -143,4 +143,4 @@ Condições de conclusão:
 | Decisão | Recomendação atual | Quando |
 |---|---|---|
 | Queda lenta de latência no ensaio longo | ensaio de várias horas para confirmar que se estabiliza | antes da etapa 6 |
-| Homebrew 7 / macOS 27 com cask sem notarização | investigar com tap local: quarentena e "Abrir Mesmo Assim" para app ad hoc, permissão de microfone após `brew upgrade`, BlackHole já instalado, `brew uninstall` | antes da etapa 6 |
+| Homebrew 7 / macOS 27 com cask sem notarização | auditoria, confiança no tap e quarentena verificadas ([distribution.md](distribution.md#homebrew-tap-próprio)); falta a instalação real: permissão de microfone após `brew upgrade`, BlackHole instalado por pkg, `brew uninstall` | na publicação do tap |
