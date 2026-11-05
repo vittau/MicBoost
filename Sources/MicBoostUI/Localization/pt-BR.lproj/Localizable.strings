@@ -87,3 +87,5 @@
 "Monitor underruns" = "Faltas de áudio do monitor";
 "Monitor overruns" = "Descartes de áudio do monitor";
 "Monitor output rate" = "Taxa da saída do monitor";
+
+"Monitor resets" = "Reinícios da fila do monitor";

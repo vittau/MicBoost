@@ -12,15 +12,15 @@ typedef struct {
 } monitor_frame;
 struct mb_ring {
     monitor_frame frames[CAPACITY];
-    _Atomic uint64_t read, write, overruns;
-    _Atomic unsigned writers, reset_target, owners;
+    _Atomic uint64_t read, write, overruns_full, resets;
+    _Atomic unsigned writers, reset_target, owners, fill_min, fill_max;
     _Atomic bool enabled;
     double ticks;
 };
 struct mb_monitor {
     mb_ring *ring;
     double rate, gain;
-    uint32_t target;
+    _Atomic unsigned target, base, largest_pull, max_pull;
     _Atomic bool silent, fading;
     _Atomic uint64_t latency, underruns;
 };
@@ -29,6 +29,26 @@ static void advance(_Atomic uint64_t *index, uint64_t value) {
     while (old < value && !atomic_compare_exchange_weak_explicit(
         index, &old, value, memory_order_release, memory_order_relaxed)) {
     }
+}
+static void maximum(_Atomic unsigned *value, unsigned sample) {
+    unsigned old = atomic_load(value);
+    while (old < sample && !atomic_compare_exchange_weak(value, &old, sample)) {
+    }
+}
+static void minimum(_Atomic unsigned *value, unsigned sample) {
+    unsigned old = atomic_load(value);
+    while (old > sample && !atomic_compare_exchange_weak(value, &old, sample)) {
+    }
+}
+static unsigned fill(mb_ring *r) {
+    uint64_t write = atomic_load_explicit(&r->write, memory_order_acquire);
+    uint64_t read = atomic_load_explicit(&r->read, memory_order_acquire);
+    return (unsigned)(write > read ? fmin(CAPACITY, write - read) : 0);
+}
+static void observe_fill(mb_ring *r) {
+    unsigned current = fill(r);
+    minimum(&r->fill_min, current);
+    maximum(&r->fill_max, current);
 }
 mb_ring *mb_ring_create(double rate) {
     mb_ring *r = calloc(1, sizeof(*r));
@@ -84,13 +104,14 @@ void mb_ring_push(mb_ring *r, const float *left, const float *right,
             atomic_store(&f->host, 0);
             atomic_store_explicit(&f->tag, write + i, memory_order_release);
         }
+        atomic_fetch_add(&r->resets, 1);
         write += reset;
         atomic_store_explicit(&r->write, write, memory_order_release);
     }
     uint64_t read = atomic_load_explicit(&r->read, memory_order_acquire);
     if (write + frames - read > CAPACITY) {
         advance(&r->read, write + frames - CAPACITY);
-        atomic_fetch_add(&r->overruns, 1);
+        atomic_fetch_add(&r->overruns_full, 1);
     }
     for (uint32_t i = 0; i < frames; i++) {
         monitor_frame *f = &r->frames[(write + i) % CAPACITY];
@@ -102,6 +123,7 @@ void mb_ring_push(mb_ring *r, const float *left, const float *right,
         atomic_store_explicit(&f->tag, write + i, memory_order_release);
     }
     atomic_store_explicit(&r->write, write + frames, memory_order_release);
+    observe_fill(r);
     atomic_fetch_sub_explicit(&r->writers, 1, memory_order_release);
 }
 mb_monitor *mb_monitor_create(mb_engine *engine, double rate, uint32_t target) {
@@ -115,11 +137,14 @@ mb_monitor *mb_monitor_create(mb_engine *engine, double rate, uint32_t target) {
     m->ring = mb_engine_ring(engine);
     atomic_fetch_add(&m->ring->owners, 1);
     m->rate = rate;
-    m->target = target;
+    atomic_store(&m->target, target);
     mb_ring_enable(m->ring, false);
     atomic_store(&m->ring->read, 0);
     atomic_store(&m->ring->write, target);
-    atomic_store(&m->ring->overruns, 0);
+    atomic_store(&m->ring->overruns_full, 0);
+    atomic_store(&m->ring->resets, 0);
+    atomic_store(&m->ring->fill_min, target);
+    atomic_store(&m->ring->fill_max, target);
     atomic_store(&m->ring->reset_target, 0);
     for (unsigned i = 0; i < CAPACITY; i++) {
         atomic_store(&m->ring->frames[i].left, 0);
@@ -139,15 +164,47 @@ void mb_monitor_set_silent(mb_monitor *m, bool silent) {
 void mb_monitor_fade_out(mb_monitor *m) {
     atomic_store(&m->fading, true);
 }
-void mb_monitor_read(const mb_monitor *m, mb_monitor_stats *stats) {
-    uint64_t write = atomic_load_explicit(&m->ring->write, memory_order_acquire);
-    uint64_t read = atomic_load_explicit(&m->ring->read, memory_order_acquire);
-    stats->fill = (uint32_t)(write > read ? fmin(CAPACITY, write - read) : 0);
-    stats->target = m->target;
+void mb_monitor_set_target_base(mb_monitor *m, uint32_t engine_buffer, uint32_t initial_pull) {
+    unsigned base = engine_buffer + (unsigned)ceil(m->rate * 0.001);
+    unsigned target = (unsigned)fmin(CAPACITY - 1, (double)base + initial_pull);
+    atomic_store(&m->base, base);
+    atomic_store(&m->largest_pull, initial_pull);
+    atomic_store(&m->target, target);
+    // Configure only before enabling the producer or starting the output unit.
+    atomic_store(&m->ring->read, 0);
+    atomic_store(&m->ring->write, target);
+    atomic_store(&m->ring->fill_min, target);
+    atomic_store(&m->ring->fill_max, target);
+    for (unsigned i = 0; i < CAPACITY; i++) {
+        atomic_store(&m->ring->frames[i].left, 0);
+        atomic_store(&m->ring->frames[i].right, 0);
+        atomic_store(&m->ring->frames[i].host, 0);
+        atomic_store(&m->ring->frames[i].tag, i < target ? i : UINT64_MAX);
+    }
+}
+void mb_monitor_peek(const mb_monitor *m, mb_monitor_stats *stats) {
+    stats->fill = fill(m->ring);
+    stats->target = atomic_load(&m->target);
     stats->latency_host = atomic_load(&m->latency);
     stats->underruns = atomic_load(&m->underruns);
-    stats->overruns = atomic_load(&m->ring->overruns);
+    stats->overruns_full = atomic_load(&m->ring->overruns_full);
+    stats->resets = atomic_load(&m->ring->resets);
+    stats->max_pull = atomic_load(&m->max_pull);
+    stats->fill_min = atomic_load(&m->ring->fill_min);
+    if (stats->fill_min == UINT32_MAX) {
+        stats->fill_min = stats->fill;
+    }
+    stats->fill_max = (unsigned)fmax(stats->fill, atomic_load(&m->ring->fill_max));
     stats->correction = 0;
+}
+void mb_monitor_read(mb_monitor *m, mb_monitor_stats *stats) {
+    mb_monitor_peek(m, stats);
+    stats->max_pull = atomic_exchange(&m->max_pull, 0);
+    stats->fill_min = atomic_exchange(&m->ring->fill_min, UINT32_MAX);
+    if (stats->fill_min == UINT32_MAX) {
+        stats->fill_min = stats->fill;
+    }
+    stats->fill_max = (unsigned)fmax(stats->fill, atomic_exchange(&m->ring->fill_max, 0));
 }
 double mb_monitor_pi_update(mb_monitor_pi *pi, double error, double rate, double seconds) {
     if (!isfinite(error) || !isfinite(rate) || rate <= 0 || seconds <= 0) {
@@ -174,16 +231,25 @@ OSStatus mb_monitor_render(void *context, AudioUnitRenderActionFlags *flags,
     }
     mb_monitor *m = context;
     mb_ring *r = m->ring;
+    maximum(&m->max_pull, frames);
+    maximum(&m->largest_pull, frames);
+    unsigned base = atomic_load(&m->base);
+    if (base) {
+        unsigned pull = atomic_load(&m->largest_pull);
+        maximum(&m->target, (unsigned)fmin(CAPACITY - 1, (double)base + pull));
+    }
+    unsigned target = atomic_load(&m->target);
+    unsigned excursion = (unsigned)fmax(CAPACITY / 2, target);
+    observe_fill(r);
     uint64_t read = atomic_load_explicit(&r->read, memory_order_acquire);
     uint64_t write = atomic_load_explicit(&r->write, memory_order_acquire);
-    if (write > read + m->target + CAPACITY / 2) {
-        read = write - m->target;
+    if (write > read + target + excursion) {
+        read = write - target;
         advance(&r->read, read);
-        atomic_fetch_add(&r->overruns, 1);
+        atomic_fetch_add(&r->resets, 1);
     }
-    if (m->target > CAPACITY / 2 && write - read < m->target - CAPACITY / 2) {
-        atomic_store_explicit(&r->reset_target, m->target, memory_order_release);
-        atomic_fetch_add(&r->overruns, 1);
+    if (write >= read && target >= write - read + excursion) {
+        atomic_store_explicit(&r->reset_target, target, memory_order_release);
     }
     bool silent = atomic_load(&m->silent);
     bool fading = atomic_load(&m->fading);
@@ -237,6 +303,7 @@ OSStatus mb_monitor_render(void *context, AudioUnitRenderActionFlags *flags,
         }
     }
     advance(&r->read, read);
+    observe_fill(r);
     if (missing) {
         atomic_fetch_add(&m->underruns, 1);
     }

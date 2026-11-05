@@ -65,6 +65,12 @@ public struct EngineStatus: Sendable {
     public var lastMonitorFailure: MonitorFailure?
     public var monitor: MonitorStatus = .off
     public var monitorStats = mb_monitor_stats()
+    public var monitorOutputBufferFrames: UInt32 = 0
+    public var monitorOutputBufferReadFromAUHAL = false
+    public var monitorPreferredBufferFrames: UInt32 = 0
+    public var monitorHostLatencyMs: Double?
+    public var monitorVarispeedLatencyMs = 0.0
+    public var monitorAUHALLatencyMs = 0.0
     public var state: EngineState
     public var source: AudioDevice?
     public var blackHole: AudioDevice?
@@ -128,6 +134,13 @@ public actor EngineController {
     private var monitorTimer: Task<Void, Never>?
     private var monitorPI = mb_monitor_pi()
     private var monitorCorrection = 0.0
+    private var monitorMetricsDate = Date.distantPast
+    private var monitorWindowMin = UInt32.max
+    private var monitorWindowMax: UInt32 = 0
+    private var monitorWindowPull: UInt32 = 0
+    private var monitorSecondMin: UInt32 = 0
+    private var monitorSecondMax: UInt32 = 0
+    private var monitorSecondPull: UInt32 = 0
     private var monitorSettleUntil = Date.distantPast
     /// The resolved candidate is retained even when monitoring is unavailable.
     private var resolvedMonitorOutput: AudioDevice?
@@ -392,11 +405,12 @@ public actor EngineController {
             return monitorStatus
         }
         var stats = mb_monitor_stats()
-        mb_monitor_read(context, &stats)
+        mb_monitor_peek(context, &stats)
         let added =
             stats.latency_host > 0
-            ? Self.hostMilliseconds(stats.latency_host) + session.latencySeconds * 1000
-                + Double(session.outputBufferFrames) * 1000 / output.sampleRate : nil
+            ? MonitorLatency.addedMilliseconds(
+                hostMilliseconds: Self.hostMilliseconds(stats.latency_host),
+                varispeedSeconds: session.varispeedLatencySeconds, auhalSeconds: session.auhalLatencySeconds) : nil
         let physical = (try? hardware.latencyFrames(source?.id ?? 0, scope: kAudioObjectPropertyScopeInput)) ?? 0
         let outFrames = (try? hardware.latencyFrames(output.id, scope: kAudioObjectPropertyScopeOutput)) ?? 0
         let total =
@@ -436,9 +450,24 @@ public actor EngineController {
                 let context = mb_monitor_create(engine, rate, UInt32(target.rounded(.up)))
             else { throw EngineError.formatUnsupported }
             monitorContext = context
+            monitorMetricsDate = Date()
+            monitorWindowMin = UInt32.max
+            monitorWindowMax = 0
+            monitorWindowPull = 0
+            monitorSecondMin = UInt32(target.rounded(.up))
+            monitorSecondMax = monitorSecondMin
+            monitorSecondPull = 0
             mb_monitor_set_silent(context, diagnosticMonitorSilent)
             operation = "Create and start monitor units"
             monitorSession = try hardware.createMonitor(output, context: context, rate: rate)
+            if let session = monitorSession {
+                mb_monitor_set_target_base(
+                    context, buffer, UInt32(ceil(Double(session.outputBufferFrames) * rate / output.sampleRate)))
+                var initial = mb_monitor_stats()
+                mb_monitor_peek(context, &initial)
+                monitorSecondMin = initial.target
+                monitorSecondMax = initial.target
+            }
             monitorOutput = output
             monitorPI = mb_monitor_pi()
             mb_engine_set_monitor_enabled(engine, true)
@@ -538,6 +567,19 @@ public actor EngineController {
         guard let context = monitorContext, let session = monitorSession else { return }
         var stats = mb_monitor_stats()
         mb_monitor_read(context, &stats)
+        monitorWindowMin = min(monitorWindowMin, stats.fill_min)
+        monitorWindowMax = max(monitorWindowMax, stats.fill_max)
+        monitorWindowPull = max(monitorWindowPull, stats.max_pull)
+        if Date().timeIntervalSince(monitorMetricsDate) >= 1 {
+            session.refreshMetrics()
+            monitorSecondMin = monitorWindowMin
+            monitorSecondMax = monitorWindowMax
+            monitorSecondPull = monitorWindowPull
+            monitorWindowMin = UInt32.max
+            monitorWindowMax = 0
+            monitorWindowPull = 0
+            monitorMetricsDate = Date()
+        }
         monitorCorrection = mb_monitor_pi_update(
             &monitorPI, Double(stats.fill) - Double(stats.target), source?.sampleRate ?? 48000, 0.05)
         do { try session.setCorrection(monitorCorrection) } catch {
@@ -861,8 +903,22 @@ public actor EngineController {
             overloads: overloads, cycles: counters.cycles, inputMissing: counters.input_missing,
             nonfiniteResets: counters.nonfinite_resets, ioDeltaHost: counters.io_delta_host)
         if let monitorContext {
-            mb_monitor_read(monitorContext, &result.monitorStats)
+            mb_monitor_peek(monitorContext, &result.monitorStats)
             result.monitorStats.correction = monitorCorrection
+            result.monitorStats.fill_min = monitorSecondMin
+            result.monitorStats.fill_max = monitorSecondMax
+            result.monitorStats.max_pull = monitorSecondPull
+            result.monitorHostLatencyMs =
+                result.monitorStats.latency_host > 0 ? Self.hostMilliseconds(result.monitorStats.latency_host) : nil
+            if let session = monitorSession, let output = monitorOutput {
+                result.monitorOutputBufferFrames = session.outputBufferFrames
+                result.monitorOutputBufferReadFromAUHAL = session.outputBufferReadFromAUHAL
+                result.monitorPreferredBufferFrames = MonitorLatency.preferredBufferFrames(
+                    engineFrames: buffer,
+                    engineRate: rate, outputRate: output.sampleRate, range: output.bufferRange)
+                result.monitorVarispeedLatencyMs = session.varispeedLatencySeconds * 1000
+                result.monitorAUHALLatencyMs = session.auhalLatencySeconds * 1000
+            }
         }
         result.monitorOutput = resolvedMonitorOutput
         result.lastMonitorFailure = lastMonitorFailure

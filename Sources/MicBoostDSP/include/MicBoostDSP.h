@@ -68,8 +68,8 @@ int mb_engine_configure(mb_engine * _Nonnull engine, const mb_routing * _Nonnull
 void mb_engine_set_gain_db(mb_engine * _Nonnull engine, float db);
 typedef struct mb_monitor mb_monitor;
 typedef struct {
-    uint64_t latency_host, underruns, overruns;
-    uint32_t fill, target;
+    uint64_t latency_host, underruns, overruns_full, resets;
+    uint32_t fill, target, max_pull, fill_min, fill_max;
     double correction;
 } mb_monitor_stats;
 typedef struct {
@@ -83,7 +83,10 @@ void mb_monitor_destroy(mb_monitor * _Nonnull monitor);
 void mb_engine_set_monitor_enabled(mb_engine * _Nonnull engine, bool enabled);
 void mb_monitor_set_silent(mb_monitor * _Nonnull monitor, bool silent);
 void mb_monitor_fade_out(mb_monitor * _Nonnull monitor);
-void mb_monitor_read(const mb_monitor * _Nonnull monitor, mb_monitor_stats * _Nonnull stats);
+void mb_monitor_read(mb_monitor * _Nonnull monitor, mb_monitor_stats * _Nonnull stats);
+void mb_monitor_peek(const mb_monitor * _Nonnull monitor, mb_monitor_stats * _Nonnull stats);
+void mb_monitor_set_target_base(mb_monitor * _Nonnull monitor, uint32_t engine_buffer,
+                                uint32_t initial_pull);
 void mb_monitor_write(mb_engine * _Nonnull engine, const float * _Nonnull left,
                       const float * _Nonnull right, uint32_t frames, uint64_t host);
 OSStatus mb_monitor_render(void * _Nonnull context, AudioUnitRenderActionFlags * _Nonnull flags,
