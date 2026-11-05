@@ -65,6 +65,7 @@ public struct EngineStatus: Sendable {
     public var lastMonitorFailure: MonitorFailure?
     public var monitor: MonitorStatus = .off
     public var monitorStats = mb_monitor_stats()
+    public var monitorBufferRequestResult = "none"
     public var monitorOutputBufferFrames: UInt32 = 0
     public var monitorOutputBufferReadFromAUHAL = false
     public var monitorPreferredBufferFrames: UInt32 = 0
@@ -444,11 +445,8 @@ public actor EngineController {
             guard output.sampleRate > 0, output.sampleRate.isFinite else { throw EngineError.formatUnsupported }
             operation = "Create monitor ring context"
             let rate = source?.sampleRate ?? 48000
-            let outputBuffer = try hardware.monitorBuffer(output.id)
-            let target = Double(buffer) + Double(outputBuffer) * rate / output.sampleRate + rate * 0.001
-            guard target > 0, target < 8192,
-                let context = mb_monitor_create(engine, rate, UInt32(target.rounded(.up)))
-            else { throw EngineError.formatUnsupported }
+            let target = 1.0
+            guard let context = mb_monitor_create(engine, rate, 1) else { throw EngineError.formatUnsupported }
             monitorContext = context
             monitorMetricsDate = Date()
             monitorWindowMin = UInt32.max
@@ -459,7 +457,12 @@ public actor EngineController {
             monitorSecondPull = 0
             mb_monitor_set_silent(context, diagnosticMonitorSilent)
             operation = "Create and start monitor units"
-            monitorSession = try hardware.createMonitor(output, context: context, rate: rate)
+            let shared = output.sharesDevice(with: [source, destination].compactMap { $0 }, in: devices)
+            let preferred = MonitorLatency.preferredBufferFrames(
+                engineFrames: buffer, engineRate: rate, outputRate: output.sampleRate, range: output.bufferRange)
+            monitorSession = try hardware.createMonitor(
+                output, context: context, rate: rate,
+                bufferPolicy: shared ? .sharedWithSource : .request(preferred))
             if let session = monitorSession {
                 mb_monitor_set_target_base(
                     context, buffer, UInt32(ceil(Double(session.outputBufferFrames) * rate / output.sampleRate)))
@@ -913,6 +916,7 @@ public actor EngineController {
             result.monitorHostLatencyMs =
                 result.monitorStats.latency_host > 0 ? Self.hostMilliseconds(result.monitorStats.latency_host) : nil
             if let session = monitorSession, let output = monitorOutput {
+                result.monitorBufferRequestResult = session.bufferRequestResult
                 result.monitorOutputBufferFrames = session.outputBufferFrames
                 result.monitorOutputBufferReadFromAUHAL = session.outputBufferReadFromAUHAL
                 result.monitorPreferredBufferFrames = MonitorLatency.preferredBufferFrames(

@@ -53,6 +53,15 @@ final class FakeAudioHardware: AudioHardware, @unchecked Sendable {
         get { lock.withLock { storedOutput } }
         set { lock.withLock { storedOutput = newValue } }
     }
+    private var storedRejectMonitorBuffer = false
+    var rejectMonitorBuffer: Bool {
+        get { lock.withLock { storedRejectMonitorBuffer } }
+        set { lock.withLock { storedRejectMonitorBuffer = newValue } }
+    }
+    private var storedMonitorBufferPolicies: [(AudioObjectID, MonitorBufferPolicy)] = []
+    var monitorBufferPolicies: [(AudioObjectID, MonitorBufferPolicy)] {
+        lock.withLock { storedMonitorBufferPolicies }
+    }
     var failMonitorStart: Bool {
         get { lock.withLock { storedFailMonitorStart } }
         set { lock.withLock { storedFailMonitorStart = newValue } }
@@ -196,14 +205,19 @@ extension FakeAudioHardware: EngineHardware {
     var microphoneAuthorized: Bool { microphoneAllowed }
 
     func monitorBuffer(_ device: AudioObjectID) throws -> UInt32 { 256 }
-    func createMonitor(_ device: AudioDevice, context: OpaquePointer, rate: Double) throws -> any MonitorSession {
+    func createMonitor(_ device: AudioDevice, context: OpaquePointer, rate: Double, bufferPolicy: MonitorBufferPolicy)
+        throws -> any MonitorSession
+    {
         if let monitorError { throw monitorError }
         if failMonitorStart { throw EngineError.halFailure(-321, "Create monitor") }
         lock.withLock {
+            storedMonitorBufferPolicies.append((device.id, bufferPolicy))
             monitorCreates += 1
             observedMonitorRates.append(device.sampleRate)
         }
         return FakeMonitorSession(
+            bufferPolicy: bufferPolicy,
+            rejectBuffer: rejectMonitorBuffer,
             onStart: { [self] in lock.withLock { monitorStarts += 1 } },
             onStop: { [self] in
                 if failMonitorStop { throw EngineError.halFailure(-322, "Stop monitor") }
@@ -341,11 +355,23 @@ final class FakeEngineEvents: @unchecked Sendable {
 }
 
 final class FakeMonitorSession: MonitorSession {
+    let bufferRequestResult: String
     var latencySeconds: Double { 0.001 }
-    var outputBufferFrames: UInt32 { 256 }
+    let outputBufferFrames: UInt32
     private let onStart: () -> Void
     private let onStop: () throws -> Void
-    init(onStart: @escaping () -> Void, onStop: @escaping () throws -> Void) {
+    init(
+        bufferPolicy: MonitorBufferPolicy, rejectBuffer: Bool, onStart: @escaping () -> Void,
+        onStop: @escaping () throws -> Void
+    ) {
+        switch bufferPolicy {
+        case .request(let frames):
+            bufferRequestResult = rejectBuffer ? "rejected (-777)" : String(frames)
+            outputBufferFrames = rejectBuffer ? 256 : frames
+        case .sharedWithSource:
+            bufferRequestResult = "none (shared with source)"
+            outputBufferFrames = 256
+        }
         self.onStart = onStart
         self.onStop = onStop
     }

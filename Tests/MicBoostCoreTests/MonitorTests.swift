@@ -247,3 +247,59 @@ func bluetoothOutputAtDifferentRateLeavesMotorAndOutputRatesUntouched(_ lists48:
     #expect(!fake.appliedRateWrites.contains { $0.uid == "output" })
     try await engine.stop()
 }
+
+@Test func monitorRequestsOnlyOutputBufferAndClampsDuration() async throws {
+    let fake = monitorHardware()
+    fake.update("output") {
+        $0.sampleRate = 44100
+        $0.bufferRange = .init(256, 1024)
+    }
+    let engine = EngineController(hardware: fake)
+    try await engine.start(inputUID: "source")
+    try await engine.setMonitorEnabled(true)
+    #expect(fake.monitorBufferPolicies.count == 1)
+    #expect(fake.monitorBufferPolicies.first?.0 == 3)
+    #expect(fake.monitorBufferPolicies.first?.1 == .request(256))
+    #expect(await engine.status().monitorBufferRequestResult == "256")
+    try await engine.stop()
+}
+
+@Test(arguments: [false, true])
+func monitorSkipsBufferRequestForSharedPhysicalDevice(_ nested: Bool) async throws {
+    let fake = monitorHardware()
+    if nested {
+        fake.update("source") { $0.subdeviceUIDs = ["nested"] }
+        var aggregate = AudioDevice(id: 4, uid: "nested", name: "Nested")
+        aggregate.subdeviceUIDs = ["output"]
+        fake.deviceList += [aggregate]
+    } else {
+        fake.update("source") { $0.outputChannels = 2 }
+        fake.output = 1
+    }
+    let engine = EngineController(hardware: fake)
+    try await engine.start(inputUID: "source")
+    try await engine.setMonitorEnabled(true)
+    #expect(fake.monitorBufferPolicies.count == 1)
+    #expect(fake.monitorBufferPolicies.first?.1 == .sharedWithSource)
+    #expect(await engine.status().monitorBufferRequestResult == "none (shared with source)")
+    #expect(await engine.status().state == .running)
+    try await engine.stop()
+}
+
+@Test func rejectedMonitorBufferRequestDoesNotStopMonitor() async throws {
+    let fake = monitorHardware()
+    fake.rejectMonitorBuffer = true
+    let engine = EngineController(hardware: fake)
+    try await engine.start(inputUID: "source")
+    try await engine.setMonitorEnabled(true)
+    let status = await engine.status()
+    #expect(status.state == .running)
+    guard case .active = status.monitor else {
+        Issue.record("Monitor inactive")
+        return
+    }
+    #expect(status.monitorBufferRequestResult == "rejected (-777)")
+    #expect(status.monitorOutputBufferFrames == 256)
+    #expect(fake.monitorBufferPolicies.allSatisfy { $0.0 == 3 })
+    try await engine.stop()
+}

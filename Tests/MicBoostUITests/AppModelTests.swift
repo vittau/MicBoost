@@ -431,6 +431,7 @@ import Testing
     status.monitorStats.max_pull = 2048
     status.monitorStats.quantum = 4096
     status.monitorOutputBufferFrames = 512
+    status.monitorBufferRequestResult = "256"
     status.monitorHostLatencyMs = 30
     status.monitorVarispeedLatencyMs = 1
     status.monitorAUHALLatencyMs = 2
@@ -442,7 +443,7 @@ import Testing
     #expect(model.report.contains("monitor_resets: 4"))
     #expect(model.report.contains("monitor_max_pull: 2048"))
     #expect(model.report.contains("monitor_quantum: 4096"))
-    #expect(model.report.contains("monitor_output_buffer_requested: none (read-only)"))
+    #expect(model.report.contains("monitor_output_buffer_requested: 256"))
     #expect(model.report.contains("monitor_output_buffer_actual: 512"))
     #expect(model.report.contains("monitor_host_ms: 30"))
     #expect(model.report.contains("monitor_varispeed_ms: 1"))

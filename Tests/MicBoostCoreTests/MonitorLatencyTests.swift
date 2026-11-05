@@ -9,7 +9,7 @@ import Testing
     let oldWithBuffer = actual + 512.0 / 44100 * 1000
     #expect(abs((oldWithBuffer - actual) - 11.6099773243) < 0.000001)
 }
-@Test func monitorBufferPreferenceIsReadOnlyAdvisoryAndClamped() {
+@Test func monitorBufferPreferenceUsesDurationAndClampsToReportedRange() {
     #expect(
         MonitorLatency.preferredBufferFrames(
             engineFrames: 256, engineRate: 48000, outputRate: 44100, range: .init(256, 2048)) == 256)
