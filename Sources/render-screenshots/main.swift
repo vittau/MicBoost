@@ -152,10 +152,8 @@ private struct ScreenshotLoginItem: LoginItemService {
         loginItemBundleURL: URL(fileURLWithPath: "/Applications/MicBoost.app"),
         updateFeed: ScreenshotReleaseFeed())
     model.refreshLoginItemStatus()
-    model.updateStatus = .available(
-        AvailableUpdate(
-            version: "0.4.0",
-            url: URL(string: "https://github.com/vittau/MicBoost/releases/tag/v0.4.0")!))
+    // Public screenshots never advertise a version that does not exist.
+    model.updateStatus = .upToDate(Date(timeIntervalSince1970: 1_793_000_000))
     var source = AudioDevice(id: 2, uid: "usb.microphone", name: "USB Microphone")
     source.inputChannels = 2
     source.sampleRate = 48000
